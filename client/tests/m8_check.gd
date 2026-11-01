@@ -18,6 +18,7 @@ func _initialize() -> void:
 	_check_survivor_prefers_the_higher_payout()
 	_check_market_buys_sells_and_trades_byte()
 	_check_tuned_dollar_scores()
+	_check_difficulties()
 	_check_full_matches()
 	_finish()
 
@@ -465,11 +466,7 @@ func _check_tuned_dollar_scores() -> void:
 
 
 func _restore_score_defaults() -> void:
-	BotPolicy.placement_plies = 5
-	BotPolicy.continuation_num = 3
-	BotPolicy.continuation_den = 4
-	BotPolicy.threat_div = 2
-	BotPolicy.threat_uses_marginal = true
+	BotPolicy.set_difficulty("normal")
 
 
 func _check_byte_midrange_and_share_cap() -> void:
@@ -714,6 +711,192 @@ func _reply_table():
 	_plant(table, "pulse_media", ["I1", "I2"])
 	_plant(table, "evermart", ["H5", "H6"])
 	return table
+
+
+func _check_difficulties() -> void:
+	_check_easy_plays_legally_and_misses()
+	_check_hard_buys_a_larger_contest()
+	_check_each_difficulty_replays()
+	_restore_score_defaults()
+
+
+func _check_easy_plays_legally_and_misses() -> void:
+	BotPolicy.set_difficulty("easy")
+	var chain = _chain_table()
+	var started := Time.get_ticks_usec()
+	var greedy := BotPolicy.decide(chain)
+	var greedy_again := BotPolicy.decide(chain)
+	for _repeat in range(48):
+		BotPolicy.decide(chain)
+	var easy_us := Time.get_ticks_usec() - started
+	if str(greedy.get("coordinate", "")) != "B1" or str(greedy_again.get("coordinate", "")) != "B1":
+		_fail("easy chain %s %s" % [str(greedy), str(greedy_again)])
+	BotPolicy.set_difficulty("normal")
+	if str(BotPolicy.decide(_chain_table()).get("coordinate", "")) != "E3":
+		_fail("normal chain after easy")
+	BotPolicy.set_difficulty("hard")
+	if BotPolicy.placement_plies != 5 or BotPolicy.continuation_num != 3 or BotPolicy.continuation_den != 4 or BotPolicy.market_style != "sharp":
+		_fail("hard knobs plies %d keep %d/%d style %s" % [BotPolicy.placement_plies, BotPolicy.continuation_num, BotPolicy.continuation_den, BotPolicy.market_style])
+	var hard_chain := BotPolicy.decide(_chain_table())
+	var hard_chain_again := BotPolicy.decide(_chain_table())
+	if str(hard_chain.get("coordinate", "")) != "E3" or str(hard_chain_again.get("coordinate", "")) != "E3":
+		_fail("hard chain %s %s" % [str(hard_chain), str(hard_chain_again)])
+	BotPolicy.set_difficulty("easy")
+	var easy_blob := BotPolicy.decide(_blob_table())
+	if str(easy_blob.get("coordinate", "")) != "B1":
+		_fail("easy blob %s" % str(easy_blob))
+	BotPolicy.set_difficulty("hard")
+	var hard_blob := BotPolicy.decide(_blob_table())
+	var hard_blob_again := BotPolicy.decide(_blob_table())
+	if str(hard_blob.get("coordinate", "")) != "B8" or str(hard_blob_again.get("coordinate", "")) != "B8":
+		_fail("hard blob %s %s" % [str(hard_blob), str(hard_blob_again)])
+	BotPolicy.set_difficulty("easy")
+	var fight = _market_table()
+	_plant_market(fight, "nova_ai", 6, 400, 0)
+	_seat(fight, "Ada")["shares"]["nova_ai"] = 3
+	_seat(fight, "Rowan")["shares"]["nova_ai"] = 3
+	if str(BotPolicy.decide(fight).get("command", "")) != "pass_market":
+		_fail("easy contest %s" % str(BotPolicy.decide(fight)))
+	var coin = _market_table()
+	coin.byte_price = 300
+	if str(BotPolicy.decide(coin).get("command", "")) != "pass_market":
+		_fail("easy byte %s" % str(BotPolicy.decide(coin)))
+	var second = _market_table()
+	_plant_market(second, "nova_ai", 2, 200, 0)
+	_seat(second, "Ada")["shares"]["nova_ai"] = 1
+	if str(BotPolicy.decide(second).get("command", "")) != "pass_market":
+		_fail("easy second share %s" % str(BotPolicy.decide(second)))
+	var floor = _market_table()
+	_plant_market(floor, "nova_ai", 2, 200, 0)
+	_seat(floor, "Ada")["cash"] = 600
+	if str(BotPolicy.decide(floor).get("command", "")) != "pass_market":
+		_fail("easy floor %s" % str(BotPolicy.decide(floor)))
+	var broke = _market_table()
+	_plant_market(broke, "nova_ai", 2, 200, 0)
+	var poor := _seat(broke, "Ada")
+	poor["cash"] = 400
+	poor["shares"]["nova_ai"] = 1
+	var sold := BotPolicy.decide(broke)
+	if str(sold.get("command", "")) != "sell_share" or str(sold.get("corporation_id", "")) != "nova_ai":
+		_fail("easy liquidity %s" % str(sold))
+	if not bool(BotPolicy.apply(broke, sold).get("ok", false)) or int(poor["cash"]) != 600 or int(poor["shares"]["nova_ai"]) != 0:
+		_fail("easy liquidity book cash %d shares %s" % [int(poor["cash"]), str(poor["shares"])])
+	var empty = _market_table()
+	_seat(empty, "Ada")["cash"] = 400
+	if str(BotPolicy.decide(empty).get("command", "")) != "pass_market":
+		_fail("easy sold an empty book %s" % str(BotPolicy.decide(empty)))
+	var opener = _market_table()
+	_plant_market(opener, "nova_ai", 2, 200, 0)
+	var buyer := _seat(opener, "Ada")
+	buyer["cash"] = 800
+	var bought := BotPolicy.decide(opener)
+	if str(bought.get("command", "")) != "buy_share" or str(bought.get("corporation_id", "")) != "nova_ai":
+		_fail("easy first share %s" % str(bought))
+	if not bool(BotPolicy.apply(opener, bought).get("ok", false)):
+		_fail("easy first share rejected")
+	if int(buyer["cash"]) != 600 or int(buyer["shares"]["nova_ai"]) != 1:
+		_fail("easy first share book cash %d shares %s" % [int(buyer["cash"]), str(buyer["shares"])])
+	print("M8_EASY chain B1 blob B1 contest pass byte pass us %d" % easy_us)
+
+
+func _check_hard_buys_a_larger_contest() -> void:
+	var big = _market_table()
+	_plant_market(big, "nova_ai", 16, 900, 0)
+	_seat(big, "Ada")["shares"]["nova_ai"] = 3
+	_seat(big, "Rowan")["shares"]["nova_ai"] = 3
+	BotPolicy.set_difficulty("normal")
+	if str(BotPolicy.decide(big).get("command", "")) != "pass_market":
+		_fail("normal size 16 %s" % str(BotPolicy.decide(big)))
+	BotPolicy.set_difficulty("easy")
+	if str(BotPolicy.decide(big).get("command", "")) != "pass_market":
+		_fail("easy size 16 %s" % str(BotPolicy.decide(big)))
+	BotPolicy.set_difficulty("hard")
+	var taken := BotPolicy.decide(big)
+	var taken_again := BotPolicy.decide(big)
+	if str(taken.get("command", "")) != "buy_share" or str(taken.get("corporation_id", "")) != "nova_ai":
+		_fail("hard size 16 %s" % str(taken))
+	if str(taken_again.get("command", "")) != "buy_share" or str(taken_again.get("corporation_id", "")) != "nova_ai":
+		_fail("hard size 16 drifted %s" % str(taken_again))
+	if not bool(BotPolicy.apply(big, taken).get("ok", false)):
+		_fail("hard size 16 rejected")
+	if int(_seat(big, "Ada")["shares"]["nova_ai"]) != 4:
+		_fail("hard size 16 book %s" % str(_seat(big, "Ada")["shares"]))
+	if str(BotPolicy.decide(big).get("command", "")) != "pass_market":
+		_fail("hard contest continued %s" % str(BotPolicy.decide(big)))
+	var huge = _market_table()
+	_plant_market(huge, "nova_ai", 19, 900, 0)
+	_seat(huge, "Ada")["shares"]["nova_ai"] = 3
+	_seat(huge, "Rowan")["shares"]["nova_ai"] = 3
+	if str(BotPolicy.decide(huge).get("command", "")) != "pass_market":
+		_fail("hard size 19 %s" % str(BotPolicy.decide(huge)))
+	var hot = _market_table()
+	_plant_market(hot, "nova_ai", 6, 400, 2)
+	_seat(hot, "Ada")["shares"]["nova_ai"] = 3
+	_seat(hot, "Rowan")["shares"]["nova_ai"] = 3
+	if str(BotPolicy.decide(hot).get("command", "")) != "pass_market":
+		_fail("hard sentiment %s" % str(BotPolicy.decide(hot)))
+	var tied = _market_table()
+	_plant_market(tied, "pulse_media", 18, 1000, 2)
+	_seat(tied, "Ada")["shares"]["pulse_media"] = 2
+	_seat(tied, "Rowan")["shares"]["pulse_media"] = 2
+	if str(BotPolicy.decide(tied).get("command", "")) != "pass_market":
+		_fail("hard tied sale %s" % str(BotPolicy.decide(tied)))
+	print("M8_HARD chain E3 blob B8 size16 buy size19 pass")
+
+
+func _check_each_difficulty_replays() -> void:
+	var easy_a := _prefix(7710, 16, "easy")
+	var easy_b := _prefix(7710, 16, "easy")
+	var normal_a := _prefix(7710, 16, "normal")
+	var normal_b := _prefix(7710, 16, "normal")
+	var hard_a := _prefix(7710, 16, "hard")
+	var hard_b := _prefix(7710, 16, "hard")
+	BotPolicy.set_difficulty("mystery")
+	if BotPolicy.difficulty != "normal" or BotPolicy.placement_plies != 5 or BotPolicy.continuation_num != 3 or BotPolicy.continuation_den != 4 or BotPolicy.market_style != "standard":
+		_fail("unknown difficulty %s plies %d style %s" % [BotPolicy.difficulty, BotPolicy.placement_plies, BotPolicy.market_style])
+	if not bool(easy_a.get("ok", false)) or str(easy_a["trace"]) != str(easy_b["trace"]):
+		_fail("easy replay %s" % str(easy_a.get("error", "diverged")))
+	if not bool(normal_a.get("ok", false)) or str(normal_a["trace"]) != str(normal_b["trace"]):
+		_fail("normal replay %s" % str(normal_a.get("error", "diverged")))
+	if not bool(hard_a.get("ok", false)) or str(hard_a["trace"]) != str(hard_b["trace"]):
+		_fail("hard replay %s" % str(hard_a.get("error", "diverged")))
+	if str(easy_a["trace"]) == str(normal_a["trace"]):
+		_fail("easy matched normal")
+	var easy_lines := str(easy_a["trace"]).split("\n")
+	var normal_lines := str(normal_a["trace"]).split("\n")
+	var first_diff := "none"
+	var compared := mini(easy_lines.size(), normal_lines.size())
+	for index in compared:
+		if easy_lines[index] != normal_lines[index]:
+			first_diff = "%d easy %s normal %s" % [index + 1, easy_lines[index], normal_lines[index]]
+			break
+	var hard_note := "same" if str(hard_a["trace"]) == str(normal_a["trace"]) else "different"
+	print("M8_DIFFICULTY easy %d normal %d hard %d hard_vs_normal %s first %s" % [
+		str(easy_a["trace"]).length(),
+		str(normal_a["trace"]).length(),
+		str(hard_a["trace"]).length(),
+		hard_note,
+		first_diff,
+	])
+
+
+func _prefix(seed_value: int, limit: int, level: String) -> Dictionary:
+	BotPolicy.set_difficulty(level)
+	var table = OfflineMatch.create(seed_value, ["Rowan", "Ada", "Bo"], ["Ada", "Bo"])
+	if table == null:
+		return {"ok": false, "error": "deal"}
+	var trace: PackedStringArray = []
+	var steps := 0
+	while table.phase != "completed" and steps < limit:
+		steps += 1
+		var decision := BotPolicy.decide(table)
+		if not bool(decision.get("ok", false)):
+			return {"ok": false, "error": str(decision.get("error", decision))}
+		trace.append("%s:%s" % [str(decision["command"]), str(decision.get("coordinate", decision.get("corporation_id", "")))])
+		var result := BotPolicy.apply(table, decision)
+		if not bool(result.get("ok", false)):
+			return {"ok": false, "error": str(result.get("error", result))}
+	return {"ok": true, "trace": "\n".join(trace)}
 
 
 func _check_full_matches() -> void:

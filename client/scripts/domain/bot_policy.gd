@@ -1,24 +1,27 @@
 extends RefCounted
 class_name BotPolicy
 
-## Deterministic local computer. Placement scores fictional dollars for a
-## founding, a growth, or a merger across `placement_plies` tiles of this hand
-## (five: the whole starting hand). Each later tile keeps three quarters of the
-## one before it. A tile that ends the company for an opponent while we hold
-## nothing is not expanded. A tile that touches neither the board nor another
-## tile still in hand scores only its immediate value. A branch is cut when its
-## immediate value plus OPTIMISTIC_TILE still cannot beat the best continuation
-## already scored. The search stops at MAX_PLACEMENT_NODES. After the first
-## tile, one ply over at most FRONTIER_CAP empty neighbors estimates an
-## opponent's best reply. Only the increase over the reply already available
-## is kept, and half of that increase is subtracted. Hidden hands are not read.
-## Market buys and sells shares and BYTE when that score is positive, at most
-## two actions, and never spends the cash floor. BYTE under the $500 reference
-## is bought. BYTE over that reference is sold. A share past three is bought
-## only to tie or take the lead. A one-share holding is sold when someone else
-## already leads and the price is rich, and it is kept when it is the bonus.
-## Ties break by lowest coordinate, fixture order, or the earlier survivor.
-## The match generator is not advanced here.
+## Deterministic local computer. `set_difficulty` picks Easy, Normal, or Hard.
+## Normal is the shipped policy: five tiles, three-quarter continuations, and
+## the contest-aware market. Easy looks one tile ahead and only buys a first
+## cheap share. Hard uses that same five-tile search and may buy up to size 18
+## when that purchase ties or takes the lead. A heavier continuation made the
+## chain place the immediate growth, so Hard does not change the discount.
+## A tile that ends the company for an opponent while we hold nothing is not
+## expanded. A tile that touches neither the board nor another tile still in
+## hand scores only its immediate value. A branch is cut when its immediate
+## value plus OPTIMISTIC_TILE still cannot beat the best continuation already
+## scored. The search stops at MAX_PLACEMENT_NODES. After the first tile, one
+## ply over at most FRONTIER_CAP empty neighbors estimates an opponent's best
+## reply. Only the increase over the reply already available is kept, and half
+## of that increase is subtracted. Hidden hands are not read. Market buys and
+## sells shares and BYTE when that score is positive, at most two actions, and
+## never spends the cash floor. On Normal and Hard, BYTE under the $500
+## reference is bought and BYTE over that reference is sold. A share past three
+## is bought only to tie or take the lead. A one-share holding is sold when
+## someone else already leads and the price is rich, and it is kept when it is
+## the bonus. Ties break by lowest coordinate, fixture order, or the earlier
+## survivor. The match generator is not advanced here.
 
 
 const CASH_FLOOR := 500
@@ -30,8 +33,14 @@ const SELL_MIN_OWNED := 2
 const BYTE_REFERENCE := 500
 const BYTE_BUY_MAX := 490
 const BYTE_SELL_MIN := 510
+## Hard may cross the Normal size cap only to tie or take the lead.
+const HARD_BUY_MAX_SIZE := 18
 const END_FEED_PENALTY := -100000
-## Shipped depth. Tests may lower it and must restore five.
+## Lobby name. Unknown names become Normal. Tests must restore Normal.
+static var difficulty := "normal"
+## "soft", "standard", or "sharp". Set only through `set_difficulty`.
+static var market_style := "standard"
+## Shipped Normal and Hard depth. Easy uses one. Tests may lower it and must restore five.
 static var placement_plies := 5
 const MAX_PLACEMENT_NODES := 500
 const FRONTIER_CAP := 24
@@ -45,6 +54,38 @@ static var threat_uses_marginal := true
 const OPTIMISTIC_TILE := 20000
 
 static var last_placement_nodes := 0
+
+
+static func set_difficulty(name: String) -> void:
+	var choice := name.strip_edges().to_lower()
+	if choice != "easy" and choice != "hard":
+		choice = "normal"
+	difficulty = choice
+	threat_div = 2
+	threat_uses_marginal = true
+	if choice == "easy":
+		placement_plies = 1
+		continuation_num = 3
+		continuation_den = 4
+		market_style = "soft"
+	elif choice == "hard":
+		placement_plies = 5
+		continuation_num = 3
+		continuation_den = 4
+		market_style = "sharp"
+	else:
+		placement_plies = 5
+		continuation_num = 3
+		continuation_den = 4
+		market_style = "standard"
+
+
+static func difficulty_label() -> String:
+	if difficulty == "easy":
+		return "Easy"
+	if difficulty == "hard":
+		return "Hard"
+	return "Normal"
 
 static var _catalog_cache: PackedStringArray = PackedStringArray()
 static var _neighbor_cache: Dictionary = {}
@@ -133,14 +174,21 @@ static func _buy_share_score(match: OfflineMatch, corp: Dictionary, owned: int, 
 	var size := int(corp["size"])
 	var sentiment := int(match.sentiment.get(str(corp["sector"]), 0))
 	var price := int(corp["share_price"])
-	if size > BUY_MAX_SIZE or sentiment > BUY_MAX_SENTIMENT:
+	if cash - price < CASH_FLOOR:
 		return 0
+	if market_style == "soft":
+		if owned != 0 or size > 4 or sentiment > 0 or price > 200:
+			return 0
+		return (5 - size) * 20 - Pricing.div_nonneg(price, 20) + 10
 	var best_other := _best_opponent(match, str(corp["id"]))
+	var size_cap := BUY_MAX_SIZE
+	if market_style == "sharp" and owned >= 3 and best_other >= owned:
+		size_cap = HARD_BUY_MAX_SIZE
+	if size > size_cap or sentiment > BUY_MAX_SENTIMENT:
+		return 0
 	if owned >= 3 and best_other < owned:
 		return 0
 	if owned >= 2 and size >= 8 and owned - best_other >= 2:
-		return 0
-	if cash - price < CASH_FLOOR:
 		return 0
 	var stake := 0
 	if owned == 1:
@@ -156,6 +204,8 @@ static func _sell_share_score(match: OfflineMatch, corp: Dictionary, owned: int,
 	var size := int(corp["size"])
 	var sentiment := int(match.sentiment.get(str(corp["sector"]), 0))
 	var price := int(corp["share_price"])
+	if market_style == "soft":
+		return 500 if cash < CASH_FLOOR else 0
 	var best_other := _best_opponent(match, str(corp["id"]))
 	var behind := best_other > owned
 	var safe_lead := owned - 1 > best_other
@@ -174,6 +224,8 @@ static func _sell_share_score(match: OfflineMatch, corp: Dictionary, owned: int,
 
 
 static func _buy_byte_score(match: OfflineMatch, cash: int) -> int:
+	if market_style == "soft":
+		return 0
 	var price := int(match.byte_price)
 	if price > BYTE_BUY_MAX or match.byte_exchange < 1 or cash - price < CASH_FLOOR:
 		return 0
@@ -183,6 +235,8 @@ static func _buy_byte_score(match: OfflineMatch, cash: int) -> int:
 static func _sell_byte_score(match: OfflineMatch, player: Dictionary, cash: int) -> int:
 	if int(player["byte_count"]) < 1:
 		return 0
+	if market_style == "soft":
+		return 500 if cash < CASH_FLOOR else 0
 	var price := int(match.byte_price)
 	var profit := 0
 	if price >= BYTE_SELL_MIN:

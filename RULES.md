@@ -7,7 +7,7 @@ The local table deals tiles, founds and grows companies, merges them, trades sha
 ## Players and opening
 
 - 2 to 4 players. Turn order is a shuffle of the match seed (assumption A16), shown before the first tile is revealed. The same seed deals the same seats and the same hands.
-- Each player starts with $6,000 fictional cash, no shares, and no BYTE. The deal is five private coordinate tiles. On one device the hand stays covered until that player continues. A local solo table can instead seat one human and one to three computers. Computers play their seats on that device, look five tiles ahead when placing, and may buy or sell shares and BYTE. The human hand is shown on the human turn. Computer hands are counts only. In a room, only that session's snapshot includes the tiles. A public snapshot shows `hand_count`. Online rooms do not seat computers.
+- Each player starts with $6,000 fictional cash, no shares, and no BYTE. The deal is five private coordinate tiles. On one device the hand stays covered until that player continues. A local solo table can instead seat one human and one to three computers. Computers play their seats on that device. Easy looks one tile ahead and trades little. Normal and Hard look five tiles ahead and may buy or sell shares and BYTE. Hard may buy a larger company to tie or take the lead. The lobby starts on Normal. Pass-and-play uses Normal. The human hand is shown on the human turn. Computer hands are counts only. In a room, only that session's snapshot includes the tiles. A public snapshot shows `hand_count`. Online rooms do not seat computers.
 - Online seats use a guest nickname. The host starts when 2–4 players are ready. The server shuffles seats, the bag, and the event deck.
 
 ## Board and tiles

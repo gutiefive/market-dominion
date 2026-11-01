@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.15.0 — 2026-11-01
+
+Local computer difficulty. Protocol version stays `0.1.0`. Client `config/version` is `0.15.0`. Normal is the 0.14.0 policy: five tiles, three-quarter continuations, BYTE around $500, and a fourth share only to tie or take the lead. Pass-and-play forces Normal. Online rooms still have no computers.
+
+### Changed
+
+- The local lobby, when "One human versus computers" is checked, offers Easy, Normal, and Hard. The control starts on Normal and is hidden for pass-and-play. The turn-order line, the activity list, the status line, and the seat badge name the level in play.
+- Easy looks one tile ahead. It buys only a first share of a company of size 4 or smaller, sentiment 0 or below, and price $200 or below, and only when cash stays at or above $500. It does not buy BYTE. It does not sell for a profit. Cash under $500 still sells a share or a coin it holds. It does not sell an empty book.
+- Hard uses the same five-tile search and the same three-quarter continuation as Normal. A four-fifths continuation placed B1 on the C1–C4 chain, because the immediate growth still saw the later merger, so that weight was not shipped. Hard will buy a company of size 15 through 18 when the purchase ties or takes the lead. Size 19 still passes. Sentiment +2 still passes. A tied holding is still kept.
+
+### Evidence
+
+- `./scripts/check_client.sh` printed `M0_CLIENT_OK` through `M8_CLIENT_OK`. Seed 7710 still replayed at Normal. Seed 4 with three computers still finished. The mixed game still finished.
+- On the C1–C4 chain, Easy places B1. Normal and Hard place E3. On the five-tile block, Easy places B1. Hard places B8. During `./scripts/check_client.sh` the suite printed `M8_PLACEMENT_50_US 213344 nodes 64`, `M8_FIVE_PLIES shallow B1 nodes 85 deep B8 nodes 325 us 494754`, `M8_DISCOUNT half B1 threeq B8`, `M8_REPLY absolute B1 marginal I9`, `M8_EASY chain B1 blob B1 contest pass byte pass us 59237`, `M8_HARD chain E3 blob B8 size16 buy size19 pass`, and `M8_DIFFICULTY easy 207 normal 227 hard 227 hard_vs_normal same first 6 easy pass_market: normal buy_share:nova_ai`.
+- Easy passes a 3-versus-3 buy of size-6 NOVA AI at $400, passes BYTE at $300, and passes a second NOVA AI share at $200. Cash of $600 refuses that $200 share. Cash of $400 sells the one share and ends at $600. An empty book at $400 passes. Cash of $800 buys the first $200 share and ends at $600 with one share.
+- Normal passes a 3-versus-3 buy of size-16 NOVA AI at $900. Hard buys it, reaches four shares, and then passes. Hard also passes size 19, sentiment +2, and a 2–2 tie on a size-18 company.
+- The first 16 decisions of seed 7710 replay twice at each level. Easy and Normal first differ at decision 6: Easy passes the market, Normal buys NOVA AI. Hard matches Normal on that prefix. Bo's opening on seed 7710 at Normal is still B6.
+- `docs/bots-setup.png` shows the difficulty control on Normal. `docs/bots-table.png` is still seed 7710 after Bo's opening, with the Normal label.
+
+### Not in this version
+
+Computer seats in an online room, a search past five tiles or into hidden hands, a neural model, a Hard buy at sentiment +2, a Hard buy above size 18, and a sale of a tied share while cash is at least $500.
+
 ## 0.14.0 — 2026-11-01
 
 Finer local dollar scores. Protocol version stays `0.1.0`. Client `config/version` is `0.14.0`. The five-tile search, 500-evaluation cap, 24-cell frontier, and $20,000 branch ceiling are unchanged. Founding and survivor choices are unchanged. Pass-and-play and online rooms are unchanged.

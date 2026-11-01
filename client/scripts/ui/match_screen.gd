@@ -46,6 +46,8 @@ var _seed_input: LineEdit
 var _name_inputs: Array[LineEdit] = []
 var _seat_checks: Array[CheckBox] = []
 var _vs_bots: CheckBox
+var _difficulty_row: HBoxContainer
+var _difficulty: OptionButton
 var _setup_blurb: Label
 var _order_help: Label
 var _order_go: Button
@@ -171,6 +173,20 @@ func _build_setup() -> VBoxContainer:
 	_vs_bots.accessibility_name = "Play alone against computers"
 	_vs_bots.toggled.connect(func(_on: bool) -> void: _sync_seat_mode())
 	box.add_child(_vs_bots)
+	_difficulty_row = HBoxContainer.new()
+	_difficulty_row.add_theme_constant_override("separation", 8)
+	_difficulty_row.visible = false
+	box.add_child(_difficulty_row)
+	_difficulty_row.add_child(_label("Computer difficulty", 14, TEXT))
+	_difficulty = OptionButton.new()
+	_difficulty.add_item("Easy")
+	_difficulty.add_item("Normal")
+	_difficulty.add_item("Hard")
+	_difficulty.selected = 1
+	_difficulty.accessibility_name = "Computer difficulty"
+	_difficulty.custom_minimum_size = Vector2(180, 36)
+	_style_option(_difficulty)
+	_difficulty_row.add_child(_difficulty)
 	var seed_row := HBoxContainer.new()
 	seed_row.add_theme_constant_override("separation", 8)
 	box.add_child(seed_row)
@@ -402,8 +418,9 @@ func _sync_seat_mode() -> void:
 	var solo := _vs_bots.button_pressed
 	var human_names := ["Rowan", "Quinn", "Avery", "Blake"]
 	var computer_names := ["Ada", "Bo", "Cy"]
+	_difficulty_row.visible = solo
 	if solo:
-		_setup_blurb.text = "You play one seat. Add one, two, or three computers. They take their own turns on this device. Your tiles stay private. Computer tiles stay hidden."
+		_setup_blurb.text = "You play one seat. Add one, two, or three computers and pick Easy, Normal, or Hard. Easy looks one tile ahead. Normal and Hard look five. They take their own turns on this device. Your tiles stay private. Computer tiles stay hidden."
 		_seat_checks[0].text = "You"
 		_seat_checks[0].button_pressed = true
 		_seat_checks[0].disabled = true
@@ -448,6 +465,10 @@ func _on_deal_pressed() -> void:
 	if _vs_bots.button_pressed and bot_names.is_empty():
 		_error.text = "Add at least one computer."
 		return
+	if _vs_bots.button_pressed:
+		BotPolicy.set_difficulty(_selected_difficulty())
+	else:
+		BotPolicy.set_difficulty("normal")
 	var created = OfflineMatch.create(seed, names, bot_names)
 	if created == null:
 		_error.text = "Use 2 to 4 unique names, 1–24 characters: letters, numbers, spaces, hyphens, or underscores. The seed must be zero or greater."
@@ -466,12 +487,12 @@ func _begin_match(table: OfflineMatch) -> void:
 	var solo := _solo()
 	for index in range(_match.players.size()):
 		var info: Dictionary = _match.players[index]
-		var kind := "computer, tiles hidden" if bool(info.get("bot", false)) else "you, tiles face down" if solo else "five tiles face down"
+		var kind := "computer, %s, tiles hidden" % BotPolicy.difficulty_label() if bool(info.get("bot", false)) else "you, tiles face down" if solo else "five tiles face down"
 		lines.append("%d. %s (%s) — %s" % [index + 1, str(info["display_name"]), str(info["id"]), kind])
 	_order_list.text = "\n".join(lines)
 	var first: Dictionary = _match.active_player()
 	if solo:
-		_order_help.text = "The seed shuffled the seats. Computers play themselves. Your hand is the only one shown."
+		_order_help.text = "The seed shuffled the seats. Computers play at %s. Your hand is the only one shown." % BotPolicy.difficulty_label()
 		if bool(first.get("bot", false)):
 			_order_go.text = "Start — computers play first"
 			_status.text = "Seed %d. %s plays first and will not show a hand." % [_match.seed, str(first["display_name"])]
@@ -601,7 +622,7 @@ func _refresh() -> void:
 	if _match.phase == "completed":
 		_status.text = _winner_line()
 	elif _viewing_bot():
-		_status.text = "%s is a computer. The tiles stay hidden while that seat plays." % str(player["display_name"])
+		_status.text = "%s is a computer (%s). The tiles stay hidden while that seat plays." % [str(player["display_name"]), BotPolicy.difficulty_label()]
 	elif _concealed:
 		_status.text = "Hand covered. Prices stay visible. The next player continues when they have the device."
 	elif _match.phase == "choose_founder":
@@ -659,7 +680,7 @@ func _rebuild_hand(hand: Array) -> void:
 		_hand_row.add_child(_label("The match is over. The ledger above is the final score.", 14, MUTED))
 		return
 	if _viewing_bot():
-		_hand_row.add_child(_label("%s is a computer. %d tiles stay hidden. This seat does not use the device." % [str(_match.active_player()["display_name"]), hand.size()], 14, MUTED))
+		_hand_row.add_child(_label("%s is a computer (%s). %d tiles stay hidden. This seat does not use the device." % [str(_match.active_player()["display_name"]), BotPolicy.difficulty_label(), hand.size()], 14, MUTED))
 		return
 	if _concealed:
 		_hand_row.add_child(_label("Tiles stay face down until this player continues.", 14, MUTED))
@@ -771,7 +792,7 @@ func _activity_bbcode() -> String:
 	])
 	if _solo():
 		for player in _match.players:
-			var role := "computer" if bool(player.get("bot", false)) else "you"
+			var role := "computer · %s" % BotPolicy.difficulty_label() if bool(player.get("bot", false)) else "you"
 			lines.append("[color=#93a0b8]%s[/color] · %s · %d tiles" % [str(player["display_name"]), role, (player["hand"] as Array).size()])
 	if _match.log.is_empty():
 		lines.append("[color=#93a0b8]No actions yet.[/color]")
@@ -787,7 +808,7 @@ func _fill_chrome(player: Dictionary) -> void:
 	var turn := " · playing" if _match.phase != "completed" else " · finished"
 	var role := ""
 	if bool(player.get("bot", false)):
-		role = " · computer"
+		role = " · computer · %s" % BotPolicy.difficulty_label()
 	elif _solo():
 		role = " · you"
 	_badge.text = "%s  %s%s%s%s" % [str(player["display_name"]), str(player["id"]), role, turn, covered]
@@ -1533,6 +1554,7 @@ func _run_shot(path: String, phase: String) -> void:
 		_sync_seat_mode()
 		_show_setup()
 	elif phase == "bots":
+		BotPolicy.set_difficulty("normal")
 		var created = OfflineMatch.create(7710, ["Rowan", "Ada", "Bo"], ["Ada", "Bo"])
 		if created == null:
 			push_error("screenshot deal failed")
@@ -1631,6 +1653,32 @@ func _label(text: String, size: int, color: Color) -> Label:
 	Palette.remember(label, size)
 	label.add_theme_color_override("font_color", color)
 	return label
+
+
+func _selected_difficulty() -> String:
+	if _difficulty == null:
+		return "normal"
+	var index := _difficulty.selected
+	if index == 0:
+		return "easy"
+	if index == 2:
+		return "hard"
+	return "normal"
+
+
+func _style_option(option: OptionButton) -> void:
+	var fill := Color("243044")
+	option.add_theme_stylebox_override("normal", _box(fill, fill, 6))
+	option.add_theme_stylebox_override("hover", _box(fill.lightened(0.08), fill, 6))
+	option.add_theme_stylebox_override("pressed", _box(fill.darkened(0.08), fill, 6))
+	option.add_theme_stylebox_override("focus", _box(fill, AMBER, 6))
+	option.add_theme_color_override("font_color", TEXT)
+	option.add_theme_color_override("font_hover_color", TEXT)
+	option.add_theme_color_override("font_pressed_color", TEXT)
+	var popup := option.get_popup()
+	popup.add_theme_color_override("font_color", TEXT)
+	popup.add_theme_color_override("font_hover_color", Color("06211c"))
+	popup.add_theme_stylebox_override("panel", _box(CARD, Color("243044"), 6))
 
 
 func _button(text: String, primary: bool) -> Button:

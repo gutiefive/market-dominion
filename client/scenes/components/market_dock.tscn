@@ -1,0 +1,91 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/market_dock.gd" id="1_dock"]
+
+[node name="MarketDock" type="PanelContainer"]
+offset_left = 12.0
+offset_right = -12.0
+offset_top = -168.0
+offset_bottom = -8.0
+mouse_filter = 0
+theme_type_variation = &"MarketDock"
+script = ExtResource("1_dock")
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 2
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 8
+
+[node name="Box" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="TitleRow" type="HBoxContainer" parent="Margin/Box"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Title" type="Label" parent="Margin/Box/TitleRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"DockTitle"
+text = "Your turn"
+
+[node name="HandNote" type="Label" parent="Margin/Box/TitleRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"MutedLabel"
+horizontal_alignment = 2
+text = ""
+
+[node name="Steps" type="HBoxContainer" parent="Margin/Box/TitleRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Detail" type="Label" parent="Margin/Box"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"MutedLabel"
+text = ""
+autowrap_mode = 3
+clip_text = false
+
+[node name="Hand" type="HBoxContainer" parent="Margin/Box"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Trades" type="ScrollContainer" parent="Margin/Box"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+horizontal_scroll_mode = 1
+vertical_scroll_mode = 0
+
+[node name="Actions" type="HBoxContainer" parent="Margin/Box/Trades"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Commands" type="HBoxContainer" parent="Margin/Box"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Place" type="Button" parent="Margin/Box/Commands"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"PrimaryButton"
+text = "Place selected"
+
+[node name="Finish" type="Button" parent="Margin/Box/Commands"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"PrimaryButton"
+text = "Pass the market"

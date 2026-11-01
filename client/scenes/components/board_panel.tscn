@@ -1,0 +1,47 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/board_panel.gd" id="1_panel"]
+[ext_resource type="Script" path="res://scripts/ui/board_grid.gd" id="2_grid"]
+
+[node name="BoardPanel" type="PanelContainer"]
+theme_type_variation = &"TableCard"
+script = ExtResource("1_panel")
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 8
+
+[node name="Column" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Tools" type="HBoxContainer" parent="Margin/Column"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Preview" type="Label" parent="Margin/Column/Tools"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"MutedLabel"
+text = "Hover or focus a district for its coordinate."
+
+[node name="ZoomOut" type="Button" parent="Margin/Column/Tools"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"GhostButton"
+text = "Zoom −"
+
+[node name="ZoomIn" type="Button" parent="Margin/Column/Tools"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"GhostButton"
+text = "Zoom +"
+
+[node name="Grid" type="GridContainer" parent="Margin/Column"]
+unique_name_in_owner = true
+layout_mode = 2
+script = ExtResource("2_grid")

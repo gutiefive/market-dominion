@@ -19,6 +19,8 @@ server/  FastAPI. Dev listens on 127.0.0.1:8741. The image listens on 0.0.0.0:87
 
 Public snapshots omit the bag order and private hands. The schema rejects `private_tile_hand` on a public player. A direct `state_snapshot` may add `your_hand` for the session that owns those tiles. Broadcast events leave that field off.
 
+The play screen is a scene tree, not one script painting every control. `client/scenes/main.tscn` loads `client/theme/market_theme.tres` and a feedback node. The board, tile chips, market dock, price list, and opponent chips are packed scenes. They emit signals. `match_screen.gd` still owns the match, the market pass, and the computer turns. Rules stay in `offline_match.gd` and `bot_policy.gd`. Input actions live in the project InputMap. Place, market, and click sounds are synthesized tones. The window stretches with `canvas_items` so the same layout scales.
+
 ## Kernels
 
 | Kernel | Python | GDScript | Fixture |

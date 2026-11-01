@@ -1,0 +1,12 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/table_feedback.gd" id="1_fx"]
+
+[node name="TableFeedback" type="Node"]
+script = ExtResource("1_fx")
+
+[node name="Place" type="AudioStreamPlayer" parent="."]
+
+[node name="Market" type="AudioStreamPlayer" parent="."]
+
+[node name="Ui" type="AudioStreamPlayer" parent="."]

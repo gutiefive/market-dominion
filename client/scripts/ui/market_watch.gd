@@ -14,7 +14,7 @@ const _ACCENTS := {
 
 
 func _init() -> void:
-	add_theme_constant_override("separation", 6)
+	add_theme_constant_override("separation", 4)
 
 
 func show_rows(rows: Array) -> void:
@@ -38,13 +38,14 @@ func _add_card(info: Dictionary) -> void:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 1)
 	panel.add_child(box)
-	var title := _add("%s  %s  %s" % [str(info["symbol"]), mark, str(info["name"])], Palette.TEXT if active else Palette.MUTED, 14)
-	box.add_child(title)
+	var title_text := "%s  %s  %s" % [str(info["symbol"]), mark, str(info["name"])]
 	if not active:
-		box.add_child(_add("Available to found", Palette.MUTED, 12))
-	elif str(info.get("detail", "")) != "":
+		title_text += "   ·   available"
+	var title := _add(title_text, Palette.TEXT if active else Palette.MUTED, 14)
+	box.add_child(title)
+	if active and str(info.get("detail", "")) != "":
 		box.add_child(_add(str(info["detail"]), Palette.MUTED, 13))
-	else:
+	elif active:
 		box.add_child(_add("$%d" % int(info["price"]), accent, 18))
 		box.add_child(_add("sentiment %s   ·   size %d   ·   bank %d   ·   you %d" % [
 			str(info["sentiment"]), int(info["size"]), int(info["bank"]), int(info["yours"])
@@ -61,8 +62,8 @@ func _card_style(accent: Color, active: bool) -> StyleBoxFlat:
 	box.set_corner_radius_all(8)
 	box.content_margin_left = 10
 	box.content_margin_right = 10
-	box.content_margin_top = 6
-	box.content_margin_bottom = 6
+	box.content_margin_top = 4
+	box.content_margin_bottom = 4
 	return box
 
 

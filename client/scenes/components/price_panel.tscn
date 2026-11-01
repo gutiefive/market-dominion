@@ -1,0 +1,54 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/price_panel.gd" id="1_panel"]
+[ext_resource type="Script" path="res://scripts/ui/market_watch.gd" id="2_watch"]
+
+[node name="PricePanel" type="PanelContainer"]
+custom_minimum_size = Vector2(280, 0)
+size_flags_vertical = 3
+theme_type_variation = &"TableCard"
+script = ExtResource("1_panel")
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 8
+
+[node name="Column" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Heading" type="Label" parent="Margin/Column"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 15
+text = "Prices"
+
+[node name="WatchScroll" type="ScrollContainer" parent="Margin/Column"]
+custom_minimum_size = Vector2(0, 96)
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="Watch" type="VBoxContainer" parent="Margin/Column/WatchScroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 6
+script = ExtResource("2_watch")
+
+[node name="ActivityHeading" type="Label" parent="Margin/Column"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "Activity"
+
+[node name="Activity" type="RichTextLabel" parent="Margin/Column"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+size_flags_vertical = 0
+bbcode_enabled = true
+fit_content = false
+scroll_active = true
+theme_override_font_sizes/normal_font_size = 13

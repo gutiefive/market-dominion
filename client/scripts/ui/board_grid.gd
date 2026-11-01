@@ -78,6 +78,15 @@ func _add_label(text: String) -> void:
 	add_child(label)
 
 
+func flash(coordinate: String) -> void:
+	var button: Button = _buttons.get(coordinate)
+	if button == null or Palette.reduced_motion:
+		return
+	button.modulate = Color(1.35, 1.22, 0.72)
+	var tween := button.create_tween()
+	tween.tween_property(button, "modulate", Color.WHITE, 0.22)
+
+
 func set_cell_size(px: int) -> void:
 	_cell_size = clampi(px, 24, 58)
 	var font := 13 if _cell_size >= 46 else 11

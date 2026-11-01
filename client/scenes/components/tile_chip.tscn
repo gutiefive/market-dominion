@@ -1,0 +1,9 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/tile_chip.gd" id="1_chip"]
+
+[node name="TileChip" type="Button"]
+custom_minimum_size = Vector2(78, 44)
+theme_type_variation = &"TileChip"
+text = "A1"
+script = ExtResource("1_chip")

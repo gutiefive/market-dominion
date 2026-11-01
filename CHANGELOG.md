@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.17.0 — 2026-11-01
+
+The table is built as Godot scenes. Protocol version stays `0.1.0`. Client `config/version` is `0.17.0`. Placement, market rules, and Easy / Normal / Hard are unchanged. Computers still wait until the market is passed.
+
+### Changed
+
+- The board, tile chips, market dock, price list, and opponent seats are packed scenes. They emit signals. `match_screen.gd` still owns the match, the market pass, and the computer turns, so a new panel can plug in without rewriting the grid.
+- `client/theme/market_theme.tres` styles buttons, fields, cards, the dock, and the step pills. The window stretches with `canvas_items`.
+- A placed district flashes. The dock pulses when the market opens. Short synthesized tones mark a placement, the market, and a trade. Reduced motion skips the tweens. The InputMap covers the rules key, text size, motion, the hand arrows, and tiles 1–5. Enter and Space still place a tile, or pass the market while it is open.
+- After a tile lands, the dock still says the tile is on the board, how many trades are left, and offers Pass the market. The last computer placement is still quoted there on the next turn. At 1280×720, rows 1–9 stay above the dock.
+
+### Evidence
+
+- `./scripts/check_client.sh` printed `M0_CLIENT_OK` through `M8_CLIENT_OK`. The suite printed `M8_PLACEMENT_50_US 215338 nodes 64`, `M8_FIVE_PLIES shallow B1 nodes 85 deep B8 nodes 325 us 494323`, `M8_DISCOUNT half B1 threeq B8`, `M8_REPLY absolute B1 marginal I9`, `M8_EASY chain B1 blob B1 contest pass byte pass us 59895`, `M8_HARD chain E3 blob B8 size16 buy size19 pass`, and `M8_DIFFICULTY easy 207 normal 227 hard 227 hard_vs_normal same first 6 easy pass_market: normal buy_share:nova_ai`.
+- Seed 7710, Rowan versus Ada at Normal: placing C1 opened the market with “Your tile is on the board”, two trades, and Pass the market. Ada had not moved. After the pass and the round event, the dock read that Ada had placed a tile.
+- `docs/bots-setup.png` is the versus-computers lobby. `docs/bots-table.png` is seed 7710 after Bo’s opening, with the place dock quoting that placement.
+
+### Not in this version
+
+Computer seats in an online room, a search past five tiles, a neural model, and a public invite URL.
+
 ## 0.16.0 — 2026-11-01
 
 The turn no longer looks frozen after the first tile. Protocol version stays `0.1.0`. Client `config/version` is `0.16.0`.

@@ -2,7 +2,7 @@
 
 Audit base: `2ffc6b55928e54a0c39d303ca900a563c48e7fe0`, client `0.19.0`, protocol `0.1.0`.
 
-Current client: `0.20.0`. Protocol is still `0.1.0`. M9 is in progress. M10, M11, and M12 are not started.
+Current client: `0.20.0`. Protocol is still `0.1.0`. M9 local Chromium acceptance is verified; public release, CI runner results and additional browser/device gates remain pending. M10, M11, and M12 are not started.
 
 ## What already existed
 
@@ -20,7 +20,7 @@ M0–M8 are in [TASKS.md](../TASKS.md). The server already had authoritative roo
 | Pass | State | Result |
 | --- | --- | --- |
 | 1 Audit and these documents | Done with the 0.20.0 commit | Gaps were the deadline loop, invite URLs, web server default, export checks, and deploy examples |
-| 2–3 M9 | In progress | Server and export checks below are verified. Public HTTPS, a browser match, and device tests are not |
+| 2–3 M9 | Local acceptance verified; public release blocked | Full two-browser match, refresh/reconnect, responsive desktop viewports and container readiness passed. Public HTTPS, inaccessible CI results and physical devices remain pending |
 | 4 M10 | Not started | Menu, tutorial, charts, analytics, simulation harness |
 | 5 M11 | Not started | Write the Dominion spec before code |
 | 6 M12 | Not started | Profiles, server-side bots, rankings, replays |

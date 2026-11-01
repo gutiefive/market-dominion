@@ -2,7 +2,7 @@
 
 A fictional tile-and-market strategy game for 2–4 players. Cash, shares, and BYTE coins are game currency. This repository does not take bets, hold wallets, or trade real assets.
 
-**Client 0.20.0 is a browser-beta slice.** The page is a Godot 4.7.2 Compatibility single-threaded export. The API is a long-lived FastAPI process with SQLite. Headless Chrome loaded the canvas on loopback HTTP. There is no public HTTPS site. See [TASKS.md](TASKS.md), [docs/ROADMAP_M9_M12.md](docs/ROADMAP_M9_M12.md), and [RUNBOOK.md](RUNBOOK.md).
+**Client 0.20.0 is a browser-beta slice.** The page is a Godot 4.7.2 Compatibility single-threaded export. The API is a long-lived FastAPI process with SQLite. The M9 candidate completed a full two-browser Chromium match on loopback HTTP, including refresh/reconnect and identical final standings. See [release validation](docs/milestones/M9_RELEASE_CANDIDATE.md). There is no public HTTPS site. See [TASKS.md](TASKS.md), [docs/ROADMAP_M9_M12.md](docs/ROADMAP_M9_M12.md), and [RUNBOOK.md](RUNBOOK.md).
 
 ## Tested Godot build
 

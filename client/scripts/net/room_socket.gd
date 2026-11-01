@@ -7,12 +7,16 @@ signal message_received(payload: Dictionary)
 signal closed
 
 var peer: WebSocketPeer
-var _saw_open := false
+var _active := false
+var _started := 0
 
 
 func connect_to(url: String) -> int:
+	if peer != null:
+		peer.close()
 	peer = WebSocketPeer.new()
-	_saw_open = false
+	_active = true
+	_started = Time.get_ticks_msec()
 	return peer.connect_to_url(url)
 
 
@@ -22,14 +26,14 @@ func poll() -> void:
 	peer.poll()
 	var state := peer.get_ready_state()
 	if state == WebSocketPeer.STATE_OPEN:
-		_saw_open = true
 		while peer.get_available_packet_count() > 0:
 			var text := peer.get_packet().get_string_from_utf8()
 			var parsed = JSON.parse_string(text)
 			if typeof(parsed) == TYPE_DICTIONARY:
 				message_received.emit(parsed)
-	elif state == WebSocketPeer.STATE_CLOSED and _saw_open:
-		_saw_open = false
+	elif _active and (state == WebSocketPeer.STATE_CLOSED or (state == WebSocketPeer.STATE_CONNECTING and Time.get_ticks_msec() - _started > 10000)):
+		_active = false
+		peer.close()
 		closed.emit()
 
 

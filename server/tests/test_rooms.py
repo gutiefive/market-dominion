@@ -68,7 +68,7 @@ def test_two_sessions_hide_hands_and_follow_the_server_seed(tmp_path):
     started = _ready_and_start(service, "room_one", host, guest)
     state = _state(started)
     assert state["phase"] == "playing"
-    assert state["seed"] == 7710
+    assert state["seed"] == 0  # Public seed is redacted; actual deterministic deal is unchanged.
     assert state["active_player_id"] == "p1"
     local = OfflineMatch(7710, ["Rowan", "Quinn"])
     host_hand = next(player["hand"] for player in local.players if player["id"] == "p1")
@@ -389,3 +389,21 @@ def test_two_players_play_to_a_winner_and_public_events_hide_hands(tmp_path):
             assert ranking[0] in seats
             return
     raise AssertionError("match did not finish")
+
+
+def test_old_socket_cleanup_keeps_replacement_subscription():
+    """A refreshed browser may connect before the previous socket finishes closing."""
+    import asyncio
+    from app.api.rooms import RoomHub
+
+    hub = RoomHub()
+    old = hub.attach("room", "seat")
+    current = hub.attach("room", "seat")
+    assert hub.detach("room", "seat", old) is False
+    assert hub.queues["room"]["seat"] is current
+    event = {"event": "turn_changed", "payload": {}}
+    asyncio.run(hub.publish(None, "room", [event]))
+    assert current.get_nowait() == event
+    assert old.empty()
+    assert hub.detach("room", "seat", current) is True
+    assert "room" not in hub.queues

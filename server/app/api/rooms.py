@@ -49,13 +49,14 @@ class RoomHub:
         self.queues.setdefault(match_id, {})[token] = queue
         return queue
 
-    def detach(self, match_id: str, token: str) -> None:
+    def detach(self, match_id: str, token: str, queue: asyncio.Queue[dict[str, Any]]) -> bool:
         room = self.queues.get(match_id)
-        if room is None:
-            return
+        if room is None or room.get(token) is not queue:
+            return False
         room.pop(token, None)
         if not room:
             self.queues.pop(match_id, None)
+        return True
 
     async def publish(
         self,
@@ -205,10 +206,10 @@ async def room_socket(websocket: WebSocket, match_id: str, session_token: str) -
         pass
     finally:
         sender.cancel()
-        hub.detach(match_id, session_token)
-        notice = service.bye(match_id, session_token)
-        if notice is not None:
-            await hub.publish(service, match_id, [notice])
+        if hub.detach(match_id, session_token, queue):
+            notice = service.bye(match_id, session_token)
+            if notice is not None:
+                await hub.publish(service, match_id, [notice])
 
 
 async def _pump(websocket: WebSocket, queue: asyncio.Queue[dict[str, Any]]) -> None:

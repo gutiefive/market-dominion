@@ -91,6 +91,9 @@ var _seats: SeatBar
 
 
 func _ready() -> void:
+	# Use CSS pixel dimensions on web so narrow viewports reflow instead of shrinking the desktop table.
+	if OS.has_feature("web"):
+		get_tree().root.content_scale_size = Vector2i.ZERO
 	set_anchors_preset(PRESET_FULL_RECT)
 	if theme == null:
 		theme = load("res://theme/market_theme.tres") as Theme

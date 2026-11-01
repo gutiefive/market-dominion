@@ -19,6 +19,10 @@ var _token := ""
 var _you := ""
 var _version := 0
 var _seq := 0
+# A fresh nonce per page load keeps retries idempotent without colliding across seats or refreshes.
+var _action_nonce := Crypto.new().generate_random_bytes(12).hex_encode()
+var _retry_in := -1.0
+var _standings: Label
 var _host := false
 var _step := "lobby"
 var _hand: Array = []
@@ -40,7 +44,7 @@ var _link_banner: Label
 var _lobby: VBoxContainer
 var _play: VBoxContainer
 var _board: BoardGrid
-var _hand_row: HBoxContainer
+var _hand_row: Container
 var _actions: Container
 var _lobby_actions: HBoxContainer
 var _side: RichTextLabel
@@ -176,8 +180,13 @@ func _ready() -> void:
 	_build()
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	_socket.poll()
+	if _retry_in >= 0.0:
+		_retry_in -= delta
+		if _retry_in <= 0.0:
+			_retry_in = -1.0
+			_connect_socket()
 
 
 func show_snapshot(event: Dictionary) -> void:
@@ -203,7 +212,7 @@ func _build() -> void:
 	root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	root.add_theme_constant_override("separation", 8)
 	scroll.add_child(root)
-	var header := HBoxContainer.new()
+	var header := HFlowContainer.new()
 	root.add_child(header)
 	var title := _note("Online room")
 	title.add_theme_font_size_override("font_size", 22)
@@ -262,7 +271,11 @@ func _build() -> void:
 	_play.visible = false
 	_play.add_theme_constant_override("separation", 6)
 	root.add_child(_play)
-	var top := HBoxContainer.new()
+	_standings = _note("")
+	_standings.add_theme_color_override("font_color", TEXT)
+	_standings.add_theme_font_size_override("font_size", 20)
+	_play.add_child(_standings)
+	var top := HFlowContainer.new()
 	top.add_theme_constant_override("separation", 8)
 	_play.add_child(top)
 	_badge = _note("Seat")
@@ -310,7 +323,7 @@ func _build() -> void:
 	hand_caption.autowrap_mode = TextServer.AUTOWRAP_OFF
 	hand_caption.add_theme_color_override("font_color", TEXT)
 	column.add_child(hand_caption)
-	_hand_row = HBoxContainer.new()
+	_hand_row = HFlowContainer.new()
 	_hand_row.add_theme_constant_override("separation", 8)
 	column.add_child(_hand_row)
 	_actions = HFlowContainer.new()
@@ -389,7 +402,7 @@ func _apply_full_rect() -> void:
 
 func _create_room() -> void:
 	_base = _server.text.strip_edges()
-	_match_id = "room_%d" % int(Time.get_unix_time_from_system())
+	_match_id = "room_%s" % Crypto.new().generate_random_bytes(12).hex_encode()
 	_post(RoomCommands.envelope(_match_id, _next_action(), 0, "guesttoken", "create_room", {"nickname": _nickname.text.strip_edges()}))
 
 
@@ -470,7 +483,7 @@ func _on_socket_closed() -> void:
 		return
 	_link_banner.text = "Connection lost. Reconnecting with the same session token."
 	_show_problem("Connection lost", "The socket closed. The client is reconnecting with your session token. Tiles stay on the server.", true)
-	_connect_socket()
+	_retry_in = minf(pow(2.0, _reconnect_attempts - 1), 8.0)
 
 
 func _on_event(event: Dictionary) -> void:
@@ -518,6 +531,11 @@ func _apply_snapshot(payload: Dictionary) -> void:
 	var state: Dictionary = payload["state"]
 	_public = state
 	_version = int(state["version"])
+	if _reconnect_attempts > 0:
+		_link_banner.text = "Reconnected. Your seat was restored."
+	_reconnect_attempts = 0
+	_retry_in = -1.0
+	_error_layer.visible = false
 	var playing := str(state["phase"]) != "lobby"
 	_lobby.visible = not playing
 	_play.visible = playing
@@ -527,9 +545,18 @@ func _apply_snapshot(payload: Dictionary) -> void:
 		return
 	var mine := str(state.get("active_player_id", "")) == _you and str(state["phase"]) != "completed"
 	_status.text = "Version %d. %s" % [_version, "Your turn." if mine else "Waiting for the other seat."]
-	_reconnect_attempts = 0
+	_standings.text = ""
 	if str(state["phase"]) == "completed":
 		_status.text = "Match complete. Version %d." % _version
+		_link_banner.text = "Match complete. Final standings below."
+		var lines: PackedStringArray = ["Final standings"]
+		var rank := 0
+		for player_id in final_ranking(state):
+			rank += 1
+			for player in state["players"]:
+				if str(player["id"]) == str(player_id):
+					lines.append("%d. %s — $%d" % [rank, str(player["display_name"]), _net_worth(state, player)])
+		_standings.text = "\n".join(lines)
 	var occupied := {}
 	var companies := {}
 	for cell in state["board"]:
@@ -637,8 +664,7 @@ func _trade(command: String, corp_id: String) -> void:
 
 func _send(command: String, payload: Dictionary) -> void:
 	_error.text = ""
-	_seq += 1
-	var body := RoomCommands.envelope(_match_id, "a%d" % _seq, _version, _token, command, payload)
+	var body := RoomCommands.envelope(_match_id, _next_action(), _version, _token, command, payload)
 	if _socket.is_open():
 		_socket.send_text(JSON.stringify(body))
 		return
@@ -670,6 +696,8 @@ func _fill_online_chrome(state: Dictionary, mine: bool) -> void:
 			mine_player = player
 	var who := "you" if mine else "waiting"
 	_badge.text = "%s  %s  ·  %s" % [active_name, active_id, who]
+	if str(state["phase"]) == "completed":
+		_badge.text = "Match complete · your seat %s" % _you
 	var cash := int(mine_player.get("cash", 0)) if not mine_player.is_empty() else 0
 	_cash_label.text = "Cash $%d" % cash
 	_net_label.text = "Net $%d" % _net_worth(state, mine_player)
@@ -677,6 +705,8 @@ func _fill_online_chrome(state: Dictionary, mine: bool) -> void:
 	var resolve_mark := "Now" if _step == "choose_founder" or _step == "choose_survivor" else "After place"
 	var market_mark := "Now" if _step == "market" else "Up to 2"
 	_checklist.text = "1 %s place   ·   2 %s resolve   ·   3 %s market" % [place_mark, resolve_mark, market_mark]
+	if str(state["phase"]) == "completed":
+		_checklist.text = "Final scores include shares and BYTE at the closing prices."
 	var rows: Array = []
 	var market: Dictionary = state["crypto_market"]
 	var byte_count := int(mine_player.get("byte_count", 0)) if not mine_player.is_empty() else 0
@@ -713,6 +743,20 @@ func _fill_online_chrome(state: Dictionary, mine: bool) -> void:
 	var show_event := latest != "" and latest != _dismissed_event and str(state["phase"]) != "completed"
 	_event_layer.visible = show_event
 	_event_copy.text = latest
+
+
+static func final_ranking(state: Dictionary) -> PackedStringArray:
+	var rows: Array = []
+	for player in state["players"]:
+		var net := int(player["cash"]) + int(player["byte_count"]) * int(state["crypto_market"]["price"])
+		var active_shares := 0
+		for corp in state["corporations"]:
+			if bool(corp["active"]):
+				var count := int(player["holdings_by_corp"].get(corp["id"], 0))
+				active_shares += count
+				net += count * int(corp["share_price"])
+		rows.append({"id": player["id"], "net_worth": net, "cash": int(player["cash"]), "active_shares": active_shares, "turn_order_index": int(player["turn_order_index"])})
+	return Ranking.rank_players(rows)
 
 
 func _net_worth(state: Dictionary, player: Dictionary) -> int:
@@ -811,6 +855,10 @@ func _fit_board() -> void:
 	var window := get_viewport_rect().size
 	if window.x < 2.0:
 		return
+	for layer in [_founder_layer, _merger_layer, _confirm_layer, _event_layer, _error_layer]:
+		var center := layer.get_child(1) as CenterContainer
+		var card := center.get_child(0) as PanelContainer
+		card.custom_minimum_size.x = minf(460, window.x - 24)
 	_layout_online(window.x >= 980.0)
 	var side := 300.0 if window.x >= 980.0 else 0.0
 	var cell := int((window.x - side - 80.0) / 10.0)
@@ -939,6 +987,7 @@ func _restore_saved_session() -> void:
 		return
 	_match_id = str(parsed.get("match_id", ""))
 	_token = str(parsed.get("token", ""))
+	_dismissed_event = str(parsed.get("dismissed_event", ""))
 	var server := str(parsed.get("server", "")).strip_edges()
 	if server.begins_with("https://") or server.begins_with("http://"):
 		_server.text = server
@@ -955,6 +1004,7 @@ func _remember_session() -> void:
 		"match_id": _match_id,
 		"token": _token,
 		"server": _server.text.strip_edges(),
+		"dismissed_event": _dismissed_event,
 	})
 	JavaScriptBridge.eval("localStorage.setItem('md.session', %s)" % JSON.stringify(payload), true)
 
@@ -998,6 +1048,7 @@ func _error_heading(code: String) -> String:
 func _dismiss_event() -> void:
 	_dismissed_event = _event_copy.text
 	_event_layer.visible = false
+	_remember_session()
 
 
 func _choice_layer(title: String) -> Control:
@@ -1013,7 +1064,7 @@ func _choice_layer(title: String) -> Control:
 	center.set_anchors_preset(PRESET_FULL_RECT)
 	layer.add_child(center)
 	var card := PanelContainer.new()
-	card.custom_minimum_size = Vector2(460, 0)
+	card.custom_minimum_size = Vector2(minf(460, get_viewport_rect().size.x - 24), 0)
 	card.add_theme_stylebox_override("panel", Palette.flat(CARD, Color("243044"), 1, 8))
 	center.add_child(card)
 	var margin := MarginContainer.new()
@@ -1030,7 +1081,7 @@ func _choice_layer(title: String) -> Control:
 	heading.add_theme_font_size_override("font_size", 20)
 	box.add_child(heading)
 	var copy := _note("")
-	copy.custom_minimum_size = Vector2(420, 0)
+	copy.custom_minimum_size = Vector2(0, 0)
 	copy.add_theme_color_override("font_color", TEXT)
 	box.add_child(copy)
 	var buttons := VBoxContainer.new()
@@ -1087,7 +1138,7 @@ func _close() -> void:
 
 func _next_action() -> String:
 	_seq += 1
-	return "a%d" % _seq
+	return "a%s_%d" % [_action_nonce, _seq]
 
 
 func _button(text: String, callback: Callable) -> Button:
@@ -1115,7 +1166,8 @@ func _button(text: String, callback: Callable) -> Button:
 func _field(value: String) -> LineEdit:
 	var edit := LineEdit.new()
 	edit.text = value
-	edit.custom_minimum_size = Vector2(280, 36)
+	edit.custom_minimum_size = Vector2(180, 44)
+	edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	return edit
 
 

@@ -812,7 +812,7 @@ def _public_state(room: dict[str, Any]) -> dict[str, Any]:
         return {
             "match_id": room["match_id"],
             "version": int(room["version"]),
-            "seed": int(match.seed),
+            "seed": 0,  # Do not reveal the shuffle seed while private hands are in play.
             "phase": phase,
             "active_player_id": active,
             "turn_index": int(match.turn_index),

@@ -111,9 +111,9 @@ Not a spec milestone. The specification left bots until after launch. This is lo
 
 ## M9 Public browser beta
 
-Client `0.20.0`. Protocol stays `0.1.0`. Not complete.
+Client `0.20.0`. Protocol stays `0.1.0`. Local M9 acceptance is verified; public release remains blocked. See [release report](docs/milestones/M9_RELEASE_CANDIDATE.md).
 
-- [x] `MD_ENV` profiles, production URL checks, and `GET /health` `environment` (`pytest`, 86 passed)
+- [x] `MD_ENV` profiles, production URL checks, and `GET /health` `environment` (`pytest`, 87 passed)
 - [x] Server deadline sweep without a second command, no duplicate sweep, restart keeps the advanced turn (`test_deadline_advances_without_another_command_and_does_not_repeat`)
 - [x] Public invite lookup without a session token (`GET /v1/rooms/invites/{code}` on the live API and in pytest)
 - [x] Two server sessions play to `game_ended` without putting `your_hand` or a session token on public events (`test_two_players_play_to_a_winner_and_public_events_hide_hands`)
@@ -122,12 +122,13 @@ Client `0.20.0`. Protocol stays `0.1.0`. Not complete.
 - [x] Headless Chrome created the canvas and the Godot `Engine` object (`BROWSER_SMOKE_OK`). Not a match
 - [x] Invitation link builder drops `session_token` (`M9_CLIENT_OK`)
 - [ ] Public HTTPS URL (blocked: no hosting account was used)
-- [ ] Two browsers join one room and play to standings
-- [ ] Browser refresh and reconnect played in a browser
+- [x] Two independent Chromium contexts join and play through 138 UI commands to identical standings
+- [x] Browser refresh and forced socket disconnect/reconnect, followed by successful commands
 - [ ] Firefox, Safari, iPad, iPhone, Android
 - [ ] Phone layout on a phone. A width under 720px in code is not that test
 - [ ] GitHub Actions web job executed
-- [ ] Container image rebuilt with `MD_ENV=container`
+- [x] Container image rebuilt; readiness and room creation passed with `MD_ENV=container`
+- [x] Tablet/phone desktop viewport interaction: placement and share buys/sells at 768×1024 and 390×844
 
 ## Known limits
 
@@ -136,6 +137,6 @@ Client `0.20.0`. Protocol stays `0.1.0`. Not complete.
 - A disconnected seat is autopassed by the server deadline loop after the grace window. The fallback is still the lowest sorted tile, the first legal choice, or a market pass (assumption A21). Another player's command is not required.
 - Room rate limits live in process memory. Restarting the API clears them. SQLite keeps the rooms.
 - GDScript rejection for prices is −1 or an empty list; the offline table returns `{ok: false, error}`. Python raises (assumption A13).
-- The web export was loaded by headless Chrome on loopback HTTP. That check created the Godot engine object and did not play a match. Firefox, Safari, phones, tablets, and HTTPS were not tested. The API image was not rebuilt in this pass. `docker compose` was not started. PostgreSQL is a SQL file, not a driver (assumption A15).
+- Local headless Chromium multiplayer and desktop tablet/phone viewports passed M9 acceptance. Firefox, Safari, physical devices/touch, public HTTPS, and inaccessible CI runner results remain unverified. The API image passed readiness and room creation; `docker compose` was not started. PostgreSQL is a SQL file, not a driver (assumption A15).
 - A 420×800 window stacks the watchlist under the board. That does not establish mobile support.
 - Local computers do not join online rooms. The lobby difficulty is Easy, Normal, or Hard, and it starts on Normal. Easy looks one tile ahead and mostly passes the market. Normal and Hard look at five tiles. Each later tile keeps three quarters of the previous one. The search stops at 500 evaluations. A later tile is dropped when its immediate value plus $20,000 still cannot beat the best continuation. That ceiling rarely binds. At most 24 frontier cells are scored, and half of any increase in the opponent's reply is subtracted. BYTE at exactly $500 is left alone. Hard will buy a company of size 15 through 18 to tie or take the lead. Size 19 or more is still refused, including a contest. Sentiment +2 is still not bought. A tied holding is not sold unless cash is under $500. The heuristic can still misread a position.

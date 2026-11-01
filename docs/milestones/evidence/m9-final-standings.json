@@ -1,0 +1,21 @@
+{
+  "version": 143,
+  "ranking": [
+    "p1",
+    "p2"
+  ],
+  "standings": [
+    {
+      "id": "p2",
+      "display_name": "Player B",
+      "net_worth": 9680
+    },
+    {
+      "id": "p1",
+      "display_name": "Rowan",
+      "net_worth": 13000
+    }
+  ],
+  "bothCanvasStandingsMatched": true,
+  "completedSessionRestoration": true
+}

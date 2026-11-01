@@ -11,7 +11,10 @@ COPY server ./server
 COPY shared ./shared
 COPY infra/entrypoint.py /entrypoint.py
 
-RUN pip install --no-cache-dir .
+RUN --mount=type=secret,id=proxy_ca \
+    chmod -R a+rX /app/shared \
+    && if [ -f /run/secrets/proxy_ca ]; then export PIP_CERT=/run/secrets/proxy_ca; fi \
+    && pip install --no-cache-dir .
 
 ENV MD_HOST=0.0.0.0 \
     MD_PORT=8741 \
@@ -25,6 +28,6 @@ ENV MD_HOST=0.0.0.0 \
 EXPOSE 8741
 
 HEALTHCHECK --interval=10s --timeout=3s --retries=3 --start-period=8s \
-    CMD python -c "import os,urllib.request; urllib.request.urlopen('http://127.0.0.1:%s/health' % os.environ.get('MD_PORT','8741'))"
+    CMD python -c "import os,urllib.request; urllib.request.urlopen('http://127.0.0.1:%s/ready' % os.environ.get('MD_PORT','8741'))"
 
 ENTRYPOINT ["python", "/entrypoint.py"]

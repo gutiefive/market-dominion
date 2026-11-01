@@ -1,0 +1,45 @@
+{
+  "viewportAcceptance": true,
+  "completed": false,
+  "refreshed": false,
+  "reconnected": false,
+  "counts": {
+    "commands": 10,
+    "placed": [
+      2,
+      1
+    ],
+    "bought": [
+      1,
+      1
+    ],
+    "sold": [
+      1,
+      1
+    ],
+    "events": 1,
+    "mergers": 0
+  },
+  "errors": [],
+  "browser": "154.0.8037.57",
+  "finalVersion": 15,
+  "commands": [
+    [
+      "ready",
+      "start_match",
+      "place_tile",
+      "pass_market_action",
+      "pass_market_action",
+      "place_tile",
+      "market_buy_share",
+      "market_sell_share"
+    ],
+    [
+      "ready",
+      "place_tile",
+      "choose_founder",
+      "market_buy_share",
+      "market_sell_share"
+    ]
+  ]
+}

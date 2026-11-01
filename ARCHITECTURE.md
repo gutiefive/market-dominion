@@ -84,3 +84,14 @@ A21. Online rooms wrap `OfflineMatch`. Create and join ignore the client's place
 ## What is intentionally absent
 
 Accounts, a PostgreSQL driver, HTTPS termination, a public URL, a Firefox or Safari run, a phone or tablet run, a remote error sink, and computer seats in an online room. Local computers live in `client/scripts/domain/bot_policy.gd` (Easy, Normal, and Hard; five-tile placement search on Normal and Hard, three-quarter continuations, dollar scores) and do not call the server. The protocol validator still returns `applied: false`. Room rate limits do not survive a process restart. The deadline loop is inside the API process, so two API workers would each sweep the same SQLite file without a shared lock. Stay on one process. Headless Chrome loaded the loopback export far enough to construct `Engine`. It did not play a match. The container image was not rebuilt for `MD_ENV=container`.
+
+
+### M9 release candidate corrections
+
+Online command IDs include a cryptographically random per-client-load nonce and a counter. Independent browsers and refreshed pages cannot reuse another command's idempotency key; retrying the same envelope still uses the server's existing cache. Room IDs are generated independently for each creation. These identifiers do not consume the match RNG or change rules, prices, deals or scoring.
+
+Online public snapshots retain the protocol's `seed` field as zero. The actual shuffle seed remains private on the authoritative server and in its SQLite state; exposing it would allow deterministic reconstruction of hidden hands. Fixed-seed tests still compare the same dealt hands. Personalized snapshots contain only the receiving seat's hand, and room invitations contain no token.
+
+A replacement WebSocket subscription owns its queue. Cleanup of an older connection cannot remove the replacement or mark that seat disconnected. The client reports failed initial handshakes, retries with bounded exponential backoff, and clears the reconnect error after a fresh snapshot. Browser session storage also remembers the last dismissed round event for that room.
+
+The online completion view uses the existing `Ranking.rank_players` tie-break order and public final holdings/prices. It displays the same final standings after refresh, without introducing financial rules or requiring a new protocol message. Web controls use actual viewport dimensions and existing flow/stack layouts at narrow widths.

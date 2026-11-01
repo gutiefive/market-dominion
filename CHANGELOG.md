@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.20.0 M9 release candidate — 2026-11-01
+
+Continues `231d2ab` and invitation/session follow-up `292c121`. M10 is not started. Classic rules and protocol `0.1.0` remain unchanged.
+
+- Fixed guest action-ID collisions and refreshed-page command collisions with a per-load nonce. Room creation uses independent random identifiers.
+- Fixed initially failed WebSocket handshake detection, bounded reconnect backoff, old-subscription cleanup, and stale connection/completion text. Dismissed round events survive browser refresh.
+- Redacted the public shuffle seed while preserving deterministic server deals and scoring. Private hands and tokens stay out of public events/state.
+- Added online final standings and repaired real viewport scaling, wrapping controls and narrow dialogs.
+- Fixed container shared-asset permissions and changed image/Compose healthchecks to readiness. Optional build CA mounts preserve TLS verification.
+- Verified 87 Python tests, Godot M0–M9, web export/MIME/browser smoke, and Docker readiness/room creation. A real two-browser canvas match completed 138 UI commands, refresh, forced reconnect, share trades, events and a merger choice; both displayed the same standings as the server ledger. Desktop tablet/phone viewport interaction passed separately.
+
+See [M9 release evidence and blockers](docs/milestones/M9_RELEASE_CANDIDATE.md). Public HTTPS, inaccessible CI results, other browsers and physical devices remain unverified. No public deployment is claimed.
+
 ## 0.20.0 — 2026-11-01
 
 Browser beta code for a static page and a long-lived API. Protocol version stays `0.1.0`. Client `config/version` is `0.20.0`. Classic rules, bot difficulty, and the market pass are unchanged. This is not a completed public launch.

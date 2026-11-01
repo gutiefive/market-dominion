@@ -1481,7 +1481,10 @@ func _fit_board() -> void:
 	var cell_h := int((window.y - dock_h - chrome) / 10.0)
 	cell_h = clampi(cell_h, 24, 46)
 	_cell_px = mini(maxi(cell_w, 24), cell_h) + _zoom_steps * 6
+	if window.x < 720.0:
+		_cell_px = maxi(_cell_px, 28)
 	_board.set_cell_size(_cell_px)
+	_sync_touch_targets(window.x < 720.0)
 	call_deferred("_trim_board_to_viewport")
 
 
@@ -1493,13 +1496,23 @@ func _trim_board_to_viewport() -> void:
 	if overflow <= 1:
 		_scroll.scroll_vertical = 0
 		return
+	var floor_px := 28 if get_viewport_rect().size.x < 720.0 else 24
 	var next := _cell_px - int(ceil(float(overflow) / 9.0))
-	next = clampi(next, 24, 58)
+	next = clampi(next, floor_px, 58)
 	if next >= _cell_px:
 		return
 	_cell_px = next
 	_board.set_cell_size(next)
 	_scroll.scroll_vertical = 0
+
+
+func _sync_touch_targets(phone: bool) -> void:
+	var height := 48.0 if phone else 40.0
+	if _dock == null:
+		return
+	for node in _dock.find_children("*", "Button", true, false):
+		if node is Button:
+			(node as Button).custom_minimum_size.y = height
 
 
 func _ensure_table(wide: bool) -> void:

@@ -69,6 +69,8 @@ var _nickname: LineEdit
 var _join_match: LineEdit
 var _join_code: LineEdit
 var _server: LineEdit
+var _restore: Button
+var _pending_http := "command"
 var _zoom_steps := 0
 
 
@@ -96,6 +98,60 @@ static func server_from_search(search: String) -> String:
 			return value
 		return ""
 	return ""
+
+
+static func invite_from_search(search: String) -> String:
+	var query := _query_of(search)
+	if query == "":
+		return ""
+	for part in query.split("&"):
+		var bits := part.split("=", true, 1)
+		if bits.size() != 2 or bits[0].uri_decode() != "invite":
+			continue
+		var value := bits[1].uri_decode().strip_edges().to_upper()
+		if value.length() < 4 or value.length() > 12:
+			return ""
+		return value
+	return ""
+
+
+static func invitation_href(page: String, code: String) -> String:
+	var text := page.strip_edges()
+	var hash := text.find("#")
+	if hash >= 0:
+		text = text.substr(0, hash)
+	var base := text
+	var query := ""
+	var qmark := text.find("?")
+	if qmark >= 0:
+		base = text.substr(0, qmark)
+		query = text.substr(qmark + 1)
+	var kept: PackedStringArray = []
+	for part in query.split("&"):
+		if part == "":
+			continue
+		var bits := part.split("=", true, 1)
+		var key := bits[0].uri_decode()
+		if key == "invite" or key == "session_token" or key == "token":
+			continue
+		kept.append(part)
+	kept.append("invite=%s" % code.uri_encode())
+	if base == "":
+		return "?%s" % "&".join(kept)
+	return "%s?%s" % [base, "&".join(kept)]
+
+
+static func _query_of(search: String) -> String:
+	var text := search.strip_edges()
+	var hash := text.find("#")
+	if hash >= 0:
+		text = text.substr(0, hash)
+	var qmark := text.find("?")
+	if qmark >= 0:
+		return text.substr(qmark + 1)
+	if text.contains("://"):
+		return ""
+	return text
 
 
 func _web_server_query() -> String:
@@ -165,10 +221,14 @@ func _build() -> void:
 	_lobby.add_theme_constant_override("separation", 8)
 	root.add_child(_lobby)
 	var server_text := "http://127.0.0.1:8741"
-	var from_page := _web_server_query()
+	if OS.has_feature("web"):
+		server_text = ""
+	var from_page := _configured_server()
 	if from_page != "":
 		server_text = from_page
 	_server = _field(server_text)
+	if from_page != "":
+		_server.editable = false
 	_nickname = _field("Rowan")
 	_join_match = _field("")
 	_join_code = _field("")
@@ -182,7 +242,7 @@ func _build() -> void:
 	_invite_code.add_theme_font_size_override("font_size", 28)
 	_invite_code.add_theme_color_override("font_color", TEAL)
 	_lobby.add_child(_invite_code)
-	_lobby.add_child(_button("Copy invite code", _copy_invite))
+	_lobby.add_child(_button("Copy invitation link", _copy_invite))
 	_invite = _note("The server deals the tiles. This screen never shuffles them.")
 	_lobby.add_child(_invite)
 	_ready_list = VBoxContainer.new()
@@ -192,6 +252,9 @@ func _build() -> void:
 	_lobby.add_child(_lobby_actions)
 	_start_hint = _note("The host starts when 2–4 players are in the room and every one of them is ready.")
 	_lobby.add_child(_start_hint)
+	_restore = _button("Restore this browser's room", _restore_saved_session)
+	_restore.visible = false
+	_lobby.add_child(_restore)
 	_play = VBoxContainer.new()
 	_play.visible = false
 	_play.add_theme_constant_override("separation", 6)
@@ -230,6 +293,11 @@ func _build() -> void:
 	column.add_child(_checklist)
 	_preview = _note("Hover or focus a district.")
 	column.add_child(_preview)
+	var zoom_row := HBoxContainer.new()
+	zoom_row.add_theme_constant_override("separation", 8)
+	column.add_child(zoom_row)
+	zoom_row.add_child(_button("Zoom out", func() -> void: _nudge_zoom(-1)))
+	zoom_row.add_child(_button("Zoom in", func() -> void: _nudge_zoom(1)))
 	_board = BoardGrid.new()
 	_board.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	column.add_child(_board)
@@ -251,6 +319,7 @@ func _build() -> void:
 	side.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	side.add_theme_constant_override("separation", 6)
 	(_play.get_meta("table") as HBoxContainer).add_child(side)
+	_play.set_meta("side", side)
 	side.add_child(_note("Market watchlist"))
 	_watch = MarketWatch.new()
 	side.add_child(_watch)
@@ -288,6 +357,9 @@ func _build() -> void:
 	_layer_box(_error_layer, 2).add_child(_button("Dismiss", func() -> void: _error_layer.visible = false))
 	_layer_box(_error_layer, 2).add_child(_button("Reconnect", _reconnect))
 	add_child(_error_layer)
+	_apply_page_invite()
+	_offer_saved_session()
+	resized.connect(_fit_board)
 
 
 func _create_room() -> void:
@@ -298,10 +370,19 @@ func _create_room() -> void:
 
 func _join_room() -> void:
 	_base = _server.text.strip_edges()
+	if _base == "":
+		_error.text = "Set the server, or open the page with ?server= or window.MD_SERVER."
+		_show_problem("Server address missing", _error.text, false)
+		return
+	var code := _join_code.text.strip_edges().to_upper()
+	if _join_match.text.strip_edges() == "" and code != "":
+		_resolve_invite(code, true)
+		return
 	_match_id = _join_match.text.strip_edges()
+	_pending_http = "command"
 	_post(RoomCommands.envelope(
 		_match_id, _next_action(), 0, "guesttoken", "join_room",
-		{"invite_code": _join_code.text.strip_edges().to_upper(), "nickname": _nickname.text.strip_edges()}
+		{"invite_code": code, "nickname": _nickname.text.strip_edges()}
 	))
 
 
@@ -312,6 +393,11 @@ func _post(body: Dictionary) -> void:
 
 
 func _on_http(result: int, code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
+	var kind := _pending_http
+	_pending_http = "command"
+	if kind.begins_with("invite"):
+		_on_invite_http(result, code, body, kind == "invite_join")
+		return
 	if result != HTTPRequest.RESULT_SUCCESS:
 		_error.text = "The server did not answer. Start it with ./scripts/dev.sh."
 		_show_problem("Server did not answer", _error.text, true)
@@ -366,7 +452,11 @@ func _on_event(event: Dictionary) -> void:
 			_send("request_snapshot", {})
 		return
 	if name == "player_disconnected":
-		_link_banner.text = "A seat disconnected. The turn stays open until the server plays a safe pass."
+		_link_banner.text = "A seat disconnected. The server passes that turn after the grace period."
+	if name == "turn_changed":
+		var turn_info: Dictionary = event.get("payload", {})
+		if str(turn_info.get("reason", "")) == "grace_elapsed":
+			_link_banner.text = "Time expired. The server played a safe pass for that seat."
 	if name == "player_reconnected":
 		_link_banner.text = "Reconnected. This session was restored from the server."
 		_error_layer.visible = false
@@ -377,6 +467,7 @@ func _on_event(event: Dictionary) -> void:
 		if info.has("session_token"):
 			_token = str(info["session_token"])
 			_you = str(info.get("player_id", _you))
+			_remember_session()
 		if info.has("invite_code"):
 			_invite.text = "Match %s    invite %s" % [_match_id, str(info["invite_code"])]
 			_join_match.text = _match_id
@@ -658,17 +749,43 @@ func _apply_confirm() -> void:
 	_send(command, payload)
 
 
+func _nudge_zoom(step: int) -> void:
+	_zoom_steps = clampi(_zoom_steps + step, 0, 3)
+	_fit_board()
+	_preview.text = "Zoom step %d. Scroll to reach districts past the window." % _zoom_steps
+
+
+func _layout_online(wide: bool) -> void:
+	var table := _play.get_meta("table") as HBoxContainer
+	var column := _play.get_meta("column") as VBoxContainer
+	var side := _play.get_meta("side") as VBoxContainer
+	if table == null or column == null or side == null:
+		return
+	var on_table := side.get_parent() == table
+	if wide and not on_table:
+		side.get_parent().remove_child(side)
+		table.add_child(side)
+		side.custom_minimum_size = Vector2(280, 0)
+	elif not wide and on_table:
+		table.remove_child(side)
+		column.add_child(side)
+		side.custom_minimum_size = Vector2(0, 0)
+
+
 func _fit_board() -> void:
 	if _board == null or not _play.visible:
 		return
 	var window := get_viewport_rect().size
 	if window.x < 2.0:
 		return
+	_layout_online(window.x >= 980.0)
 	var side := 300.0 if window.x >= 980.0 else 0.0
 	var cell := int((window.x - side - 80.0) / 10.0)
 	if window.y < 800.0:
 		cell = mini(cell, 26)
-	_board.set_cell_size(clampi(cell + _zoom_steps * 6, 24, 58))
+	if window.x < 720.0:
+		cell = maxi(cell, 28)
+	_board.set_cell_size(clampi(cell + _zoom_steps * 6, 28 if window.x < 720.0 else 24, 58))
 
 
 func _on_hover(coordinate: String) -> void:
@@ -679,10 +796,116 @@ func _on_hover(coordinate: String) -> void:
 func _copy_invite() -> void:
 	var code := _join_code.text.strip_edges()
 	if code == "":
-		_link_banner.text = "Create or join a room before copying an invite code."
+		_link_banner.text = "Create or join a room before copying an invitation."
 		return
-	DisplayServer.clipboard_set(code)
-	_link_banner.text = "Invite code %s copied." % code
+	var page := ""
+	if OS.has_feature("web"):
+		var raw: Variant = JavaScriptBridge.eval("String(window.location.href || '')", true)
+		if typeof(raw) == TYPE_STRING:
+			page = str(raw)
+	var link := invitation_href(page, code)
+	DisplayServer.clipboard_set(link)
+	_link_banner.text = "Invitation copied. It names the room and does not include a session token."
+
+
+func _configured_server() -> String:
+	var from_query := _web_server_query()
+	if from_query != "":
+		return from_query
+	if not OS.has_feature("web"):
+		return ""
+	var raw: Variant = JavaScriptBridge.eval("String(window.MD_SERVER || '')", true)
+	if typeof(raw) != TYPE_STRING:
+		return ""
+	var value := str(raw).strip_edges()
+	if value.begins_with("https://") or value.begins_with("http://"):
+		return value
+	return ""
+
+
+func _resolve_invite(code: String, then_join: bool) -> void:
+	_pending_http = "invite_join" if then_join else "invite"
+	_base = _server.text.strip_edges()
+	var url := "%s/v1/rooms/invites/%s" % [_base, code.uri_encode()]
+	_http.request(url, PackedStringArray(), HTTPClient.METHOD_GET)
+
+
+func _on_invite_http(result: int, code: int, body: PackedByteArray, then_join: bool) -> void:
+	if result != HTTPRequest.RESULT_SUCCESS or code != 200:
+		_error.text = "That invitation was not found."
+		_show_problem("Invitation not found", _error.text, false)
+		return
+	var parsed = JSON.parse_string(body.get_string_from_utf8())
+	if typeof(parsed) != TYPE_DICTIONARY or not parsed.has("match_id"):
+		_error.text = "The invitation response was unreadable."
+		_show_problem("Invitation not found", _error.text, false)
+		return
+	_join_match.text = str(parsed["match_id"])
+	_join_code.text = str(parsed.get("invite_code", _join_code.text))
+	_link_banner.text = "Room %s has %s players. Enter a nickname and join." % [str(parsed["match_id"]), str(parsed.get("player_count", ""))]
+	if then_join:
+		_join_room()
+
+
+func _apply_page_invite() -> void:
+	if not OS.has_feature("web"):
+		return
+	var raw: Variant = JavaScriptBridge.eval("String(window.location.search || '')", true)
+	if typeof(raw) != TYPE_STRING:
+		return
+	var code := invite_from_search(str(raw))
+	if code == "":
+		return
+	_join_code.text = code
+	_link_banner.text = "Invitation %s is ready. Enter a nickname and join." % code
+	if _server.text.strip_edges() != "":
+		_resolve_invite(code, false)
+
+
+func _offer_saved_session() -> void:
+	if not OS.has_feature("web") or _join_code.text.strip_edges() != "":
+		return
+	var raw: Variant = JavaScriptBridge.eval("String(localStorage.getItem('md.session') || '')", true)
+	if typeof(raw) != TYPE_STRING or str(raw) == "":
+		return
+	var parsed = JSON.parse_string(str(raw))
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return
+	if str(parsed.get("token", "")) == "" or str(parsed.get("match_id", "")) == "":
+		return
+	_restore.visible = true
+	_link_banner.text = "This browser can restore your seat. The session token stays in local storage."
+
+
+func _restore_saved_session() -> void:
+	if not OS.has_feature("web"):
+		return
+	var raw: Variant = JavaScriptBridge.eval("String(localStorage.getItem('md.session') || '')", true)
+	if typeof(raw) != TYPE_STRING:
+		return
+	var parsed = JSON.parse_string(str(raw))
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return
+	_match_id = str(parsed.get("match_id", ""))
+	_token = str(parsed.get("token", ""))
+	var server := str(parsed.get("server", "")).strip_edges()
+	if server.begins_with("https://") or server.begins_with("http://"):
+		_server.text = server
+	_base = _server.text.strip_edges()
+	_join_match.text = _match_id
+	_restore.visible = false
+	_reconnect()
+
+
+func _remember_session() -> void:
+	if not OS.has_feature("web") or _token == "" or _match_id == "":
+		return
+	var payload := JSON.stringify({
+		"match_id": _match_id,
+		"token": _token,
+		"server": _server.text.strip_edges(),
+	})
+	JavaScriptBridge.eval("localStorage.setItem('md.session', %s)" % JSON.stringify(payload), true)
 
 
 func _reconnect() -> void:
@@ -820,7 +1043,7 @@ func _button(text: String, callback: Callable) -> Button:
 	var button := Button.new()
 	button.text = text
 	button.focus_mode = Control.FOCUS_ALL
-	button.custom_minimum_size = Vector2(0, 36)
+	button.custom_minimum_size = Vector2(0, 44)
 	var fill := Color("243044")
 	var hover := fill if Palette.reduced_motion else fill.lightened(0.08)
 	button.add_theme_stylebox_override("normal", Palette.flat(fill, fill, 1, 6))

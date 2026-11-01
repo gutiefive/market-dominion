@@ -17,7 +17,7 @@ Finer local dollar scores. Protocol version stays `0.1.0`. Client `config/versio
 - Before this pass, three NOVA AI shares against three of Rowan's passed, and the lower coordinate did not matter: the cap refused the buy. The same position, size 6 at $400, now buys the fourth share and then passes, because Ada leads by one. Three NOVA AI shares with Rowan holding none still pass.
 - Before this pass, one PULSE MEDIA share at size 18, media +2, and $1,000 was kept whenever cash was at least $500. It is sold when Rowan holds three. It is kept when Ada is the only holder. Two shares against Rowan's two on that company used to sell and hand Rowan the lead. They now pass.
 - The C1–C4 chain still places E3. The five-tile block still places B1 at three tiles and B8 at five. Bo's opening on seed 7710 is still B6, then two passed market actions.
-- Placement timing is unchanged in kind. A separate seed-4 pass measured 56 placement decisions, ending when the match ended, at 26.6 ms on average and 104 ms at the worst (215 evaluations on average, 325 at the worst).
+- During `./scripts/check_client.sh` the suite printed `M8_PLACEMENT_50_US 227830 nodes 64`, `M8_FIVE_PLIES shallow B1 nodes 85 deep B8 nodes 325 us 545608`, `M8_DISCOUNT half B1 threeq B8`, and `M8_REPLY absolute B1 marginal I9`. A separate seed-4 pass measured 56 placement decisions, ending when the match ended, at 26.6 ms on average and 104 ms at the worst (215 evaluations on average, 325 at the worst).
 
 ### Not in this version
 

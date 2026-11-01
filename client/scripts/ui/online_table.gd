@@ -70,8 +70,10 @@ var _join_match: LineEdit
 var _join_code: LineEdit
 var _server: LineEdit
 var _restore: Button
+var _form_scroll: ScrollContainer
 var _pending_http := "command"
 var _zoom_steps := 0
+var _reconnect_attempts := 0
 
 
 static func server_from_search(search: String) -> String:
@@ -190,6 +192,7 @@ func _build() -> void:
 	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(background)
 	var scroll := ScrollContainer.new()
+	_form_scroll = scroll
 	scroll.set_anchors_preset(PRESET_FULL_RECT)
 	scroll.offset_left = 12
 	scroll.offset_top = 8
@@ -362,6 +365,28 @@ func _build() -> void:
 	resized.connect(_fit_board)
 
 
+func present() -> void:
+	visible = true
+	_apply_full_rect()
+	move_to_front()
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_VISIBILITY_CHANGED and is_visible_in_tree():
+		call_deferred("_apply_full_rect")
+
+
+func _apply_full_rect() -> void:
+	set_anchors_and_offsets_preset(PRESET_FULL_RECT)
+	if _form_scroll == null:
+		return
+	_form_scroll.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
+	_form_scroll.offset_left = 12
+	_form_scroll.offset_top = 8
+	_form_scroll.offset_right = -12
+	_form_scroll.offset_bottom = -8
+
+
 func _create_room() -> void:
 	_base = _server.text.strip_edges()
 	_match_id = "room_%d" % int(Time.get_unix_time_from_system())
@@ -436,6 +461,13 @@ func _on_socket(event: Dictionary) -> void:
 
 
 func _on_socket_closed() -> void:
+	if _token == "":
+		return
+	_reconnect_attempts += 1
+	if _reconnect_attempts > 4:
+		_link_banner.text = "Connection lost. Press Reconnect to try again."
+		_show_problem("Connection lost", "The socket closed. Press Reconnect. The session token stays in this browser.", true)
+		return
 	_link_banner.text = "Connection lost. Reconnecting with the same session token."
 	_show_problem("Connection lost", "The socket closed. The client is reconnecting with your session token. Tiles stay on the server.", true)
 	_connect_socket()
@@ -495,6 +527,7 @@ func _apply_snapshot(payload: Dictionary) -> void:
 		return
 	var mine := str(state.get("active_player_id", "")) == _you and str(state["phase"]) != "completed"
 	_status.text = "Version %d. %s" % [_version, "Your turn." if mine else "Waiting for the other seat."]
+	_reconnect_attempts = 0
 	if str(state["phase"]) == "completed":
 		_status.text = "Match complete. Version %d." % _version
 	var occupied := {}
@@ -804,8 +837,11 @@ func _copy_invite() -> void:
 		if typeof(raw) == TYPE_STRING:
 			page = str(raw)
 	var link := invitation_href(page, code)
-	DisplayServer.clipboard_set(link)
-	_link_banner.text = "Invitation copied. It names the room and does not include a session token."
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval("navigator.clipboard.writeText(%s)" % JSON.stringify(link), true)
+	else:
+		DisplayServer.clipboard_set(link)
+	_link_banner.text = link
 
 
 func _configured_server() -> String:
@@ -843,6 +879,10 @@ func _on_invite_http(result: int, code: int, body: PackedByteArray, then_join: b
 	_join_match.text = str(parsed["match_id"])
 	_join_code.text = str(parsed.get("invite_code", _join_code.text))
 	_link_banner.text = "Room %s has %s players. Enter a nickname and join." % [str(parsed["match_id"]), str(parsed.get("player_count", ""))]
+	var saved := _saved_session()
+	if not then_join and not saved.is_empty() and str(saved.get("match_id", "")) == str(parsed["match_id"]):
+		_restore_saved_session()
+		return
 	if then_join:
 		_join_room()
 
@@ -862,19 +902,30 @@ func _apply_page_invite() -> void:
 		_resolve_invite(code, false)
 
 
-func _offer_saved_session() -> void:
-	if not OS.has_feature("web") or _join_code.text.strip_edges() != "":
-		return
+func _saved_session() -> Dictionary:
+	if not OS.has_feature("web"):
+		return {}
 	var raw: Variant = JavaScriptBridge.eval("String(localStorage.getItem('md.session') || '')", true)
 	if typeof(raw) != TYPE_STRING or str(raw) == "":
-		return
+		return {}
 	var parsed = JSON.parse_string(str(raw))
 	if typeof(parsed) != TYPE_DICTIONARY:
-		return
+		return {}
 	if str(parsed.get("token", "")) == "" or str(parsed.get("match_id", "")) == "":
+		return {}
+	return parsed
+
+
+func _offer_saved_session() -> void:
+	var saved := _saved_session()
+	if saved.is_empty():
 		return
 	_restore.visible = true
-	_link_banner.text = "This browser can restore your seat. The session token stays in local storage."
+	if _join_code.text.strip_edges() != "":
+		_link_banner.text = "This browser still has a seat. It restores when the invitation matches that room."
+		return
+	_link_banner.text = "Restoring this browser's seat. The session token stays in local storage."
+	_restore_saved_session()
 
 
 func _restore_saved_session() -> void:

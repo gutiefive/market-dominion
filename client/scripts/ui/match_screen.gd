@@ -102,6 +102,8 @@ func _ready() -> void:
 		_feedback = preload("res://scenes/components/table_feedback.tscn").instantiate() as TableFeedback
 		add_child(_feedback)
 	_build()
+	if OS.has_feature("web"):
+		call_deferred("_open_web_entry")
 	var args := OS.get_cmdline_user_args()
 	if args.size() >= 1 and str(args[0]) == "--shot":
 		await _run_shot(str(args[1]), str(args[2]) if args.size() > 2 else "opening")
@@ -458,10 +460,24 @@ func _finish_market_turn() -> void:
 		_refresh()
 
 
+func _open_web_entry() -> void:
+	var search := ""
+	var raw: Variant = JavaScriptBridge.eval("String(window.location.search || '')", true)
+	if typeof(raw) == TYPE_STRING:
+		search = str(raw)
+	var server := OnlineTable.server_from_search(search)
+	if server == "":
+		var configured: Variant = JavaScriptBridge.eval("String(window.MD_SERVER || '')", true)
+		if typeof(configured) == TYPE_STRING:
+			server = str(configured).strip_edges()
+	var invited := OnlineTable.invite_from_search(search) != ""
+	if invited or server.begins_with("https://") or server.begins_with("http://"):
+		_show_online()
+
+
 func _show_online() -> void:
 	_scroll.visible = false
-	_online.visible = true
-	_online.move_to_front()
+	_online.present()
 	_sync_dock()
 
 

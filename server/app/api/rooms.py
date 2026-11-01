@@ -138,6 +138,16 @@ def _actor_token(applied: Applied) -> str | None:
     return None if not isinstance(you, str) else None
 
 
+@router.get("/v1/rooms/invites/{code}")
+async def read_invite(code: str, request: Request) -> JSONResponse:
+    """Public lobby lookup. The body never includes a session token."""
+    service: RoomService = request.app.state.rooms
+    found = service.public_invite(code)
+    if found is None:
+        return JSONResponse(status_code=404, content={"detail": "invite_not_found"})
+    return JSONResponse(content=found)
+
+
 @router.websocket("/v1/rooms/ws")
 async def room_socket(websocket: WebSocket, match_id: str, session_token: str) -> None:
     origin = websocket.headers.get("origin")

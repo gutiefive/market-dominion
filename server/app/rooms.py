@@ -7,9 +7,12 @@ client_action_id returns the original result and does not apply twice.
 
 Assumption A21: create and join issue the session token. Reconnect,
 request_snapshot, create, and join do not have to name the current version.
-Other commands do. A disconnected active player is autopassed 120 seconds
-later by placing the lowest tile in hand, or by taking the first legal
-choice, then passing any market actions left.
+Other commands do. A disconnected active player is autopassed after the
+grace period by placing the lowest tile in hand, or by taking the first
+legal choice, then passing any market actions left. ``sweep_due`` applies
+that deadline without waiting for another player's command. The room lock
+keeps the sweep from overlapping a command. A sweep that cannot move the
+match does not bump the version, so the same deadline is not applied twice.
 """
 
 from __future__ import annotations
@@ -61,6 +64,7 @@ class RoomService:
         create_limit: int = 30,
         command_limit: int = 80,
         grace_seconds: float = 120.0,
+        session_ttl_seconds: float = 86400.0,
         clock: Any = None,
     ) -> None:
         self.database = database
@@ -68,6 +72,7 @@ class RoomService:
         self.create_limit = create_limit
         self.command_limit = command_limit
         self.grace_seconds = grace_seconds
+        self.session_ttl_seconds = session_ttl_seconds
         self.clock = clock or time.time
         self._lock = threading.Lock()
         self._rooms: dict[str, dict[str, Any]] = {}
@@ -86,6 +91,38 @@ class RoomService:
                 exc.notices = list(self._notices)
                 raise
 
+    def sweep_due(self) -> list[tuple[str, list[dict[str, Any]]]]:
+        """Apply grace deadlines that have elapsed. Safe to call on a timer.
+
+        Returns ``(match_id, public events)`` for each room that moved.
+        The caller publishes those events. This method holds the room lock
+        for the whole pass, so it cannot interleave with ``apply``.
+        """
+        with self._lock:
+            due: list[tuple[str, list[dict[str, Any]]]] = []
+            for room in list(self._rooms.values()):
+                self._notices = []
+                public = self._sweep(room)
+                if public:
+                    due.append((str(room["match_id"]), public))
+            return due
+
+    def public_invite(self, code: str) -> dict[str, Any] | None:
+        """Lobby facts for an invite code. No session token is included."""
+        cleaned = code.strip().upper()
+        if len(cleaned) < 4 or len(cleaned) > 12:
+            return None
+        if any(character not in _INVITE_ALPHABET for character in cleaned):
+            return None
+        with self._lock:
+            match_id = self._by_invite.get(cleaned)
+            if match_id is None:
+                return None
+            room = self._rooms.get(match_id)
+            if room is None:
+                return None
+            return _public_invite(room)
+
     def private_hand(self, match_id: str, token: str) -> tuple[str | None, list[str]]:
         with self._lock:
             room = self._rooms.get(match_id)
@@ -101,6 +138,7 @@ class RoomService:
         with self._lock:
             room = self._require_member(match_id, session_token)
             seat = self._seat(room, session_token)
+            self._touch_session(room, seat)
             seat["connected"] = True
             seat["disconnected_at"] = None
             self._persist(room)
@@ -167,6 +205,7 @@ class RoomService:
                 match_id=match_id,
                 version=int(room["version"]),
             )
+        self._touch_session(room, seat)
         self._charge(token, room)
         notices = self._sweep(room)
         stored = room["actions"].get(self._action_key(token, command))
@@ -408,6 +447,7 @@ class RoomService:
         if float(self.clock()) - float(seat["disconnected_at"]) < self.grace_seconds:
             return []
         actor = active["id"]
+        before = (match.phase, int(match.turn_index), len(match.log), int(match.market_actions_left))
         guard = 0
         while match.phase != "completed" and match.active_player()["id"] == actor and guard < 8:
             guard += 1
@@ -426,13 +466,20 @@ class RoomService:
                 match.pass_market()
             else:
                 break
-        direct, public = self._bump(
-            room,
-            seat,
-            "autopass",
-            "Disconnected seat took the deterministic safe actions.",
-            ["turn_changed"],
-        )
+        after = (match.phase, int(match.turn_index), len(match.log), int(match.market_actions_left))
+        if after == before:
+            return []
+        room["timeout_player"] = actor
+        try:
+            direct, public = self._bump(
+                room,
+                seat,
+                "autopass",
+                "Disconnected seat took the deterministic safe actions.",
+                ["turn_changed"],
+            )
+        finally:
+            room.pop("timeout_player", None)
         self._notices.extend(public)
         self._persist(room)
         return public
@@ -471,6 +518,7 @@ class RoomService:
             "host": host,
             "disconnected_at": None,
         }
+        seat["session_seen_at"] = float(self.clock())
         room["seats"].append(seat)
         self._by_token[token] = room["match_id"]
         return seat
@@ -518,6 +566,26 @@ class RoomService:
         window.append(now)
         self._commands[token] = window
 
+    def _park_sessions(self, room: dict[str, Any]) -> None:
+        """After a restart no socket is connected. Keep an existing deadline."""
+        now = float(self.clock())
+        for seat in room["seats"]:
+            seat["connected"] = False
+            if seat.get("disconnected_at") is None:
+                seat["disconnected_at"] = now
+
+    def _touch_session(self, room: dict[str, Any], seat: dict[str, Any]) -> None:
+        now = float(self.clock())
+        seen = seat.get("session_seen_at")
+        if seen is not None and now - float(seen) > self.session_ttl_seconds:
+            raise RoomError(
+                "unauthorized",
+                "session expired",
+                match_id=room["match_id"],
+                version=int(room["version"]),
+            )
+        seat["session_seen_at"] = now
+
     def _invite(self) -> str:
         for _ in range(20):
             code = "".join(secrets.choice(_INVITE_ALPHABET) for _ in range(6))
@@ -555,6 +623,7 @@ class RoomService:
         for (blob,) in rows:
             room = _import_room(json.loads(blob))
             self._rooms[room["match_id"]] = room
+            self._park_sessions(room)
             self._remember(room)
 
 
@@ -673,7 +742,35 @@ def _public_payload(room: dict[str, Any], event_name: str) -> dict[str, Any]:
     if event_name == "round_event_applied":
         match = room["match"]
         return {"event_ids": list(match.event_ids), "byte_price": match.byte_price}
+    if event_name == "turn_changed":
+        payload: dict[str, Any] = {"command": event_name}
+        timed_out = room.get("timeout_player")
+        if isinstance(timed_out, str) and timed_out:
+            payload["timed_out_player"] = timed_out
+            payload["reason"] = "grace_elapsed"
+        return payload
     return {"command": event_name}
+
+
+def _public_invite(room: dict[str, Any]) -> dict[str, Any]:
+    match = room["match"]
+    phase = "lobby" if match is None else str(match.phase)
+    return {
+        "match_id": room["match_id"],
+        "invite_code": room["invite_code"],
+        "player_count": len(room["seats"]),
+        "phase": phase,
+        "seats": [
+            {
+                "id": seat["player_id"],
+                "display_name": seat["nickname"],
+                "is_ready": bool(seat["ready"]),
+                "connection_state": "connected" if seat["connected"] else "disconnected",
+                "host": bool(seat["host"]),
+            }
+            for seat in room["seats"]
+        ],
+    }
 
 
 def _public_state(room: dict[str, Any]) -> dict[str, Any]:

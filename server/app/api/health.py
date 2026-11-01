@@ -26,12 +26,13 @@ def root() -> dict[str, str]:
 
 
 @router.get("/health")
-def health() -> dict[str, str]:
+def health(request: Request) -> dict[str, str]:
     return {
         "status": "ok",
         "service": "market-dominion-server",
         "version": SERVER_VERSION,
         "currency": "fictional",
+        "environment": getattr(getattr(request.app.state, "settings", None), "environment", "local"),
     }
 
 

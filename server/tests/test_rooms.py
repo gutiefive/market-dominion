@@ -263,3 +263,129 @@ def test_uvicorn_has_a_websocket_implementation():
     from uvicorn.protocols.websockets.auto import AutoWebSocketsProtocol
 
     assert AutoWebSocketsProtocol is not None
+
+
+def test_deadline_advances_without_another_command_and_does_not_repeat(tmp_path):
+    clock = {"now": 1000.0}
+    service = RoomService(
+        database=tmp_path / "rooms.db",
+        seed=7710,
+        grace_seconds=5,
+        clock=lambda: clock["now"],
+    )
+    host, guest = _open_pair(service, "room_deadline")
+    started = _ready_and_start(service, "room_deadline", host, guest)
+    assert _state(started)["active_player_id"] == "p1"
+    service.bye("room_deadline", host["session_token"])
+    clock["now"] = 1004.0
+    assert service.sweep_due() == []
+    clock["now"] = 1006.0
+    due = service.sweep_due()
+    assert len(due) == 1
+    match_id, events = due[0]
+    assert match_id == "room_deadline"
+    dumped = json.dumps(events)
+    assert host["session_token"] not in dumped
+    assert guest["session_token"] not in dumped
+    timed = next(event for event in events if event["event"] == "turn_changed")
+    assert timed["payload"]["reason"] == "grace_elapsed"
+    assert timed["payload"]["timed_out_player"] == "p1"
+    snap = service.apply(_command("room_deadline", "after", 0, "request_snapshot", {}, guest["session_token"]))
+    assert _state(snap)["active_player_id"] == "p2"
+    assert service.sweep_due() == []
+    restored = RoomService(
+        database=tmp_path / "rooms.db",
+        seed=7710,
+        grace_seconds=5,
+        clock=lambda: clock["now"],
+    )
+    again = restored.apply(_command("room_deadline", "restored", 0, "request_snapshot", {}, guest["session_token"]))
+    assert _state(again)["active_player_id"] == "p2"
+    assert restored.sweep_due() == []
+
+
+def test_expired_session_is_rejected_and_invite_lookup_hides_the_token(tmp_path):
+    clock = {"now": 50_000.0}
+    service = RoomService(
+        database=tmp_path / "rooms.db",
+        seed=7710,
+        session_ttl_seconds=60,
+        clock=lambda: clock["now"],
+    )
+    host, _guest = _open_pair(service, "room_ttl")
+    code = host["invite_code"]
+    public = service.public_invite(code)
+    assert public is not None
+    assert public["match_id"] == "room_ttl"
+    assert "session_token" not in json.dumps(public)
+    clock["now"] = 50_061.0
+    try:
+        service.apply(_command("room_ttl", "late", 0, "request_snapshot", {}, host["session_token"]))
+        raise AssertionError("expired session was accepted")
+    except Exception as exc:
+        assert exc.code == "unauthorized"
+        assert exc.message == "session expired"
+
+
+def test_http_invite_lookup_does_not_return_a_session(client):
+    created = client.post(
+        "/v1/rooms/commands",
+        json=_command("invite_room", "c0", 0, "create_room", {"nickname": "Rowan"}),
+    )
+    assert created.status_code == 200
+    body = created.json()
+    token = next(event["payload"]["session_token"] for event in body["events"] if "session_token" in event["payload"])
+    code = next(event["payload"]["invite_code"] for event in body["events"] if event["event"] == "room_updated")
+    looked = client.get(f"/v1/rooms/invites/{code}")
+    assert looked.status_code == 200
+    payload = looked.json()
+    assert payload["match_id"] == "invite_room"
+    assert payload["invite_code"] == code
+    text = looked.text
+    assert token not in text
+    assert "session_token" not in text
+    assert client.get("/v1/rooms/invites/NO-SUCH").status_code == 404
+
+
+def test_two_players_play_to_a_winner_and_public_events_hide_hands(tmp_path):
+    service = RoomService(database=tmp_path / "rooms.db", seed=7710, command_limit=10000)
+    host, guest = _open_pair(service)
+    _ready_and_start(service, "room_one", host, guest)
+    seats = {host["player_id"]: host, guest["player_id"]: guest}
+    for step in range(500):
+        probe = service.apply(_command("room_one", f"probe-{step}", 0, "request_snapshot", {}, host["session_token"]))
+        state = _state(probe)
+        if state["phase"] == "completed":
+            raise AssertionError("the match completed without a game_ended event")
+        seat = seats[state["active_player_id"]]
+        view = service.apply(_command("room_one", f"view-{step}", 0, "request_snapshot", {}, seat["session_token"]))
+        body = _snapshot(view)["payload"]
+        phase = body["step"]
+        version = int(state["version"])
+        if phase == "choose_founder":
+            command, payload = "choose_founder", {"corporation_id": body["pending_options"][0]}
+        elif phase == "choose_survivor":
+            command, payload = "choose_merger_survivor", {"corporation_id": body["pending_options"][0]}
+        elif phase == "market":
+            command, payload = "pass_market_action", {}
+        elif phase == "place":
+            hand = list(body["your_hand"])
+            if hand:
+                command, payload = "place_tile", {"coordinate": sorted(hand)[0]}
+            else:
+                command, payload = "end_turn", {}
+        else:
+            raise AssertionError(phase)
+        applied = service.apply(_command("room_one", f"act-{step}", version, command, payload, seat["session_token"]))
+        public_text = json.dumps(applied.public)
+        assert "session_token" not in public_text
+        assert "your_hand" not in public_text
+        assert seat["session_token"] not in public_text
+        ended = next((event for event in applied.public if event["event"] == "game_ended"), None)
+        if ended is not None:
+            ranking = ended["payload"]["ranking"]
+            assert ranking
+            assert ended["payload"]["winner"] == ranking[0]
+            assert ranking[0] in seats
+            return
+    raise AssertionError("match did not finish")

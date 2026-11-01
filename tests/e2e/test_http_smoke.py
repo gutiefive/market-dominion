@@ -20,6 +20,7 @@ def test_health_ready_and_schema(client):
         "service": "market-dominion-server",
         "version": SERVER_VERSION,
         "currency": "fictional",
+        "environment": "local",
     }
     assert "wallet" not in json.dumps(body).lower()
     ready = client.get("/ready")

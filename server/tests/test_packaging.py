@@ -111,6 +111,7 @@ def test_preset_compose_and_migration_files_match_the_ship_plan():
     assert "10001" in dockerfile
     assert "entrypoint.py" in dockerfile
     assert "MD_REPO_ROOT=/app" in dockerfile
+    assert "MD_ENV=container" in dockerfile
     compose = (ROOT / "infra" / "docker-compose.yml").read_text(encoding="utf-8")
     assert "postgres:16-alpine" in compose
     assert 'profiles: ["postgres"]' in compose

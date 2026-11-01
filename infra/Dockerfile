@@ -18,6 +18,7 @@ ENV MD_HOST=0.0.0.0 \
     MD_DATABASE_PATH=/data/market.db \
     MD_REPO_ROOT=/app \
     MD_LOG_LEVEL=info \
+    MD_ENV=container \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 

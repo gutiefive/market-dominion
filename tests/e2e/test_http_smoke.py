@@ -26,7 +26,7 @@ def test_health_ready_and_schema(client):
     assert ready.status_code == 200
     ready_body = ready.json()
     assert ready_body["status"] == "ready"
-    assert ready_body["database_schema_version"] == "0"
+    assert ready_body["database_schema_version"] == "1"
     assert ready_body["command_count"] == 15
     assert ready_body["event_count"] == 14
     assert ready_body["currency"] == "fictional"

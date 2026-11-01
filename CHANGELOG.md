@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.6.0 — 2026-11-01
+
+M5 private rooms. Protocol version stays `0.1.0`. `POST /v1/protocol/commands/validate` still returns `applied: false`. Play goes through the room API.
+
+### Added
+
+- `RoomService` owns the seed, the bag, the event deck, cash, and holdings. Clients send a command name and a legal payload. They do not send cash, a hand, or a shuffle.
+- Create and join mint a session token and a 6-character invite. The host is `p1`. The host starts only when 2–4 seats are ready. Nicknames are guests, not accounts.
+- Commands other than create, join, reconnect, and snapshot must name `expected_state_version`. The idempotency key is `match_id`, the incoming session token, and `client_action_id`. The same payload replays. A different payload is `duplicate_action`.
+- Rejected play returns a typed error: `out_of_turn`, `stale_version`, `unauthorized`, `illegal_tile`, `insufficient_cash`, `insufficient_inventory`, `wrong_phase`, and the other codes in the schema. Version and cash stay put.
+- Direct snapshots include `your_hand`. Broadcast snapshots and the public `players` list do not. Other seats see `hand_count`.
+- SQLite schema version is `1`. A version `0` file gains a `rooms` table in place. `MD_DATABASE_PATH` still selects the file.
+- The Godot client opens an online panel: HTTP for create and join, then a WebSocket. The socket URL follows the server scheme (`ws` or `wss`). A dropped socket reconnects with the same token. A stale error asks for a fresh snapshot.
+- The server depends on `websockets` 17.4. Uvicorn needs that library to accept the upgrade. Without it the socket path answers HTTP 404.
+- A disconnected active seat is autopassed on the next command after 120 seconds: lowest tile, or the first legal choice, then any remaining market passes.
+
+### Evidence
+
+- `.venv/bin/python -m pytest -q` passed (71 tests), including hidden hands, out-of-turn, stale version, duplicate `market_buy_byte` (BYTE supply stays put), a changed payload, a foreign room, a forged tile and a forged cash field, restart from the same SQLite file, disconnect autopass, `test_http_and_websocket_share_one_room`, and a check that Uvicorn has a WebSocket implementation.
+- `./scripts/check_client.sh` prints `M0_CLIENT_OK` through `M5_CLIENT_OK`.
+- `docs/m5-room.png` is a Godot frame of a live room on the room API. The host session shows its own tiles. The other seat is a public count.
+- Two live WebSocket clients on `127.0.0.1:8741` started room `liveplay`. Each snapshot carried a different five-tile hand, and neither snapshot included the other seat's tiles or session token.
+
+### Not in this version
+
+Production layout, keyboard and tablet passes, web export, Docker, HTTPS, and a PostgreSQL migration.
+
 ## 0.5.0 — 2026-11-01
 
 M4 events and ending on the local table. Protocol version stays `0.1.0`. The HTTP validator still does not apply moves.

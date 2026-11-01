@@ -2,13 +2,13 @@
 
 This is the project rulebook for implementation. It restates the game specification in project language. It is not a copy of any published board-game rulebook. All money is fictional integer dollars.
 
-The local table deals tiles, founds and grows companies, merges them, trades shares and BYTE, draws one round event after every seat has acted, and scores the final round. Online rooms are not implemented. Those gaps are listed in [TASKS.md](TASKS.md). Assumptions that close spec gaps are numbered in [ARCHITECTURE.md](ARCHITECTURE.md).
+The local table deals tiles, founds and grows companies, merges them, trades shares and BYTE, draws one round event after every seat has acted, and scores the final round. An online room plays the same turn on the server. Those remaining gaps are listed in [TASKS.md](TASKS.md). Assumptions that close spec gaps are numbered in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Players and opening
 
 - 2 to 4 players. Turn order is a shuffle of the match seed (assumption A16), shown before the first tile is revealed. The same seed deals the same seats and the same hands.
-- Each player starts with $6,000 fictional cash, no shares, and no BYTE. M1 deals five private coordinate tiles and does not move cash. On one device the hand stays covered until that player continues. Online hands are not implemented.
-- Hands stay private in online play. A public snapshot may show `hand_count` only.
+- Each player starts with $6,000 fictional cash, no shares, and no BYTE. The deal is five private coordinate tiles. On one device the hand stays covered until that player continues. In a room, only that session's snapshot includes the tiles. A public snapshot shows `hand_count`.
+- Online seats use a guest nickname. The host starts when 2–4 players are ready. The server shuffles seats, the bag, and the event deck.
 
 ## Board and tiles
 
@@ -120,4 +120,4 @@ Net worth = cash + (active shares × posted prices) + (BYTE × posted BYTE price
 
 ## What a client may not decide
 
-Online matches will take holdings, cash, tile order, randomness, and the winner from the server. M0 only checks the shape of a command. It will not accept a command as a played move.
+A room takes holdings, cash, tile order, randomness, and the winner from the server. The client sends `place_tile`, a founder or survivor choice, or one market command, with `expected_state_version` and a new `client_action_id`. It does not send cash, a hand, or a seed. `POST /v1/protocol/commands/validate` still only checks shape and returns `applied: false`. Playing a move uses the room API (assumption A21).

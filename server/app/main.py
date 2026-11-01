@@ -10,6 +10,8 @@ from fastapi import FastAPI
 
 from app.api.health import router as health_router
 from app.api.protocol import router as protocol_router
+from app.api.rooms import RoomHub, router as rooms_router
+from app.rooms import RoomService
 from app.version import SERVER_VERSION
 
 
@@ -19,8 +21,11 @@ def create_app() -> FastAPI:
         version=SERVER_VERSION,
         summary="Fictional-currency game server. No wallets, deposits, or real-money trading.",
     )
+    app.state.rooms = RoomService()
+    app.state.hub = RoomHub()
     app.include_router(health_router)
     app.include_router(protocol_router)
+    app.include_router(rooms_router)
     return app
 
 

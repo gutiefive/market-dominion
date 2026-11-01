@@ -20,6 +20,7 @@ event, and scores. It does not start another round.
 
 from __future__ import annotations
 
+import copy
 import re
 from typing import Any
 
@@ -650,6 +651,73 @@ class OfflineMatch:
         self.market_actions_left = 0
         winner = next(row for row in rows if row["id"] == self.ranking[0])
         self.log.append(f"{winner['display_name']} wins with ${winner['net_worth']} fictional.")
+
+    def export_state(self) -> dict[str, Any]:
+        """JSON-ready match, including the generator state and private hands."""
+        return {
+            "seed": self.seed,
+            "byte_price": self.byte_price,
+            "byte_exchange": self.byte_exchange,
+            "sentiment": dict(self.sentiment),
+            "corporations": copy.deepcopy(self.corporations),
+            "players": copy.deepcopy(self.players),
+            "bag": list(self.bag),
+            "occupied": dict(self.occupied),
+            "company_of": dict(self.company_of),
+            "events": copy.deepcopy(self.events),
+            "event_ids": list(self.event_ids),
+            "rng_state": self.rng.state,
+            "turn_index": self.turn_index,
+            "round_number": self.round_number,
+            "phase": self.phase,
+            "final_round": self.final_round,
+            "market_actions_left": self.market_actions_left,
+            "pending": list(self.pending),
+            "pending_options": list(self.pending_options),
+            "pending_tile": self.pending_tile,
+            "ranking": list(self.ranking),
+            "ledger": copy.deepcopy(self.ledger),
+            "log": list(self.log),
+        }
+
+    @classmethod
+    def from_export(cls, data: dict[str, Any]) -> OfflineMatch:
+        """Restore a match without reshuffling. The caller supplies a prior export."""
+        rules = load_rules()
+        match = cls.__new__(cls)
+        match.rules = rules
+        match.seed = int(data["seed"])
+        match.hand_size = int(rules["starting_hand_size"])
+        match.starting_cash = int(rules["starting_cash"])
+        match.market_limit = int(rules["market_actions_per_turn"])
+        match.share_supply = int(rules["corporation_share_supply"])
+        match.byte_supply = int(rules["byte_supply"])
+        match.end_size = int(rules["end_company_size"])
+        match.end_occupied = int(rules["end_occupied_tiles"])
+        match.byte_price = int(data["byte_price"])
+        match.byte_exchange = int(data["byte_exchange"])
+        match.sentiment = {str(key): int(value) for key, value in data["sentiment"].items()}
+        match.corporations = copy.deepcopy(data["corporations"])
+        match.players = copy.deepcopy(data["players"])
+        match.bag = list(data["bag"])
+        match.occupied = {str(key): bool(value) for key, value in data["occupied"].items()}
+        match.company_of = {str(key): str(value) for key, value in data["company_of"].items()}
+        match.events = copy.deepcopy(data["events"])
+        match.event_ids = [str(item) for item in data["event_ids"]]
+        match.rng = MatchRng(match.seed)
+        match.rng.state = int(data["rng_state"])
+        match.turn_index = int(data["turn_index"])
+        match.round_number = int(data["round_number"])
+        match.phase = str(data["phase"])
+        match.final_round = bool(data["final_round"])
+        match.market_actions_left = int(data["market_actions_left"])
+        match.pending = list(data["pending"])
+        match.pending_options = [str(item) for item in data["pending_options"]]
+        match.pending_tile = str(data["pending_tile"])
+        match.ranking = [str(item) for item in data["ranking"]]
+        match.ledger = copy.deepcopy(data["ledger"])
+        match.log = [str(item) for item in data["log"]]
+        return match
 
 
 _SECTOR_LABELS = {

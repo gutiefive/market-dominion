@@ -1,21 +1,22 @@
 # Architecture
 
-Market Dominion splits a Godot 4 client from a Python rules server. Online matches will have one authoritative rules implementation on the server. Offline play keeps a GDScript copy, and both copies have to match the JSON fixtures in `shared/fixtures/`. M1 adds a local pass-and-play deal and placement loop. There is still no WebSocket and no company resolution.
+Market Dominion splits a Godot 4 client from a Python rules server. Online rooms have one authoritative rules implementation on the server. Offline pass-and-play keeps a GDScript copy, and both copies have to match the JSON fixtures in `shared/fixtures/`. The protocol validator still refuses to apply a move. Room commands do apply.
 
 ## Process
 
 ```
 client/  Godot 4.7 GDScript, Compatibility renderer
+   |  HTTP create/join, then WebSocket /v1/rooms/ws
    |  reads shared/ in the dev checkout (export packaging is later)
 shared/protocol/schema.json
 shared/fixtures/*
 server/  FastAPI on 127.0.0.1:8741
-   |  SQLite schema_version 0 (meta row only)
+   |  SQLite schema_version 1 (schema_meta + rooms)
 ```
 
-`GET /health` is liveness and does not touch disk. `GET /ready` opens SQLite and reads the schema. `POST /v1/protocol/commands/validate` checks an envelope and returns `applied: false`.
+`GET /health` is liveness and does not touch disk. `GET /ready` opens SQLite and reads the schema. `POST /v1/protocol/commands/validate` checks an envelope and returns `applied: false`. `POST /v1/rooms/commands` and the WebSocket `/v1/rooms/ws` apply room commands.
 
-Public snapshots omit the bag order and private hands. The schema rejects `private_tile_hand` on a public player.
+Public snapshots omit the bag order and private hands. The schema rejects `private_tile_hand` on a public player. A direct `state_snapshot` may add `your_hand` for the session that owns those tiles. Broadcast events leave that field off.
 
 ## Kernels
 
@@ -55,7 +56,7 @@ A9. Nicknames match `^[A-Za-z0-9][A-Za-z0-9 _-]{0,23}$`. Invite codes, once issu
 
 A10. Bonus remainder dollars, when mergers exist, go $1 at a time by ascending lexicographic player id. Winner order is higher net worth, then higher cash, then more active shares, then lower `turn_order_index`. Indexes are unique. Index 0 is the first seat in the shuffled opening order. Ranking does not compute net worth.
 
-A11. Command bodies over 16,384 bytes are HTTP 413. The SQLite file is `server/data/market.db` unless `MD_DATABASE_PATH` is set. Schema version is the string `0`. The dev port is 8741.
+A11. Command bodies over 16,384 bytes are HTTP 413. The SQLite file is `server/data/market.db` unless `MD_DATABASE_PATH` is set. Schema version is the string `1`. A file still at version `0` gains the `rooms` table and is updated in place. Any other version is rejected. The dev port is 8741.
 
 A12. Sample seed `7710` identifies `sample_lobby_state.json` and the M1 sample table (the client default and several golden deals). It is not a rules constant.
 
@@ -75,6 +76,8 @@ A19. Merger survivor is the company with the largest pre-placement size. Size is
 
 A20. After the opening deal, the same generator shuffles the 10 events. That shuffle does not change seats or the bag. A completed round draws the front card. An empty deck is shuffled again before the next draw. Each listed sector is clamped to −2…+2, then every active company and BYTE are repriced. The log line is `Round event: {name}. {Sector} {signed value}, …. BYTE is ${price}.` Seed 7710 opens with Grid Incentives, energy +1 and BYTE $500 to $450 (`golden_events.json`). The 11th draw of that seed is Risk-On Rally. The end check runs after the draw. Triggers are an active company of size at least 22, at least 65 occupied squares, or an empty bag and empty hands. The first trigger sets `final_round`. Seats that have not finished the current round still take one turn. That close applies one event, sets phase `completed`, and does not increment `round_number`. Later commands fail with `the match is over`. Net worth is cash plus active shares at the post-event prices plus BYTE at the post-event BYTE price. Inactive shares add nothing. `rank_players` orders the ledger (assumption A10). The winner line is `{name} wins with ${net} fictional.`
 
+A21. Online rooms wrap `OfflineMatch`. Create and join ignore the client's placeholder session token and mint `secrets.token_urlsafe(18)` plus an invite from `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`. The host is the first seat. Start requires that seat, 2–4 players, and every seat ready. The live seed is `secrets.randbits(31)` unless the process was constructed with a fixed seed (tests use 7710). Create, join, reconnect, and `request_snapshot` do not have to name the current version. Other commands do. The idempotency key is `match_id|incoming session token|client_action_id`. The fingerprint is the command name plus the canonical payload. A matching fingerprint returns the stored direct events with `replayed: true` and does not apply again. A different payload is `duplicate_action`. A token from another room, or an unknown token, is `unauthorized`. Reads do not bump the version. Mutations bump it once. Direct events may include `session_token` and `your_hand`. Public events must not. The WebSocket hub personalizes each `state_snapshot` for that socket. A disconnected active player is autopassed when a later command arrives and the grace (default 120 seconds) has elapsed: place the lexicographic lowest tile, or take the first legal founder or survivor choice, then pass any market actions left. There is no background timer. Create is limited to 30 per 60 seconds and other commands to 80 per 10 seconds, both in memory. Accounts do not exist. Uvicorn accepts the socket upgrade only when the `websockets` package imported at process start.
+
 ## What is intentionally absent
 
-Rooms, WebSockets, reconnect, idempotent command application, accounts, and deployment. The HTTP validator still returns `applied: false`.
+Accounts, PostgreSQL, HTTPS, a production WebSocket origin, Docker execution, and the web export. The protocol validator still returns `applied: false`. Room rate limits do not survive a process restart. Autopass waits for the next command.

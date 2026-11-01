@@ -2,7 +2,7 @@
 
 A fictional tile-and-market strategy game for 2–4 players. Cash, shares, and BYTE coins are game currency. This repository does not take bets, hold wallets, or trade real assets.
 
-**M4 is a local pass-and-play table.** The board deals tiles, founds and grows companies, merges them, trades shares and BYTE, draws one round event after every seat has acted, and scores the final round. Online rooms are not implemented. See [TASKS.md](TASKS.md).
+**M5 adds private online rooms on top of the local table.** The board still deals, founds, merges, trades, draws events, and scores in pass-and-play. An online room is a separate match: the Python server owns the seed, the tiles, and the cash. See [TASKS.md](TASKS.md).
 
 ## Tested Godot build
 
@@ -34,6 +34,8 @@ The API listens on `http://127.0.0.1:8741`.
 
 `POST /v1/protocol/commands/validate` checks a command envelope and does not play a move (`applied` is false).
 
+`POST /v1/rooms/commands` creates a room, joins by invite code, and plays. After create or join, the client opens `ws://127.0.0.1:8741/v1/rooms/ws` with `match_id` and `session_token`. An `https` server URL uses `wss`.
+
 In a second terminal:
 
 ```bash
@@ -41,7 +43,7 @@ In a second terminal:
 .tools/godot/Godot_v4.7.2-stable_linux.x86_64 --path client
 ```
 
-The Godot window is the local table. Deal with a seed, pass the device, place a tile, choose a brand when a chain reaches size 2, choose a survivor when the largest chains tie, then take up to two market actions. Hands stay covered between seats. Verified captures: `docs/m3-merger.png` (size 5 absorbs size 3), `docs/m3-tie.png` (survivor modal), `docs/m2-economy.png`, `docs/m1-opening.png`, `docs/m1-placed.png` (1280×720), and `docs/m1-narrow.png` (420×800).
+The Godot window is the local table, plus an Online room panel. Locally, deal with a seed, pass the device, place a tile, choose a brand when a chain reaches size 2, choose a survivor when the largest chains tie, then take up to two market actions. Hands stay covered between seats. Online, two windows share one invite code. Each window shows only its own tiles. Verified captures: `docs/m5-room.png` (live room, private hand), `docs/m4-event.png`, `docs/m4-score.png`, `docs/m3-merger.png`, `docs/m3-tie.png`, `docs/m2-economy.png`, `docs/m1-opening.png`, `docs/m1-placed.png` (1280×720), and `docs/m1-narrow.png` (420×800).
 
 ## Tests
 

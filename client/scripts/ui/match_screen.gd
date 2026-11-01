@@ -35,6 +35,7 @@ var _event_label: Label
 var _score_card: PanelContainer
 var _score_box: VBoxContainer
 var _error: Label
+var _online: OnlineTable
 var _side: PanelContainer
 var _side_text: RichTextLabel
 var _scroll: ScrollContainer
@@ -91,7 +92,7 @@ func _build() -> void:
 	titles.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(titles)
 	titles.add_child(_label("Market Dominion", 22, TEXT))
-	titles.add_child(_label("Local pass-and-play on one device. Hands stay private.", 13, MUTED))
+	titles.add_child(_label("Local pass-and-play, or a private room on the game server.", 13, MUTED))
 	var fresh := _button("New table", false)
 	fresh.pressed.connect(_show_setup)
 	header.add_child(fresh)
@@ -107,6 +108,10 @@ func _build() -> void:
 	root.add_child(_setup)
 	root.add_child(_order)
 	root.add_child(_play)
+	_online = OnlineTable.new()
+	_online.visible = false
+	_online.closed_panel.connect(_hide_online)
+	add_child(_online)
 	_show_setup()
 
 
@@ -154,6 +159,9 @@ func _build_setup() -> VBoxContainer:
 	var start := _button("Deal tiles", true)
 	start.pressed.connect(_on_deal_pressed)
 	box.add_child(start)
+	var online := _button("Online room", false)
+	online.pressed.connect(_show_online)
+	box.add_child(online)
 	return panel
 
 
@@ -259,6 +267,17 @@ func _build_play() -> VBoxContainer:
 	leave.pressed.connect(_show_setup)
 	side_box.add_child(leave)
 	return panel
+
+
+func _show_online() -> void:
+	_scroll.visible = false
+	_online.visible = true
+	_online.move_to_front()
+
+
+func _hide_online() -> void:
+	_online.visible = false
+	_scroll.visible = true
 
 
 func _show_setup() -> void:
@@ -848,6 +867,71 @@ func _shot_merger() -> void:
 	_refresh()
 
 
+func _shot_online(match_id: String, token: String) -> void:
+	var shot_args := OS.get_cmdline_user_args()
+	_online._match_id = match_id
+	_online._token = token
+	_online._you = "p1"
+	if shot_args.size() > 5:
+		_online._join_code.text = str(shot_args[5])
+	var port := 8741
+	if shot_args.size() > 6:
+		port = int(shot_args[6])
+	var client := HTTPClient.new()
+	var err := client.connect_to_host("127.0.0.1", port)
+	if err != OK:
+		push_error("online shot could not reach the server")
+		get_tree().quit(1)
+		return
+	while client.get_status() == HTTPClient.STATUS_CONNECTING or client.get_status() == HTTPClient.STATUS_RESOLVING:
+		client.poll()
+	var body := JSON.stringify({
+		"match_id": match_id,
+		"client_action_id": "shot",
+		"expected_state_version": 0,
+		"session_token": token,
+		"command": "request_snapshot",
+		"payload": {},
+	})
+	err = client.request(HTTPClient.METHOD_POST, "/v1/rooms/commands", ["Content-Type: application/json"], body)
+	if err != OK:
+		push_error("online shot request failed")
+		get_tree().quit(1)
+		return
+	while client.get_status() == HTTPClient.STATUS_REQUESTING:
+		client.poll()
+	if not client.has_response() or client.get_response_code() != 200:
+		push_error("online shot HTTP %s" % str(client.get_response_code()))
+		get_tree().quit(1)
+		return
+	var read := PackedByteArray()
+	var spins := 0
+	while client.get_status() == HTTPClient.STATUS_BODY and spins < 2000:
+		client.poll()
+		spins += 1
+		var chunk := client.read_response_body_chunk()
+		if chunk.size() > 0:
+			read.append_array(chunk)
+		var expected := client.get_response_body_length()
+		if expected >= 0 and read.size() >= expected:
+			break
+	var parsed = JSON.parse_string(read.get_string_from_utf8())
+	if typeof(parsed) != TYPE_DICTIONARY or not parsed.has("events"):
+		push_error("online shot returned unreadable JSON")
+		get_tree().quit(1)
+		return
+	_scroll.visible = false
+	_online.set_anchors_preset(PRESET_FULL_RECT)
+	_online.offset_left = 0
+	_online.offset_top = 0
+	_online.offset_right = 0
+	_online.offset_bottom = 0
+	_online.visible = true
+	_online.move_to_front()
+	for event in parsed["events"]:
+		_online._on_event(event)
+
+
 func _shot_event() -> void:
 	var rowan: Array = _match.active_player()["hand"]
 	_selected = str(rowan[0])
@@ -897,13 +981,17 @@ func _shot_tie() -> void:
 
 
 func _run_shot(path: String, phase: String) -> void:
-	var created = OfflineMatch.create(7710, ["Rowan", "Quinn"])
-	if created == null:
-		push_error("screenshot deal failed")
-		get_tree().quit(1)
-		return
-	_begin_match(created)
-	_reveal()
+	if phase == "online":
+		var shot_args := OS.get_cmdline_user_args()
+		_shot_online(str(shot_args[3]), str(shot_args[4]))
+	else:
+		var created = OfflineMatch.create(7710, ["Rowan", "Quinn"])
+		if created == null:
+			push_error("screenshot deal failed")
+			get_tree().quit(1)
+			return
+		_begin_match(created)
+		_reveal()
 	if phase == "placed":
 		var hand: Array = _match.active_player()["hand"]
 		_selected = str(hand[0])

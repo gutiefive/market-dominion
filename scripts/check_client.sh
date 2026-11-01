@@ -40,3 +40,5 @@ echo "Godot: $("$BIN" --version)"
 "$BIN" --headless --path "$ROOT/client" --script res://tests/m3_check.gd
 "$BIN" --headless --path "$ROOT/client" --check-only --script res://tests/m4_check.gd
 "$BIN" --headless --path "$ROOT/client" --script res://tests/m4_check.gd
+"$BIN" --headless --path "$ROOT/client" --check-only --script res://tests/m5_check.gd
+"$BIN" --headless --path "$ROOT/client" --script res://tests/m5_check.gd

@@ -61,7 +61,7 @@ def load_rules() -> dict[str, Any]:
 
 
 def database_path() -> Path:
-    """SQLite file used by the schema_version 0 stub."""
+    """SQLite file for schema metadata and persisted rooms."""
     override = os.environ.get("MD_DATABASE_PATH")
     if override:
         return Path(override)

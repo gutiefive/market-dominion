@@ -1,6 +1,6 @@
 # Milestones
 
-M4 is the stage this tree claims as playable. A box is checked only where a command was run and the result is recorded in [CHANGELOG.md](CHANGELOG.md).
+M5 is the stage this tree claims as playable. A box is checked only where a command was run and the result is recorded in [CHANGELOG.md](CHANGELOG.md).
 
 ## M0 Foundation
 
@@ -59,12 +59,14 @@ Local pass-and-play only. The HTTP API does not apply these moves.
 
 ## M5 Online rooms
 
-The HTTP validator is not multiplayer.
+`POST /v1/protocol/commands/validate` still returns `applied: false`. Room commands on `/v1/rooms/commands` and `/v1/rooms/ws` are the authoritative match.
 
-- [ ] WebSocket rooms for 2–4 players
-- [ ] Private hands filtered per session
-- [ ] Server-side rejection of illegal, stale, duplicate, and cross-room commands
-- [ ] Reconnect and restart without a double trade
+- [x] Private 2–4 player rooms by invite code, with a guest nickname, ready, and a host start
+- [x] The server owns the seed, tile order, event deck, RNG, cash, and holdings
+- [x] Private hands: the session sees its tiles; other seats see `hand_count` (`docs/m5-room.png`)
+- [x] `expected_state_version`, `client_action_id` replay, and typed errors on rejected commands
+- [x] Godot WebSocket client. Reconnect uses the same session token and a snapshot
+- [x] Tests for out-of-turn, stale version, duplicate action id, a foreign room, hidden hands, restart, and two sockets on one room
 
 ## M6 Production UI
 
@@ -79,7 +81,9 @@ The HTTP validator is not multiplayer.
 
 ## Known limits
 
-- Validate never mutates a match. The offline table lives in the client and in `OfflineMatch`; it is not a server room.
-- A finished local match is scored on the device. It is not a server room.
+- `POST /v1/protocol/commands/validate` never mutates a match. Authoritative play goes through the room API.
+- The local pass-and-play table still deals and scores on the device. It is a separate copy of the rules.
+- A disconnected seat is autopassed on the next command after the grace window, not by a background timer (assumption A21).
+- Room rate limits live in process memory. Restarting the API clears them. SQLite keeps the rooms.
 - GDScript rejection for prices is −1 or an empty list; the offline table returns `{ok: false, error}`. Python raises (assumption A13).
-- Docker and web export were not executed (assumption A15).
+- Docker and web export were not executed (assumption A15). Production UI layout is M6.

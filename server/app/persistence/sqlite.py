@@ -1,7 +1,7 @@
-"""Schema version 0: a meta row and no match tables.
+"""SQLite schema version 1: a meta row and one JSON blob per room.
 
-Match persistence begins in a later milestone. This stub only proves the
-process can open SQLite and remember that no game schema has been migrated.
+Version 0 databases are upgraded in place. The blob is the authoritative room,
+including private hands and the match generator state.
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from pathlib import Path
 
 from app.files import database_path
 
-SCHEMA_VERSION = "0"
+SCHEMA_VERSION = "1"
 
 
 def connect(path: Path | None = None) -> sqlite3.Connection:
@@ -29,11 +29,28 @@ def connect(path: Path | None = None) -> sqlite3.Connection:
     )
     connection.execute(
         """
-        INSERT OR IGNORE INTO schema_meta (key, value)
-        VALUES ('schema_version', ?)
-        """,
-        (SCHEMA_VERSION,),
+        CREATE TABLE IF NOT EXISTS rooms (
+            match_id TEXT PRIMARY KEY,
+            invite_code TEXT NOT NULL UNIQUE,
+            blob TEXT NOT NULL
+        )
+        """
     )
+    row = connection.execute(
+        "SELECT value FROM schema_meta WHERE key = 'schema_version'"
+    ).fetchone()
+    if row is None:
+        connection.execute(
+            "INSERT INTO schema_meta (key, value) VALUES ('schema_version', ?)",
+            (SCHEMA_VERSION,),
+        )
+    elif str(row[0]) == "0":
+        connection.execute(
+            "UPDATE schema_meta SET value = ? WHERE key = 'schema_version'",
+            (SCHEMA_VERSION,),
+        )
+    elif str(row[0]) != SCHEMA_VERSION:
+        raise RuntimeError(f"unsupported schema_version {row[0]}")
     connection.commit()
     return connection
 

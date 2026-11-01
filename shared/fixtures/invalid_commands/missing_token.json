@@ -1,0 +1,7 @@
+{
+  "match_id": "match_demo",
+  "client_action_id": "act_missing_token",
+  "expected_state_version": 0,
+  "command": "create_room",
+  "payload": {"nickname": "Rowan"}
+}

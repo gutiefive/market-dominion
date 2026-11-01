@@ -1,0 +1,27 @@
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile
+    ports:
+      - "8741:8741"
+    environment:
+      MD_HOST: 0.0.0.0
+      MD_PORT: "8741"
+      MD_DATABASE_PATH: /data/market.db
+    volumes:
+      - market-data:/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8741/health')",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+volumes:
+  market-data:

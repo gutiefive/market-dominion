@@ -1,0 +1,491 @@
+{
+  "match_id": "match_demo",
+  "version": 0,
+  "seed": 7710,
+  "phase": "lobby",
+  "active_player_id": null,
+  "turn_index": 0,
+  "round_number": 0,
+  "final_round_flag": false,
+  "board": [
+    {
+      "coordinate": "A1",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "B1",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "C1",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "D1",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "E1",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "F1",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "G1",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "H1",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "I1",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "A2",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "B2",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "C2",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "D2",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "E2",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "F2",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "G2",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "H2",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "I2",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "A3",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "B3",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "C3",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "D3",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "E3",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "F3",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "G3",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "H3",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "I3",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "A4",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "B4",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "C4",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "D4",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "E4",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "F4",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "G4",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "H4",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "I4",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "A5",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "B5",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "C5",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "D5",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "E5",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "F5",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "G5",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "H5",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "I5",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "A6",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "B6",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "C6",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "D6",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "E6",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "F6",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "G6",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "H6",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "I6",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "A7",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "B7",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "C7",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "D7",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "E7",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "F7",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "G7",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "H7",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "I7",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "A8",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "B8",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "C8",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "D8",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "E8",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "F8",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "G8",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "H8",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "I8",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "A9",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "B9",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "C9",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "D9",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "E9",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "F9",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "G9",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "H9",
+      "occupied": false,
+      "company_id": null
+    },
+    {
+      "coordinate": "I9",
+      "occupied": false,
+      "company_id": null
+    }
+  ],
+  "tile_bag_count": 81,
+  "players": [],
+  "corporations": [
+    {
+      "id": "nova_ai",
+      "name": "NOVA AI",
+      "sector": "ai",
+      "active": false,
+      "size": 0,
+      "cells": [],
+      "total_shares": 20,
+      "bank_shares": 20,
+      "share_price": 0
+    },
+    {
+      "id": "orbit_pay",
+      "name": "ORBIT PAY",
+      "sector": "fintech",
+      "active": false,
+      "size": 0,
+      "cells": [],
+      "total_shares": 20,
+      "bank_shares": 20,
+      "share_price": 0
+    },
+    {
+      "id": "volt_grid",
+      "name": "VOLT GRID",
+      "sector": "energy",
+      "active": false,
+      "size": 0,
+      "cells": [],
+      "total_shares": 20,
+      "bank_shares": 20,
+      "share_price": 0
+    },
+    {
+      "id": "pulse_media",
+      "name": "PULSE MEDIA",
+      "sector": "media",
+      "active": false,
+      "size": 0,
+      "cells": [],
+      "total_shares": 20,
+      "bank_shares": 20,
+      "share_price": 0
+    },
+    {
+      "id": "evermart",
+      "name": "EVERMART",
+      "sector": "retail",
+      "active": false,
+      "size": 0,
+      "cells": [],
+      "total_shares": 20,
+      "bank_shares": 20,
+      "share_price": 0
+    }
+  ],
+  "crypto_market": {
+    "symbol": "BYTE",
+    "price": 500,
+    "exchange_coin_count": 30,
+    "supply": 30
+  },
+  "sector_sentiment": {
+    "ai": 0,
+    "fintech": 0,
+    "energy": 0,
+    "media": 0,
+    "retail": 0
+  },
+  "events_remaining": 10,
+  "action_log": []
+}

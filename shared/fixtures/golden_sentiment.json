@@ -1,0 +1,22 @@
+{
+  "cases": [
+    {
+      "name": "clamp at the positive cap",
+      "start": {"ai": 2, "fintech": 0, "energy": 0, "media": 0, "retail": 0},
+      "deltas": {"ai": 1},
+      "result": {"ai": 2, "fintech": 0, "energy": 0, "media": 0, "retail": 0}
+    },
+    {
+      "name": "liquidity freeze from neutral",
+      "start": {"ai": 0, "fintech": 0, "energy": 0, "media": 0, "retail": 0},
+      "deltas": {"ai": -1, "fintech": -1, "energy": -1, "media": -1, "retail": -1},
+      "result": {"ai": -1, "fintech": -1, "energy": -1, "media": -1, "retail": -1}
+    },
+    {
+      "name": "untouched sectors stay put",
+      "start": {"ai": -2, "fintech": 2, "energy": 1, "media": -1, "retail": 0},
+      "deltas": {"energy": -1, "retail": 1},
+      "result": {"ai": -2, "fintech": 2, "energy": 0, "media": -1, "retail": 1}
+    }
+  ]
+}

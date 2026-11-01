@@ -1,0 +1,12 @@
+.git
+.venv
+.tools
+.godot
+**/__pycache__
+**/.pytest_cache
+server/data
+uploads
+*.db
+client
+tests
+**/*_test.py

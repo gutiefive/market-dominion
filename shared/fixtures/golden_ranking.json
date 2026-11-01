@@ -1,0 +1,36 @@
+{
+  "cases": [
+    {
+      "name": "net worth decides",
+      "players": [
+        {"id": "p2", "net_worth": 1000, "cash": 1000, "active_shares": 0, "turn_order_index": 0},
+        {"id": "p1", "net_worth": 5000, "cash": 0, "active_shares": 0, "turn_order_index": 1}
+      ],
+      "order": ["p1", "p2"]
+    },
+    {
+      "name": "cash breaks a net-worth tie",
+      "players": [
+        {"id": "p1", "net_worth": 8000, "cash": 1000, "active_shares": 4, "turn_order_index": 0},
+        {"id": "p2", "net_worth": 8000, "cash": 3000, "active_shares": 1, "turn_order_index": 1}
+      ],
+      "order": ["p2", "p1"]
+    },
+    {
+      "name": "active shares break a cash tie",
+      "players": [
+        {"id": "p1", "net_worth": 8000, "cash": 2000, "active_shares": 3, "turn_order_index": 1},
+        {"id": "p2", "net_worth": 8000, "cash": 2000, "active_shares": 5, "turn_order_index": 0}
+      ],
+      "order": ["p2", "p1"]
+    },
+    {
+      "name": "earlier turn order wins the last tie",
+      "players": [
+        {"id": "p_b", "net_worth": 8000, "cash": 2000, "active_shares": 4, "turn_order_index": 1},
+        {"id": "p_a", "net_worth": 8000, "cash": 2000, "active_shares": 4, "turn_order_index": 0}
+      ],
+      "order": ["p_a", "p_b"]
+    }
+  ]
+}

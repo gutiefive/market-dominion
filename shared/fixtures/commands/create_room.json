@@ -1,0 +1,8 @@
+{
+  "match_id": "proposed_match_demo",
+  "client_action_id": "act_000",
+  "expected_state_version": 0,
+  "session_token": "guest_demo_token",
+  "command": "create_room",
+  "payload": {"nickname": "Rowan"}
+}

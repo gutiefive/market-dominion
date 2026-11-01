@@ -1,0 +1,9 @@
+{
+  "event": "error",
+  "match_id": "match_demo",
+  "state_version": 4,
+  "payload": {
+    "code": "stale_version",
+    "message": "expected state version 3 but the server is at version 4"
+  }
+}

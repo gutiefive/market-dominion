@@ -1,0 +1,8 @@
+{
+  "match_id": "match_demo",
+  "client_action_id": "act_bad_coord",
+  "expected_state_version": 3,
+  "session_token": "guest_demo_token",
+  "command": "place_tile",
+  "payload": {"coordinate": "J1"}
+}

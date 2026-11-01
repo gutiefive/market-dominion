@@ -1,0 +1,13 @@
+{
+  "cases": [
+    {"size": 4, "sentiment": 0, "price": 300, "note": "spec example, neutral"},
+    {"size": 4, "sentiment": 2, "price": 360, "note": "spec example, sentiment +2"},
+    {"size": 4, "sentiment": -2, "price": 240, "note": "spec example, sentiment -2"},
+    {"size": 1, "sentiment": 1, "price": 170, "note": "165 half-up to 170"},
+    {"size": 3, "sentiment": -1, "price": 230, "note": "225 rounds to 230"},
+    {"size": 7, "sentiment": 2, "price": 540, "note": "exact multiple"},
+    {"size": 2, "sentiment": 0, "price": 200, "note": "founding-size neutral price"},
+    {"size": 22, "sentiment": 0, "price": 1200, "note": "end-size threshold, neutral"},
+    {"size": 0, "sentiment": 0, "price": 0, "note": "inactive chain is not priced"}
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "deck_note": "Unshuffled v1 order. A match seed will shuffle this deck in a later milestone.",
+  "events": [
+    {
+      "id": "ai_adoption",
+      "name": "AI Adoption",
+      "sector_deltas": {"ai": 1},
+      "byte_delta_percent": 10
+    },
+    {
+      "id": "fintech_regulation",
+      "name": "Fintech Regulation",
+      "sector_deltas": {"fintech": -1},
+      "byte_delta_percent": -20
+    },
+    {
+      "id": "grid_incentives",
+      "name": "Grid Incentives",
+      "sector_deltas": {"energy": 1},
+      "byte_delta_percent": -10
+    },
+    {
+      "id": "media_boom",
+      "name": "Media Boom",
+      "sector_deltas": {"media": 1},
+      "byte_delta_percent": 10
+    },
+    {
+      "id": "retail_slowdown",
+      "name": "Retail Slowdown",
+      "sector_deltas": {"retail": -1},
+      "byte_delta_percent": -10
+    },
+    {
+      "id": "risk_on_rally",
+      "name": "Risk-On Rally",
+      "sector_deltas": {"ai": 1, "fintech": 1},
+      "byte_delta_percent": 20
+    },
+    {
+      "id": "risk_off_shock",
+      "name": "Risk-Off Shock",
+      "sector_deltas": {"ai": -1, "fintech": -1},
+      "byte_delta_percent": -20
+    },
+    {
+      "id": "consumer_recovery",
+      "name": "Consumer Recovery",
+      "sector_deltas": {"retail": 1, "media": 1},
+      "byte_delta_percent": 10
+    },
+    {
+      "id": "energy_crunch",
+      "name": "Energy Crunch",
+      "sector_deltas": {"energy": -1},
+      "byte_delta_percent": 10
+    },
+    {
+      "id": "liquidity_freeze",
+      "name": "Liquidity Freeze",
+      "sector_deltas": {"ai": -1, "fintech": -1, "energy": -1, "media": -1, "retail": -1},
+      "byte_delta_percent": -20
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "cases": [
+    {"prior": 500, "delta_percent": 20, "price": 600, "note": "spec example"},
+    {"prior": 500, "delta_percent": 10, "price": 550, "note": "exact +10 percent"},
+    {"prior": 500, "delta_percent": -10, "price": 450, "note": "exact -10 percent"},
+    {"prior": 500, "delta_percent": -20, "price": 400, "note": "exact -20 percent"},
+    {"prior": 1900, "delta_percent": 20, "price": 2000, "note": "unclamped 2280 clamps to 2000"},
+    {"prior": 100, "delta_percent": -20, "price": 100, "note": "unclamped 80 clamps to 100"},
+    {"prior": 140, "delta_percent": 10, "price": 150, "note": "154 rounds to 150"},
+    {"prior": 150, "delta_percent": 10, "price": 170, "note": "165 half-up to 170"}
+  ]
+}

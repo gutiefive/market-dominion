@@ -1,0 +1,6 @@
+{
+  "event": "room_updated",
+  "match_id": "match_demo",
+  "state_version": 1,
+  "payload": {"player_count": 1}
+}

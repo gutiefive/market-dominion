@@ -1,0 +1,6 @@
+{
+  "event": "error",
+  "match_id": "match_demo",
+  "state_version": 1,
+  "payload": {"code": "stale_version"}
+}

@@ -1,0 +1,475 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/market-dominion/protocol/schema.json",
+  "title": "Market Dominion wire protocol",
+  "description": "Version 0.1.0 command, event, and public-state contract. Fictional game currency only. Validation does not apply a move.",
+  "$defs": {
+    "command_name": {
+      "type": "string",
+      "enum": [
+        "create_room",
+        "join_room",
+        "ready",
+        "start_match",
+        "place_tile",
+        "choose_founder",
+        "choose_merger_survivor",
+        "market_buy_share",
+        "market_sell_share",
+        "market_buy_byte",
+        "market_sell_byte",
+        "pass_market_action",
+        "end_turn",
+        "reconnect",
+        "request_snapshot"
+      ]
+    },
+    "event_name": {
+      "type": "string",
+      "enum": [
+        "room_updated",
+        "match_started",
+        "state_snapshot",
+        "tile_placed",
+        "company_founded",
+        "merger_started",
+        "merger_resolved",
+        "trade_completed",
+        "round_event_applied",
+        "turn_changed",
+        "game_ended",
+        "player_disconnected",
+        "player_reconnected",
+        "error"
+      ]
+    },
+    "error_code": {
+      "type": "string",
+      "enum": [
+        "invalid_json",
+        "unauthorized",
+        "wrong_phase",
+        "out_of_turn",
+        "stale_version",
+        "duplicate_action",
+        "illegal_tile",
+        "insufficient_cash",
+        "insufficient_inventory",
+        "rate_limited",
+        "payload_too_large",
+        "invalid_command",
+        "not_found",
+        "invalid_nickname"
+      ]
+    },
+    "corporation_id": {
+      "type": "string",
+      "enum": ["nova_ai", "orbit_pay", "volt_grid", "pulse_media", "evermart"]
+    },
+    "sector_id": {
+      "type": "string",
+      "enum": ["ai", "fintech", "energy", "media", "retail"]
+    },
+    "phase": {
+      "type": "string",
+      "enum": ["lobby", "playing", "final_round", "completed"]
+    },
+    "coordinate": {
+      "type": "string",
+      "pattern": "^[A-I][1-9]$"
+    },
+    "nickname": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 24,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9 _-]{0,23}$"
+    },
+    "invite_code": {
+      "type": "string",
+      "pattern": "^[A-HJ-NP-Z2-9]{6}$"
+    },
+    "id_token": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9_-]+$"
+    },
+    "session_token": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_-]+$"
+    },
+    "empty_payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "maxProperties": 0
+    },
+    "create_room_payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["nickname"],
+      "properties": {
+        "nickname": {"$ref": "#/$defs/nickname"}
+      }
+    },
+    "join_room_payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["invite_code", "nickname"],
+      "properties": {
+        "invite_code": {"$ref": "#/$defs/invite_code"},
+        "nickname": {"$ref": "#/$defs/nickname"}
+      }
+    },
+    "ready_payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["is_ready"],
+      "properties": {
+        "is_ready": {"type": "boolean"}
+      }
+    },
+    "place_tile_payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["coordinate"],
+      "properties": {
+        "coordinate": {"$ref": "#/$defs/coordinate"}
+      }
+    },
+    "corporation_payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["corporation_id"],
+      "properties": {
+        "corporation_id": {"$ref": "#/$defs/corporation_id"}
+      }
+    },
+    "error_payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": {"$ref": "#/$defs/error_code"},
+        "message": {"type": "string", "minLength": 1, "maxLength": 400}
+      }
+    },
+    "command_envelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "match_id",
+        "client_action_id",
+        "expected_state_version",
+        "session_token",
+        "command",
+        "payload"
+      ],
+      "properties": {
+        "match_id": {"$ref": "#/$defs/id_token"},
+        "client_action_id": {"$ref": "#/$defs/id_token"},
+        "expected_state_version": {"type": "integer", "minimum": 0},
+        "session_token": {"$ref": "#/$defs/session_token"},
+        "command": {"$ref": "#/$defs/command_name"},
+        "payload": {"type": "object"}
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {"command": {"const": "create_room"}},
+            "required": ["command"]
+          },
+          "then": {"properties": {"payload": {"$ref": "#/$defs/create_room_payload"}}}
+        },
+        {
+          "if": {
+            "properties": {"command": {"const": "join_room"}},
+            "required": ["command"]
+          },
+          "then": {"properties": {"payload": {"$ref": "#/$defs/join_room_payload"}}}
+        },
+        {
+          "if": {
+            "properties": {"command": {"const": "ready"}},
+            "required": ["command"]
+          },
+          "then": {"properties": {"payload": {"$ref": "#/$defs/ready_payload"}}}
+        },
+        {
+          "if": {
+            "properties": {"command": {"const": "place_tile"}},
+            "required": ["command"]
+          },
+          "then": {"properties": {"payload": {"$ref": "#/$defs/place_tile_payload"}}}
+        },
+        {
+          "if": {
+            "properties": {"command": {"const": "choose_founder"}},
+            "required": ["command"]
+          },
+          "then": {"properties": {"payload": {"$ref": "#/$defs/corporation_payload"}}}
+        },
+        {
+          "if": {
+            "properties": {"command": {"const": "choose_merger_survivor"}},
+            "required": ["command"]
+          },
+          "then": {"properties": {"payload": {"$ref": "#/$defs/corporation_payload"}}}
+        },
+        {
+          "if": {
+            "properties": {"command": {"const": "market_buy_share"}},
+            "required": ["command"]
+          },
+          "then": {"properties": {"payload": {"$ref": "#/$defs/corporation_payload"}}}
+        },
+        {
+          "if": {
+            "properties": {"command": {"const": "market_sell_share"}},
+            "required": ["command"]
+          },
+          "then": {"properties": {"payload": {"$ref": "#/$defs/corporation_payload"}}}
+        },
+        {
+          "if": {
+            "properties": {"command": {"const": "start_match"}},
+            "required": ["command"]
+          },
+          "then": {"properties": {"payload": {"$ref": "#/$defs/empty_payload"}}}
+        },
+        {
+          "if": {
+            "properties": {"command": {"const": "market_buy_byte"}},
+            "required": ["command"]
+          },
+          "then": {"properties": {"payload": {"$ref": "#/$defs/empty_payload"}}}
+        },
+        {
+          "if": {
+            "properties": {"command": {"const": "market_sell_byte"}},
+            "required": ["command"]
+          },
+          "then": {"properties": {"payload": {"$ref": "#/$defs/empty_payload"}}}
+        },
+        {
+          "if": {
+            "properties": {"command": {"const": "pass_market_action"}},
+            "required": ["command"]
+          },
+          "then": {"properties": {"payload": {"$ref": "#/$defs/empty_payload"}}}
+        },
+        {
+          "if": {
+            "properties": {"command": {"const": "end_turn"}},
+            "required": ["command"]
+          },
+          "then": {"properties": {"payload": {"$ref": "#/$defs/empty_payload"}}}
+        },
+        {
+          "if": {
+            "properties": {"command": {"const": "reconnect"}},
+            "required": ["command"]
+          },
+          "then": {"properties": {"payload": {"$ref": "#/$defs/empty_payload"}}}
+        },
+        {
+          "if": {
+            "properties": {"command": {"const": "request_snapshot"}},
+            "required": ["command"]
+          },
+          "then": {"properties": {"payload": {"$ref": "#/$defs/empty_payload"}}}
+        }
+      ]
+    },
+    "event_envelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event", "match_id", "state_version", "payload"],
+      "properties": {
+        "event": {"$ref": "#/$defs/event_name"},
+        "match_id": {"$ref": "#/$defs/id_token"},
+        "state_version": {"type": "integer", "minimum": 0},
+        "payload": {"type": "object"}
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {"event": {"const": "error"}},
+            "required": ["event"]
+          },
+          "then": {"properties": {"payload": {"$ref": "#/$defs/error_payload"}}}
+        }
+      ]
+    },
+    "board_cell": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["coordinate", "occupied", "company_id"],
+      "properties": {
+        "coordinate": {"$ref": "#/$defs/coordinate"},
+        "occupied": {"type": "boolean"},
+        "company_id": {
+          "anyOf": [
+            {"type": "null"},
+            {"$ref": "#/$defs/corporation_id"}
+          ]
+        }
+      }
+    },
+    "public_player": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "display_name",
+        "connection_state",
+        "cash",
+        "holdings_by_corp",
+        "byte_count",
+        "hand_count",
+        "is_ready",
+        "turn_order_index"
+      ],
+      "properties": {
+        "id": {"$ref": "#/$defs/id_token"},
+        "display_name": {"$ref": "#/$defs/nickname"},
+        "connection_state": {
+          "type": "string",
+          "enum": ["connected", "disconnected", "abandoned"]
+        },
+        "cash": {"type": "integer", "minimum": 0},
+        "holdings_by_corp": {
+          "type": "object",
+          "additionalProperties": {"type": "integer", "minimum": 0, "maximum": 20}
+        },
+        "byte_count": {"type": "integer", "minimum": 0, "maximum": 30},
+        "hand_count": {"type": "integer", "minimum": 0, "maximum": 5},
+        "is_ready": {"type": "boolean"},
+        "turn_order_index": {"type": "integer", "minimum": 0}
+      }
+    },
+    "public_corporation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "sector",
+        "active",
+        "size",
+        "cells",
+        "total_shares",
+        "bank_shares",
+        "share_price"
+      ],
+      "properties": {
+        "id": {"$ref": "#/$defs/corporation_id"},
+        "name": {"type": "string", "minLength": 1},
+        "sector": {"$ref": "#/$defs/sector_id"},
+        "active": {"type": "boolean"},
+        "size": {"type": "integer", "minimum": 0, "maximum": 81},
+        "cells": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/coordinate"}
+        },
+        "total_shares": {"type": "integer", "const": 20},
+        "bank_shares": {"type": "integer", "minimum": 0, "maximum": 20},
+        "share_price": {"type": "integer", "minimum": 0}
+      }
+    },
+    "public_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "match_id",
+        "version",
+        "seed",
+        "phase",
+        "active_player_id",
+        "turn_index",
+        "round_number",
+        "final_round_flag",
+        "board",
+        "tile_bag_count",
+        "players",
+        "corporations",
+        "crypto_market",
+        "sector_sentiment",
+        "events_remaining",
+        "action_log"
+      ],
+      "properties": {
+        "match_id": {"$ref": "#/$defs/id_token"},
+        "version": {"type": "integer", "minimum": 0},
+        "seed": {"type": "integer", "minimum": 0},
+        "phase": {"$ref": "#/$defs/phase"},
+        "active_player_id": {
+          "anyOf": [
+            {"type": "null"},
+            {"$ref": "#/$defs/id_token"}
+          ]
+        },
+        "turn_index": {"type": "integer", "minimum": 0},
+        "round_number": {"type": "integer", "minimum": 0},
+        "final_round_flag": {"type": "boolean"},
+        "board": {
+          "type": "array",
+          "minItems": 81,
+          "maxItems": 81,
+          "items": {"$ref": "#/$defs/board_cell"}
+        },
+        "tile_bag_count": {"type": "integer", "minimum": 0, "maximum": 81},
+        "players": {
+          "type": "array",
+          "maxItems": 4,
+          "items": {"$ref": "#/$defs/public_player"}
+        },
+        "corporations": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "items": {"$ref": "#/$defs/public_corporation"}
+        },
+        "crypto_market": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["symbol", "price", "exchange_coin_count", "supply"],
+          "properties": {
+            "symbol": {"type": "string", "const": "BYTE"},
+            "price": {"type": "integer", "minimum": 100, "maximum": 2000},
+            "exchange_coin_count": {"type": "integer", "minimum": 0, "maximum": 30},
+            "supply": {"type": "integer", "const": 30}
+          }
+        },
+        "sector_sentiment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["ai", "fintech", "energy", "media", "retail"],
+          "properties": {
+            "ai": {"type": "integer", "minimum": -2, "maximum": 2},
+            "fintech": {"type": "integer", "minimum": -2, "maximum": 2},
+            "energy": {"type": "integer", "minimum": -2, "maximum": 2},
+            "media": {"type": "integer", "minimum": -2, "maximum": 2},
+            "retail": {"type": "integer", "minimum": -2, "maximum": 2}
+          }
+        },
+        "events_remaining": {"type": "integer", "minimum": 0, "maximum": 10},
+        "action_log": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["seq", "actor", "command", "outcome"],
+            "properties": {
+              "seq": {"type": "integer", "minimum": 1},
+              "actor": {"type": "string", "minLength": 1},
+              "command": {"type": "string", "minLength": 1},
+              "outcome": {"type": "string", "minLength": 1}
+            }
+          }
+        }
+      }
+    }
+  }
+}

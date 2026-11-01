@@ -1,0 +1,8 @@
+{
+  "match_id": "match_demo",
+  "client_action_id": "act_003",
+  "expected_state_version": 4,
+  "session_token": "guest_demo_token",
+  "command": "market_buy_share",
+  "payload": {"corporation_id": "nova_ai"}
+}

@@ -1,0 +1,9 @@
+{
+  "corporations": [
+    {"id": "nova_ai", "name": "NOVA AI", "sector": "ai", "total_shares": 20},
+    {"id": "orbit_pay", "name": "ORBIT PAY", "sector": "fintech", "total_shares": 20},
+    {"id": "volt_grid", "name": "VOLT GRID", "sector": "energy", "total_shares": 20},
+    {"id": "pulse_media", "name": "PULSE MEDIA", "sector": "media", "total_shares": 20},
+    {"id": "evermart", "name": "EVERMART", "sector": "retail", "total_shares": 20}
+  ]
+}

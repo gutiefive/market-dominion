@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "market-dominion-server"
+version = "0.1.0"
+description = "Authoritative local server for Market Dominion. Fictional game currency only."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi==0.162.0",
+    "uvicorn==0.54.0",
+    "pydantic==2.14.2",
+    "jsonschema==4.26.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==9.2.0",
+    "httpx2==2.16.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["server"]
+
+[tool.pytest.ini_options]
+testpaths = ["server/tests", "tests"]
+pythonpath = ["server"]

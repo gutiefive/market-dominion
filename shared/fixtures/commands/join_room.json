@@ -1,0 +1,8 @@
+{
+  "match_id": "match_demo",
+  "client_action_id": "act_001",
+  "expected_state_version": 1,
+  "session_token": "guest_demo_token",
+  "command": "join_room",
+  "payload": {"invite_code": "H4K2NP", "nickname": "Rowan"}
+}

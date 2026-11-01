@@ -1,0 +1,15 @@
+.godot/
+.tools/
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+*.pyo
+*.egg-info/
+server/data/
+*.db
+uploads/
+agent-tools/
+*.log
+.DS_Store
+client/*.tmp

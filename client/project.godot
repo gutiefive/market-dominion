@@ -1,0 +1,29 @@
+; Engine configuration file.
+; Market Dominion — tested on Godot 4.7.2.stable.official.ed1daf0bf
+; Compatibility renderer is selected for a later web export. M0 does not export.
+
+config_version=5
+
+[application]
+
+config/name="Market Dominion"
+config/description="Fictional district-and-market strategy game. No real-money trading."
+config/version="0.1.0"
+run/main_scene="res://scenes/main.tscn"
+config/features=PackedStringArray("4.7", "GL Compatibility")
+config/icon="res://icon.svg"
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/stretch/mode="disabled"
+window/handheld/orientation="landscape"
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+renderer/rendering_method.web="gl_compatibility"
+environment/defaults/default_clear_color=Color(0.054902, 0.082353, 0.145098, 1)
+textures/vram_compression/import_etc2_astc=true

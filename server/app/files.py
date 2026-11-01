@@ -9,13 +9,27 @@ from pathlib import Path
 from typing import Any
 
 
-def repo_root() -> Path:
-    """Return the directory that contains ``shared/protocol/schema.json``."""
-    here = Path(__file__).resolve()
-    for parent in here.parents:
+def find_repo_root(start: Path) -> Path:
+    """Return the directory that contains ``shared/protocol/schema.json``.
+
+    A checkout walk finds it from ``server/app``. An installed image keeps the
+    same tree at ``MD_REPO_ROOT`` (the Dockerfile sets ``/app``) because the
+    installed package lives under site-packages and is not next to ``shared/``.
+    """
+    for parent in (start, *start.parents):
         if (parent / "shared" / "protocol" / "schema.json").is_file():
             return parent
+    configured = os.environ.get("MD_REPO_ROOT", "").strip()
+    if configured:
+        root = Path(configured)
+        if (root / "shared" / "protocol" / "schema.json").is_file():
+            return root
     raise FileNotFoundError("Could not find shared/protocol/schema.json")
+
+
+def repo_root() -> Path:
+    """Return the directory that contains ``shared/protocol/schema.json``."""
+    return find_repo_root(Path(__file__).resolve())
 
 
 @lru_cache(maxsize=None)
@@ -60,8 +74,37 @@ def load_rules() -> dict[str, Any]:
     return raw
 
 
+class DatabaseURLError(RuntimeError):
+    """``DATABASE_URL`` names a database this process will not open."""
+
+
 def database_path() -> Path:
-    """SQLite file for schema metadata and persisted rooms."""
+    """SQLite file for schema metadata and persisted rooms.
+
+    ``DATABASE_URL`` wins when it is set. ``sqlite:///relative`` and
+    ``sqlite:////absolute`` are files. ``postgres://`` and ``postgresql://``
+    raise ``DatabaseURLError`` and point at ``infra/migrations/0001_rooms.sql``.
+    The API does not open PostgreSQL. When ``DATABASE_URL`` is unset,
+    ``MD_DATABASE_PATH`` selects the file, otherwise ``server/data/market.db``.
+    """
+    url = os.environ.get("DATABASE_URL", "").strip()
+    if url:
+        if url.startswith("sqlite:///"):
+            raw = url.removeprefix("sqlite:///")
+            if not raw or "?" in raw:
+                raise DatabaseURLError(
+                    "sqlite DATABASE_URL must be sqlite:///relative.db or sqlite:////absolute/market.db"
+                )
+            return Path(raw)
+        if url.startswith("postgres://") or url.startswith("postgresql://"):
+            raise DatabaseURLError(
+                "DATABASE_URL is PostgreSQL. This API stores rooms in SQLite. "
+                "Apply infra/migrations/0001_rooms.sql with psql when preparing PostgreSQL, "
+                "then run the API with MD_DATABASE_PATH or a sqlite:/// DATABASE_URL."
+            )
+        raise DatabaseURLError(
+            "DATABASE_URL must start with sqlite:///. postgres:// is not opened by this process."
+        )
     override = os.environ.get("MD_DATABASE_PATH")
     if override:
         return Path(override)

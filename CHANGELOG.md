@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.8.0 — 2026-11-01
+
+M7 packaging. Protocol version stays `0.1.0`. Client `config/version` is `0.8.0`. No public URL was deployed.
+
+### Added
+
+- `client/export_presets.cfg` exports a single-threaded Compatibility web build to `build/web/index.html`. `scripts/export_web.sh` checks the pinned 4.7.2 template archive, copies `shared/` into the pack, and runs the export. `scripts/serve_web.py` sends `application/wasm` for `.wasm`. `scripts/smoke_web.sh` checks `index.html`, the wasm type, and `must-revalidate`.
+- A web page may pass `?server=https://...` or `?server=http://...`. Other schemes are ignored. The desktop client still defaults to `http://127.0.0.1:8741`.
+- The image runs uvicorn as uid 10001 after the entrypoint makes `/data` writable. Compose keeps SQLite on a volume. A `postgres` profile and `infra/migrations/0001_rooms.sql` are present. The API rejects `postgres://` and `postgresql://` instead of opening them. `MD_CORS_ORIGINS` limits browser origins and the WebSocket `Origin`. A missing Origin is still allowed. `MD_LOG_LEVEL` selects JSON logs on the `market` logger. `.env.example` lists names only.
+- `GET /ready` adds `database_backend` (`sqlite`) and `cors_origin_count`. `GET /health` is unchanged.
+
+### Evidence
+
+- `.venv/bin/python -m pytest -q` passed (76 tests). `./scripts/check_client.sh` prints `M0_CLIENT_OK` through `M7_CLIENT_OK`.
+- `./scripts/export_web.sh` printed `WEB_EXPORT_OK`. `build/web/index.html` has `GODOT_THREADS_ENABLED = false`. Sizes: `index.js` 274K, `index.wasm` 38M, `index.pck` 182K. Those files are gitignored.
+- `./scripts/smoke_web.sh` printed `WEB_SMOKE_OK http://127.0.0.1:8097/index.html`. Loopback HTTP. No browser.
+- `docker build -f infra/Dockerfile -t market-dominion-api:local .` produced `0e9f554b751a`. On `http://127.0.0.1:8751`, `/health` was ok, `/ready` reported schema `1` and backend `sqlite`, and create-room returned 200. The process uid was 10001. The container was removed. `docker compose` is not installed, so the compose file was not started.
+- A PostgreSQL `DATABASE_URL` made the container exit 1 and name `infra/migrations/0001_rooms.sql`. `psql` is absent, so that file was not applied.
+
+### Not in this version
+
+A public HTTPS page, Cloudflare Pages, a TLS terminator, WSS from a real browser, Chrome/Firefox/Safari smoke, a running compose stack, a PostgreSQL driver, and the section 10 match (two to four people, one invite URL, a full game, a reconnect, one winner).
+
 ## 0.7.0 — 2026-11-01
 
 M6 production UI on the desktop Godot client. Protocol version stays `0.1.0`. Local pass-and-play and online rooms both use the new chrome. No browser export was run.

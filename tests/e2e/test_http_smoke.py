@@ -27,6 +27,8 @@ def test_health_ready_and_schema(client):
     ready_body = ready.json()
     assert ready_body["status"] == "ready"
     assert ready_body["database_schema_version"] == "1"
+    assert ready_body["database_backend"] == "sqlite"
+    assert ready_body["cors_origin_count"] == 0
     assert ready_body["command_count"] == 15
     assert ready_body["event_count"] == 14
     assert ready_body["currency"] == "fictional"

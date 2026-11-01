@@ -1,6 +1,6 @@
 # Milestones
 
-M6 is the stage this tree claims as playable. A box is checked only where a command was run and the result is recorded in [CHANGELOG.md](CHANGELOG.md).
+M7 packages a local web export and a container. The playable game is still the M6 desktop table plus the M5 rooms. A box is checked only where a command was run and the result is recorded in [CHANGELOG.md](CHANGELOG.md). This is not a public release.
 
 ## M0 Foundation
 
@@ -13,8 +13,8 @@ M6 is the stage this tree claims as playable. A box is checked only where a comm
 - [x] `./scripts/dev.sh` local start and `./scripts/test.sh`
 - [x] GitHub Actions workflow for pytest and the Godot headless check
 - [x] Pure kernels with tests: catalog, prices, BYTE, sentiment clamp, tile conservation, lobby invariants, winner order
-- [ ] Docker image actually built (Docker was not installed; compose file only)
-- [ ] Browser export
+- [ ] Docker image built during M0 (built later; see M7)
+- [ ] Browser export during M0 (produced later; see M7)
 
 ## M1 Offline board
 
@@ -82,9 +82,19 @@ Desktop Godot windows only. No browser and no physical tablet were tested.
 
 ## M7 Ship
 
+Local packaging only. Nothing here is a public HTTPS deploy.
+
+- [x] Web preset, `scripts/export_web.sh`, and the pinned 4.7.2 template archive. `build/web/` was produced and is gitignored
+- [x] `scripts/serve_web.py` MIME types and `scripts/smoke_web.sh` on `http://127.0.0.1:8097/index.html` (loopback HTTP, no browser)
+- [x] Shared JSON copied into the web pack at `res://export_shared/`
+- [x] `?server=http(s)://...` on the web page (`M7_CLIENT_OK`)
+- [x] Image `market-dominion-api:local` (`0e9f554b751a`) built from `infra/Dockerfile`, probed on `127.0.0.1:8751` (`/health`, `/ready`, create room, uid 10001, SQLite file), then removed
+- [x] `postgres://` `DATABASE_URL` aborts startup. `infra/migrations/0001_rooms.sql` exists and was not applied (`psql` is missing)
+- [x] JSON logs, `MD_CORS_ORIGINS`, `MD_REPO_ROOT`, and `.env.example`. No secret file was committed
+- [ ] `docker compose` up (the compose plugin is not installed here)
 - [ ] Web export loaded over HTTPS
-- [ ] Container backend with a real database migration and health checks
 - [ ] Smoke on current desktop Chrome, Firefox, and Safari
+- [ ] Section 10: 2–4 people, one invite URL, a full match, a reconnect, one winner
 
 ## Known limits
 
@@ -93,5 +103,5 @@ Desktop Godot windows only. No browser and no physical tablet were tested.
 - A disconnected seat is autopassed on the next command after the grace window, not by a background timer (assumption A21).
 - Room rate limits live in process memory. Restarting the API clears them. SQLite keeps the rooms.
 - GDScript rejection for prices is −1 or an empty list; the offline table returns `{ok: false, error}`. Python raises (assumption A13).
-- Docker and web export were not executed (assumption A15). No browser or physical phone/tablet was tested.
+- The web export and the API image were exercised on loopback (assumption A15). `docker compose` was not started. No browser, HTTPS page, or physical phone/tablet was tested. PostgreSQL is a SQL file, not a driver.
 - A 420×800 window stacks the watchlist under the board. That does not establish mobile support.

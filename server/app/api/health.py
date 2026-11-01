@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 
 from app.contract import load_schema
 from app.files import load_rules
@@ -36,7 +36,7 @@ def health() -> dict[str, str]:
 
 
 @router.get("/ready")
-def ready() -> dict[str, object]:
+def ready(request: Request) -> dict[str, object]:
     schema = load_schema()
     rules = load_rules()
     connection = connect()
@@ -50,6 +50,8 @@ def ready() -> dict[str, object]:
         "command_count": len(schema["$defs"]["command_name"]["enum"]),
         "event_count": len(schema["$defs"]["event_name"]["enum"]),
         "database_schema_version": version,
+        "database_backend": "sqlite",
+        "cors_origin_count": len(getattr(request.app.state, "cors_origins", [])),
         "protocol_version": rules["protocol_version"],
         "currency": "fictional",
     }

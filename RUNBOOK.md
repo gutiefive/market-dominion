@@ -81,12 +81,84 @@ GitHub Actions workflow `.github/workflows/ci.yml` runs pytest on Python 3.12 an
 
 ## Logs and data
 
-Uvicorn writes access logs to the terminal. There is no remote error sink. Tables are `schema_meta` and `rooms`. Deleting the db file drops rooms and is the local rollback. A version `0` file upgrades to `1` on the next open.
+The `market` logger writes one JSON object per line to stderr. `MD_LOG_LEVEL` defaults to `info`. Fields named password, secret, token, session_token, database_url, or authorization are dropped. Startup logs the protocol version, `database_backend=sqlite`, and the CORS origin count. It does not log the database URL. An unhandled exception logs `unhandled` with the path and the exception type, and the HTTP body is `{"detail":"server_error"}`. Uvicorn's own access lines stay plain text. There is no remote alert sink. Ship stderr to whatever collector you run.
+
+Tables are `schema_meta` and `rooms`. The file is `server/data/market.db`, or `MD_DATABASE_PATH`, or the path inside a `sqlite:///` `DATABASE_URL`. `DATABASE_URL` wins when both are set. Deleting that file drops rooms and is the local rollback. A version `0` file upgrades to `1` on the next open. Copy the file to back it up. Stop the API first so SQLite is not mid-write. Restore by putting the copy back at the same path and starting the API again.
+
+## What was run in this environment
+
+- `./scripts/export_web.sh` wrote `build/web/` (gitignored). The template archive SHA-512 matched the pin in that script. `GODOT_TEMPLATES_TPZ` pointed at the already downloaded file, so the script checked the hash and unzipped it instead of fetching it a second time.
+- `./scripts/smoke_web.sh` printed `WEB_SMOKE_OK http://127.0.0.1:8097/index.html`. Loopback HTTP. The process then exited. No browser, no HTTPS.
+- `docker build -f infra/Dockerfile -t market-dominion-api:local .` produced image `0e9f554b751a`. `docker run -p 8751:8741` answered `/health`, `/ready` (schema `1`, backend `sqlite`), and a create-room POST 200. The server process was uid 10001. `/data/market.db` was owned by 10001. Logs started with a JSON `api_start` line. The container was removed. Nothing is still listening on 8751.
+- A container started with `DATABASE_URL=postgresql://...` exited 1 and named `infra/migrations/0001_rooms.sql`.
+- `./scripts/apply_postgres_migration.sh` exited 1 because `psql` is not installed. A `sqlite:///` URL is rejected by that script. The SQL file was not applied.
+- `docker compose` is not installed (the plugin is missing), so `infra/docker-compose.yml` was not started and the optional Postgres service was not pulled.
 
 ## Production
 
-Not deployed. No HTTPS, WSS, or hosted database was configured. `docker compose -f infra/docker-compose.yml up --build` is the intended local container path and was not executed in the M0 environment because Docker was not installed. Do not describe that compose file as a running stack.
+Not deployed. No public URL, DNS name, TLS certificate, or Cloudflare Pages project exists. No Origin namespace was configured.
+
+On a machine that already has a running Docker engine and the compose plugin:
+
+```bash
+docker compose -f infra/docker-compose.yml up --build -d
+curl -sS http://127.0.0.1:8741/ready
+```
+
+That stack is the API plus a SQLite file on the `market-data` volume. It is not the public service. The `postgres` and `web` profiles stay off unless you ask for them:
+
+```bash
+docker compose -f infra/docker-compose.yml --profile postgres up -d
+docker compose -f infra/docker-compose.yml --profile web up -d
+```
+
+The web profile serves `build/web` and fails until `./scripts/export_web.sh` has been run. The API does not connect to Postgres. Change `POSTGRES_PASSWORD` before port 5432 is reachable past the machine. Do not put that URL in the API environment. The process will refuse it.
+
+`MD_REPO_ROOT=/app` is set in the image so the installed package can still read `/app/shared`. Leave it unset in a checkout.
+
+## Database migration
+
+SQLite schema version is `1`. Opening a database creates `schema_meta` and `rooms`, or upgrades a version `0` file in place. Any other version is rejected. There is no separate SQLite migration command.
+
+`infra/migrations/0001_rooms.sql` is the same two tables for PostgreSQL. Apply it only when you are preparing a database the current process will not open:
+
+```bash
+DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/market ./scripts/apply_postgres_migration.sh
+```
+
+That needs `psql`. It was not run here. After it succeeds, keep the API on SQLite until a driver exists.
 
 ## Web export
 
-Not run. The project sets `renderer/rendering_method` to `gl_compatibility` for desktop, mobile, and web. Export presets and templates are a later milestone.
+```bash
+./scripts/export_web.sh
+python3 scripts/serve_web.py --directory build/web --host 127.0.0.1 --port 8097
+```
+
+For a static host, upload every file in `build/web/`. Set:
+
+```
+/index.html
+  Cache-Control: no-cache
+/*.js
+  Cache-Control: no-cache
+/*.wasm
+  Content-Type: application/wasm
+  Cache-Control: public, max-age=3600, must-revalidate
+/*.pck
+  Content-Type: application/octet-stream
+  Cache-Control: public, max-age=3600, must-revalidate
+```
+
+Do not add COOP or COEP for this single-threaded export.
+
+## What a public deploy still requires
+
+1. Run the API on an always-on host that keeps WebSocket connections open. Do not put it on a short-lived serverless function. Terminate TLS in front of it.
+2. Set `MD_CORS_ORIGINS` to the exact `https` origin of the static page. Restart the API.
+3. Upload `build/web/` with the MIME and cache headers above.
+4. Open `https://<pages-host>/index.html?server=https://<api-host>`. The client then uses `wss`.
+5. Play from current desktop Chrome, Firefox, and Safari before claiming those browsers. Mobile is still untested.
+6. Two to four people must finish a real match on that invite URL, including a reconnect, before section 10 of the spec is met.
+
+No secret belongs in the repository. `.env.example` lists the variable names only.

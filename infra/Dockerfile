@@ -2,16 +2,28 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
+RUN useradd --uid 10001 --no-create-home --shell /usr/sbin/nologin market \
+    && mkdir -p /data \
+    && chown 10001:10001 /data
+
 COPY pyproject.toml README.md ./
 COPY server ./server
 COPY shared ./shared
+COPY infra/entrypoint.py /entrypoint.py
 
 RUN pip install --no-cache-dir .
 
-ENV MD_HOST=0.0.0.0
-ENV MD_PORT=8741
-ENV MD_DATABASE_PATH=/data/market.db
+ENV MD_HOST=0.0.0.0 \
+    MD_PORT=8741 \
+    MD_DATABASE_PATH=/data/market.db \
+    MD_REPO_ROOT=/app \
+    MD_LOG_LEVEL=info \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
 EXPOSE 8741
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8741"]
+HEALTHCHECK --interval=10s --timeout=3s --retries=3 --start-period=8s \
+    CMD python -c "import os,urllib.request; urllib.request.urlopen('http://127.0.0.1:%s/health' % os.environ.get('MD_PORT','8741'))"
+
+ENTRYPOINT ["python", "/entrypoint.py"]

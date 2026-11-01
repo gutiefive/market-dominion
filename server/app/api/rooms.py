@@ -14,6 +14,8 @@ from fastapi import APIRouter, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 
 from app.files import load_rules
+from app.http_policy import origin_allowed
+from app.logging_json import log_event
 from app.rooms import Applied, RoomError, RoomService
 
 router = APIRouter()
@@ -138,6 +140,11 @@ def _actor_token(applied: Applied) -> str | None:
 
 @router.websocket("/v1/rooms/ws")
 async def room_socket(websocket: WebSocket, match_id: str, session_token: str) -> None:
+    origin = websocket.headers.get("origin")
+    if not origin_allowed(origin):
+        log_event("warning", "origin_rejected", origin=origin or "", match_id=match_id)
+        await websocket.close(code=1008)
+        return
     await websocket.accept()
     service: RoomService = websocket.app.state.rooms
     hub: RoomHub = websocket.app.state.hub

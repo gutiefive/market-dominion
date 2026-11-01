@@ -72,6 +72,41 @@ var _server: LineEdit
 var _zoom_steps := 0
 
 
+static func server_from_search(search: String) -> String:
+	var text := search.strip_edges()
+	var hash := text.find("#")
+	if hash >= 0:
+		text = text.substr(0, hash)
+	var query := text
+	var qmark := text.find("?")
+	if qmark >= 0:
+		query = text.substr(qmark + 1)
+	elif text.contains("://"):
+		return ""
+	for part in query.split("&"):
+		if part == "":
+			continue
+		var bits := part.split("=", true, 1)
+		if bits.size() != 2:
+			continue
+		if bits[0].uri_decode() != "server":
+			continue
+		var value := bits[1].uri_decode().strip_edges()
+		if value.begins_with("https://") or value.begins_with("http://"):
+			return value
+		return ""
+	return ""
+
+
+func _web_server_query() -> String:
+	if not OS.has_feature("web"):
+		return ""
+	var raw: Variant = JavaScriptBridge.eval("window.location.search", true)
+	if typeof(raw) != TYPE_STRING:
+		return ""
+	return server_from_search(str(raw))
+
+
 func _ready() -> void:
 	set_anchors_preset(PRESET_FULL_RECT)
 	Palette.load_settings()
@@ -129,7 +164,11 @@ func _build() -> void:
 	_lobby = VBoxContainer.new()
 	_lobby.add_theme_constant_override("separation", 8)
 	root.add_child(_lobby)
-	_server = _field("http://127.0.0.1:8741")
+	var server_text := "http://127.0.0.1:8741"
+	var from_page := _web_server_query()
+	if from_page != "":
+		server_text = from_page
+	_server = _field(server_text)
 	_nickname = _field("Rowan")
 	_join_match = _field("")
 	_join_code = _field("")

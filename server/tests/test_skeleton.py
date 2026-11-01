@@ -31,6 +31,8 @@ REQUIRED = [
     "client/tests/m4_check.gd",
     "client/tests/m5_check.gd",
     "client/tests/m6_check.gd",
+    "client/tests/m7_check.gd",
+    "client/export_presets.cfg",
     "client/scripts/ui/palette.gd",
     "client/scripts/ui/rules_panel.gd",
     "client/scripts/ui/market_watch.gd",
@@ -99,11 +101,18 @@ REQUIRED = [
     "shared/fixtures/commands/place_tile.json",
     "infra/docker-compose.yml",
     "infra/Dockerfile",
+    "infra/entrypoint.py",
+    "infra/migrations/0001_rooms.sql",
     "infra/deploy/README.md",
+    ".env.example",
     ".dockerignore",
     "scripts/dev.sh",
     "scripts/test.sh",
     "scripts/check_client.sh",
+    "scripts/export_web.sh",
+    "scripts/smoke_web.sh",
+    "scripts/serve_web.py",
+    "scripts/apply_postgres_migration.sh",
     "scripts/dump_fixtures.py",
     "tests/e2e/test_http_smoke.py",
 ]
@@ -115,7 +124,14 @@ def test_required_paths_exist():
 
 
 def test_shell_scripts_parse():
-    for name in ("scripts/dev.sh", "scripts/test.sh", "scripts/check_client.sh"):
+    for name in (
+        "scripts/dev.sh",
+        "scripts/test.sh",
+        "scripts/check_client.sh",
+        "scripts/export_web.sh",
+        "scripts/smoke_web.sh",
+        "scripts/apply_postgres_migration.sh",
+    ):
         subprocess.run(["bash", "-n", str(ROOT / name)], check=True)
 
 
@@ -140,3 +156,4 @@ def test_ci_runs_pytest_and_pins_godot():
     assert "pytest" in workflow
     assert "4.7.2" in workflow
     assert "check_client.sh" in workflow
+    assert "does not download Godot export templates" in workflow

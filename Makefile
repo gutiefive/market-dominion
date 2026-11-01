@@ -1,4 +1,4 @@
-.PHONY: dev test client-check fixtures
+.PHONY: dev test client-check fixtures web smoke-web
 
 dev:
 	./scripts/dev.sh
@@ -11,3 +11,9 @@ client-check:
 
 fixtures:
 	python3 scripts/dump_fixtures.py
+
+web:
+	./scripts/export_web.sh
+
+smoke-web:
+	./scripts/smoke_web.sh

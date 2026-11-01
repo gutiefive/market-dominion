@@ -19,6 +19,14 @@ jobs:
         run: python -m pytest -q
       - name: Byte-compile
         run: python -m compileall -q server tests scripts
+      - name: Packaging scripts (no export templates, no Docker)
+        run: |
+          bash -n scripts/export_web.sh
+          bash -n scripts/smoke_web.sh
+          bash -n scripts/apply_postgres_migration.sh
+          test -f client/export_presets.cfg
+          grep -q 'thread_support=false' client/export_presets.cfg
+          echo "CI does not download Godot export templates, run the web export, or build a container image."
 
   client:
     name: godot 4.7.2 headless

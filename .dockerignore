@@ -10,3 +10,7 @@ uploads
 client
 tests
 **/*_test.py
+build/
+.env
+.env.*
+!.env.example

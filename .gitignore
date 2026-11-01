@@ -13,3 +13,6 @@ agent-tools/
 *.log
 .DS_Store
 client/*.tmp
+build/
+.env
+client/export_shared/

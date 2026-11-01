@@ -13,10 +13,18 @@ static func shared_path(relative: String) -> String:
 
 
 static func read_json(relative: String):
-	var path := shared_path(relative)
-	if not FileAccess.file_exists(path):
-		push_error("Missing shared file: %s" % path)
-		return null
+	var external := shared_path(relative)
+	if FileAccess.file_exists(external):
+		return _parse(external)
+	# Web export has no sibling shared/ directory. export_web.sh copies it into the pack.
+	var packed := "res://export_shared/%s" % relative
+	if FileAccess.file_exists(packed):
+		return _parse(packed)
+	push_error("Missing shared file: %s" % external)
+	return null
+
+
+static func _parse(path: String):
 	var parser := JSON.new()
 	var text := FileAccess.get_file_as_string(path)
 	if parser.parse(text) != OK:

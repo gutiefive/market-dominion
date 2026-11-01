@@ -1,3 +1,8 @@
+# Local and prod-like API. The process stores rooms in SQLite on the market-data volume.
+# It does not read DATABASE_URL and it does not connect to the optional postgres service.
+# The password on that service is a local default. Change it before the port is reachable
+# beyond this machine. No production secret belongs in this file.
+
 services:
   api:
     build:
@@ -9,6 +14,8 @@ services:
       MD_HOST: 0.0.0.0
       MD_PORT: "8741"
       MD_DATABASE_PATH: /data/market.db
+      MD_LOG_LEVEL: info
+      MD_CORS_ORIGINS: ${MD_CORS_ORIGINS:-}
     volumes:
       - market-data:/data
     healthcheck:
@@ -22,6 +29,31 @@ services:
       interval: 10s
       timeout: 3s
       retries: 3
+      start_period: 8s
+
+  postgres:
+    profiles: ["postgres"]
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: market
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-market}
+      POSTGRES_DB: market
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+
+  web:
+    profiles: ["web"]
+    image: python:3.12-slim
+    volumes:
+      - ../build/web:/web:ro
+      - ../scripts/serve_web.py:/serve_web.py:ro
+    ports:
+      - "8097:8097"
+    command:
+      ["python", "/serve_web.py", "--host", "0.0.0.0", "--port", "8097", "--directory", "/web"]
 
 volumes:
   market-data:
+  pg-data:

@@ -7,11 +7,12 @@ Market Dominion splits a Godot 4 client from a Python rules server. Online rooms
 ```
 client/  Godot 4.7 GDScript, Compatibility renderer
    |  HTTP create/join, then WebSocket /v1/rooms/ws
-   |  reads shared/ in the dev checkout (export packaging is later)
+   |  dev reads ../shared; the web pack falls back to res://export_shared
 shared/protocol/schema.json
 shared/fixtures/*
-server/  FastAPI on 127.0.0.1:8741
+server/  FastAPI. Dev listens on 127.0.0.1:8741. The image listens on 0.0.0.0:8741
    |  SQLite schema_version 1 (schema_meta + rooms)
+   |  postgres:// DATABASE_URL is rejected. DDL lives in infra/migrations/
 ```
 
 `GET /health` is liveness and does not touch disk. `GET /ready` opens SQLite and reads the schema. `POST /v1/protocol/commands/validate` checks an envelope and returns `applied: false`. `POST /v1/rooms/commands` and the WebSocket `/v1/rooms/ws` apply room commands.
@@ -56,7 +57,7 @@ A9. Nicknames match `^[A-Za-z0-9][A-Za-z0-9 _-]{0,23}$`. Invite codes, once issu
 
 A10. Bonus remainder dollars, when mergers exist, go $1 at a time by ascending lexicographic player id. Winner order is higher net worth, then higher cash, then more active shares, then lower `turn_order_index`. Indexes are unique. Index 0 is the first seat in the shuffled opening order. Ranking does not compute net worth.
 
-A11. Command bodies over 16,384 bytes are HTTP 413. The SQLite file is `server/data/market.db` unless `MD_DATABASE_PATH` is set. Schema version is the string `1`. A file still at version `0` gains the `rooms` table and is updated in place. Any other version is rejected. The dev port is 8741.
+A11. Command bodies over 16,384 bytes are HTTP 413. The SQLite file is `server/data/market.db` unless `MD_DATABASE_PATH` is set. A `sqlite:///` `DATABASE_URL` overrides that path. `postgres://` and `postgresql://` raise `DatabaseURLError` at startup and name `infra/migrations/0001_rooms.sql`. The process does not open PostgreSQL. Schema version is the string `1`. A file still at version `0` gains the `rooms` table and is updated in place. Any other version is rejected. The dev port is 8741. An installed image finds `shared/` through `MD_REPO_ROOT` (`/app` in the Dockerfile) because the package lives under site-packages.
 
 A12. Sample seed `7710` identifies `sample_lobby_state.json` and the M1 sample table (the client default and several golden deals). It is not a rules constant.
 
@@ -64,7 +65,7 @@ A13. GDScript rejection uses −1 or an empty collection. Python raises. Golden 
 
 A14. `round_events.json` order is the unshuffled deck. Deltas clamp per sector. A match shuffles and draws that deck under assumption A20.
 
-A15. Docker Compose and the Godot web export were not run. The Compatibility renderer is selected so that export remains possible. See [infra/deploy/README.md](infra/deploy/README.md).
+A15. The web preset is single-threaded Compatibility (`variant/thread_support=false`, COOP/COEP not required). `./scripts/export_web.sh` installs the pinned 4.7.2 templates and writes gitignored `build/web/`. The shared JSON is copied to `client/export_shared/` before export and packed as `res://export_shared/`. Desktop play still reads the checkout's `shared/` directory when that path exists. The API image was built and probed on `127.0.0.1:8751`, then removed. `docker compose` is not installed here, so the compose file was not started. PostgreSQL DDL is not executed by the API. CORS is `MD_CORS_ORIGINS`. An empty list adds no middleware. A non-empty list checks the WebSocket `Origin` and still allows a missing Origin so the desktop client connects. See [infra/deploy/README.md](infra/deploy/README.md) and [RUNBOOK.md](RUNBOOK.md).
 
 A16. The match generator is a 32-bit xorshift, not a language runtime RNG. `state = seed & 0xFFFFFFFF`, and a zero state becomes `0x6D2B79F5`. Each step is `x ^= (x << 13)`, `x ^= x >> 17`, `x ^= (x << 5)`, masked to 32 bits after each xor. `below(n)` is `next_u32() % n`; modulo bias is accepted. Seed 0 and seed 2^32 share a state. A negative seed is rejected. Opening order shuffles the entry-order roster with Fisher-Yates (`i` from `n-1` down to `1`, `j` in `0..i` inclusive), then shuffles the catalog into the bag, then deals one tile at a time round-robin for five rounds. Bag index 0 is the next draw. Player ids `p1`..`pn` stay with entry order. `turn_order_index` is assigned after the seat shuffle.
 
@@ -80,4 +81,4 @@ A21. Online rooms wrap `OfflineMatch`. Create and join ignore the client's place
 
 ## What is intentionally absent
 
-Accounts, PostgreSQL, HTTPS, a production WebSocket origin, Docker execution, and the web export. The protocol validator still returns `applied: false`. Room rate limits do not survive a process restart. Autopass waits for the next command.
+Accounts, a PostgreSQL driver, HTTPS termination, a public URL, Cloudflare Pages, a multi-browser smoke, and a remote error sink. The protocol validator still returns `applied: false`. Room rate limits do not survive a process restart. Autopass waits for the next command. The container and the web export were exercised on loopback only.

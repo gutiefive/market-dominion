@@ -3,35 +3,41 @@ class_name BotPolicy
 
 ## Deterministic local computer. Placement scores fictional dollars for a
 ## founding, a growth, or a merger across `placement_plies` tiles of this hand
-## (five: the whole starting hand). Each later tile counts half as much as the
+## (five: the whole starting hand). Each later tile keeps three quarters of the
 ## one before it. A tile that ends the company for an opponent while we hold
 ## nothing is not expanded. A tile that touches neither the board nor another
 ## tile still in hand scores only its immediate value. A branch is cut when its
 ## immediate value plus OPTIMISTIC_TILE still cannot beat the best continuation
 ## already scored. The search stops at MAX_PLACEMENT_NODES. After the first
 ## tile, one ply over at most FRONTIER_CAP empty neighbors estimates an
-## opponent's best reply, and a quarter of that gain is subtracted. Hidden
-## hands are not read. Market buys and sells shares and BYTE when that score
-## is positive, at most two actions, and never spends the cash floor. Ties
-## break by lowest coordinate, fixture order, or the earlier survivor. The
-## match generator is not advanced here.
+## opponent's best reply. Only the increase over the reply already available
+## is kept, and half of that increase is subtracted. Hidden hands are not read.
+## Market buys and sells shares and BYTE when that score is positive, at most
+## two actions, and never spends the cash floor. A third share of one company
+## is the last buy. BYTE at $450 or below is bought when cash stays at or above
+## $500; BYTE at $700 or above is sold. Ties break by lowest coordinate, fixture order, or
+## the earlier survivor. The match generator is not advanced here.
 
 
 const CASH_FLOOR := 500
 const BUY_MAX_SIZE := 14
 const BUY_MAX_SENTIMENT := 1
-const BUY_OWNED_LIMIT := 5
+const BUY_OWNED_LIMIT := 3
 const SELL_MIN_SIZE := 16
 const SELL_MIN_SENTIMENT := 1
 const SELL_MIN_OWNED := 2
-const BYTE_BUY_MAX := 400
-const BYTE_SELL_MIN := 800
+const BYTE_BUY_MAX := 450
+const BYTE_SELL_MIN := 700
 const END_FEED_PENALTY := -100000
 ## Shipped depth. Tests may lower it and must restore five.
 static var placement_plies := 5
 const MAX_PLACEMENT_NODES := 500
 const FRONTIER_CAP := 24
-const THREAT_DIV := 4
+## Shipped weights. Tests may lower them and must restore three quarters and half the new reply.
+static var continuation_num := 3
+static var continuation_den := 4
+static var threat_div := 2
+static var threat_uses_marginal := true
 ## Upper bound on one later tile's contribution after the half-step discount.
 ## A sibling is skipped when even this cannot beat the best continuation.
 const OPTIMISTIC_TILE := 20000
@@ -127,9 +133,13 @@ static func _buy_share_score(match: OfflineMatch, corp: Dictionary, owned: int, 
 	var price := int(corp["share_price"])
 	if size > BUY_MAX_SIZE or sentiment > BUY_MAX_SENTIMENT or owned >= BUY_OWNED_LIMIT:
 		return 0
+	var corp_id := str(corp["id"])
+	if owned >= 2 and size >= 8 and owned - _others(match, corp_id) >= 2:
+		return 0
 	if cash - price < CASH_FLOOR:
 		return 0
-	return (15 - size) * 30 + (1 - sentiment) * 40 - Pricing.div_nonneg(price, 20) + owned * 80
+	var stake := 40 if owned == 1 else 0
+	return (15 - size) * 30 + (1 - sentiment) * 40 - Pricing.div_nonneg(price, 20) + stake
 
 
 static func _sell_share_score(match: OfflineMatch, corp: Dictionary, owned: int, cash: int) -> int:
@@ -138,9 +148,15 @@ static func _sell_share_score(match: OfflineMatch, corp: Dictionary, owned: int,
 	var size := int(corp["size"])
 	var sentiment := int(match.sentiment.get(str(corp["sector"]), 0))
 	var price := int(corp["share_price"])
+	var corp_id := str(corp["id"])
+	var lead := owned - _others(match, corp_id)
 	var profit := 0
 	if owned >= SELL_MIN_OWNED and size >= SELL_MIN_SIZE and sentiment >= SELL_MIN_SENTIMENT:
 		profit = (size - 14) * 50 + sentiment * 80 + Pricing.div_nonneg(price, 10)
+	elif owned >= 4 and size >= 10 and sentiment >= 0 and lead >= 2:
+		profit = (size - 8) * 40 + Pricing.div_nonneg(price, 10)
+	elif owned >= 2 and size >= 6 and sentiment >= 2:
+		profit = sentiment * 70 + Pricing.div_nonneg(price, 10)
 	var liquidity := 500 if cash < CASH_FLOOR else 0
 	return maxi(profit, liquidity)
 
@@ -158,7 +174,7 @@ static func _sell_byte_score(match: OfflineMatch, player: Dictionary, cash: int)
 	var price := int(match.byte_price)
 	var profit := 0
 	if price >= BYTE_SELL_MIN:
-		profit = (price - 700) + 30
+		profit = (price - 650) + 40
 	var liquidity := 500 if cash < CASH_FLOOR else 0
 	return maxi(profit, liquidity)
 
@@ -171,14 +187,16 @@ static func _tile(match: OfflineMatch, hand: Array) -> String:
 	var best := ""
 	var best_score := 0
 	var chosen := false
+	var base_threat := _opponent_threat(match, filled, company) if threat_uses_marginal else 0
 	for coordinate in ordered:
 		var text := str(coordinate)
 		var rest := _without(ordered, text)
 		var score := _line(match, text, rest, filled, company, {}, placement_plies, budget)
 		var projected := _project(match, text, filled, company, {})
 		var threat := _opponent_threat(match, projected["filled"], projected["company"])
-		if threat > 0:
-			score -= Pricing.div_nonneg(threat, THREAT_DIV)
+		var penalty := threat - base_threat if threat_uses_marginal else threat
+		if penalty > 0:
+			score -= Pricing.div_nonneg(penalty, threat_div)
 		if not chosen or score > best_score or (score == best_score and text < best):
 			chosen = true
 			best = text
@@ -233,8 +251,8 @@ static func _extend_after(match: OfflineMatch, immediate: int, coordinate: Strin
 		var child := _extend_after(match, child_imm, next, _without(others, next), next_filled, next_company, next_extra, plies - 1, budget)
 		if child > best_cont:
 			best_cont = child
-	if best_cont > 0:
-		immediate += Pricing.div_nonneg(best_cont, 2)
+	if best_cont > 0 and continuation_den > 0:
+		immediate += Pricing.div_nonneg(best_cont * continuation_num, continuation_den)
 	return immediate
 
 

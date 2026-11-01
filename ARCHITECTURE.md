@@ -81,4 +81,4 @@ A21. Online rooms wrap `OfflineMatch`. Create and join ignore the client's place
 
 ## What is intentionally absent
 
-Accounts, a PostgreSQL driver, HTTPS termination, a public URL, Cloudflare Pages, a multi-browser smoke, a remote error sink, and computer seats in an online room. Local computers live in `client/scripts/domain/bot_policy.gd` (five-tile placement search, dollar scores) and do not call the server. The protocol validator still returns `applied: false`. Room rate limits do not survive a process restart. Autopass waits for the next command. The container and the web export were exercised on loopback only.
+Accounts, a PostgreSQL driver, HTTPS termination, a public URL, Cloudflare Pages, a multi-browser smoke, a remote error sink, and computer seats in an online room. Local computers live in `client/scripts/domain/bot_policy.gd` (five-tile placement search, three-quarter continuations, dollar scores) and do not call the server. The protocol validator still returns `applied: false`. Room rate limits do not survive a process restart. Autopass waits for the next command. The container and the web export were exercised on loopback only.

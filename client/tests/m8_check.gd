@@ -17,6 +17,7 @@ func _initialize() -> void:
 	_check_founder_and_survivor_choices()
 	_check_survivor_prefers_the_higher_payout()
 	_check_market_buys_sells_and_trades_byte()
+	_check_tuned_dollar_scores()
 	_check_full_matches()
 	_finish()
 
@@ -331,7 +332,7 @@ func _check_market_buys_sells_and_trades_byte() -> void:
 	held_orbit["bank_shares"] = 20
 	holder["shares"]["orbit_pay"] = 2
 	var held := BotPolicy.decide(held_table)
-	if str(held.get("corporation_id", "")) != "orbit_pay":
+	if str(held.get("command", "")) != "buy_share" or str(held.get("corporation_id", "")) != "nova_ai":
 		_fail("held share %s" % str(held))
 	_check_sells_then_buys()
 	_check_byte_round_trip()
@@ -455,7 +456,184 @@ func _check_byte_round_trip() -> void:
 		_fail("byte liquidity book byte %s cash %d exchange %d" % [str(poor["byte_count"]), int(poor["cash"]), reserved_table.byte_exchange])
 
 
+func _check_tuned_dollar_scores() -> void:
+	_check_byte_midrange_and_share_cap()
+	_check_long_setup_beats_immediate_gain()
+	_check_new_reply_outweighs_a_small_growth()
+	_restore_score_defaults()
+
+
+func _restore_score_defaults() -> void:
+	BotPolicy.placement_plies = 5
+	BotPolicy.continuation_num = 3
+	BotPolicy.continuation_den = 4
+	BotPolicy.threat_div = 2
+	BotPolicy.threat_uses_marginal = true
+
+
+func _check_byte_midrange_and_share_cap() -> void:
+	var mid = OfflineMatch.create(4, ["Rowan", "Ada"], ["Ada"])
+	var ada := _seat(mid, "Ada")
+	mid.turn_index = int(ada["turn_order_index"])
+	mid.phase = "market"
+	mid.market_actions_left = 2
+	mid.byte_price = 440
+	var bought := BotPolicy.decide(mid)
+	if str(bought.get("command", "")) != "buy_byte":
+		_fail("mid byte buy %s" % str(bought))
+	mid.byte_price = 640
+	var quiet := BotPolicy.decide(mid)
+	if str(quiet.get("command", "")) != "pass_market":
+		_fail("near byte %s" % str(quiet))
+	mid.byte_price = 720
+	ada["byte_count"] = 1
+	mid.byte_exchange = 29
+	var sold := BotPolicy.decide(mid)
+	if str(sold.get("command", "")) != "sell_byte":
+		_fail("mid byte sell %s" % str(sold))
+	var reserved = OfflineMatch.create(4, ["Rowan", "Ada"], ["Ada"])
+	var poor := _seat(reserved, "Ada")
+	reserved.turn_index = int(poor["turn_order_index"])
+	reserved.phase = "market"
+	reserved.market_actions_left = 1
+	reserved.byte_price = 440
+	poor["cash"] = 900
+	var held_cash := BotPolicy.decide(reserved)
+	if str(held_cash.get("command", "")) != "pass_market":
+		_fail("mid byte floor %s" % str(held_cash))
+	var share_table = OfflineMatch.create(4, ["Rowan", "Ada"], ["Ada"])
+	var buyer := _seat(share_table, "Ada")
+	share_table.turn_index = int(buyer["turn_order_index"])
+	share_table.phase = "market"
+	share_table.market_actions_left = 1
+	share_table.byte_price = 440
+	var nova: Dictionary = share_table.corporations[0]
+	nova["active"] = true
+	nova["size"] = 2
+	nova["share_price"] = 200
+	nova["bank_shares"] = 20
+	var share := BotPolicy.decide(share_table)
+	if str(share.get("command", "")) != "buy_share" or str(share.get("corporation_id", "")) != "nova_ai":
+		_fail("share over mid byte %s" % str(share))
+	buyer["shares"]["nova_ai"] = 3
+	nova["bank_shares"] = 17
+	share_table.byte_price = 500
+	var capped := BotPolicy.decide(share_table)
+	if str(capped.get("command", "")) != "pass_market":
+		_fail("fourth share %s" % str(capped))
+	var trim = OfflineMatch.create(4, ["Rowan", "Ada"], ["Ada"])
+	var holder := _seat(trim, "Ada")
+	trim.turn_index = int(holder["turn_order_index"])
+	trim.phase = "market"
+	trim.market_actions_left = 1
+	holder["shares"]["orbit_pay"] = 4
+	var orbit: Dictionary = trim.corporations[1]
+	orbit["active"] = true
+	orbit["size"] = 12
+	orbit["share_price"] = 700
+	orbit["bank_shares"] = 16
+	var trimmed := BotPolicy.decide(trim)
+	if str(trimmed.get("command", "")) != "sell_share" or str(trimmed.get("corporation_id", "")) != "orbit_pay":
+		_fail("trim modest %s" % str(trimmed))
+	var hot = OfflineMatch.create(4, ["Rowan", "Ada"], ["Ada"])
+	var seller := _seat(hot, "Ada")
+	hot.turn_index = int(seller["turn_order_index"])
+	hot.phase = "market"
+	hot.market_actions_left = 1
+	hot.sentiment["energy"] = 2
+	seller["shares"]["volt_grid"] = 2
+	var volt: Dictionary = hot.corporations[2]
+	volt["active"] = true
+	volt["size"] = 8
+	volt["share_price"] = 600
+	volt["bank_shares"] = 18
+	var locked := BotPolicy.decide(hot)
+	if str(locked.get("command", "")) != "sell_share" or str(locked.get("corporation_id", "")) != "volt_grid":
+		_fail("hot modest %s" % str(locked))
+
+
+func _check_long_setup_beats_immediate_gain() -> void:
+	# B1 grows ORBIT by one tile (four shares, $200) and does not lead into NOVA.
+	# The NOVA path is B8, C8, D8, then E8 takes a 14-cell block.
+	# Keeping half of each later tile still places B1. Three quarters places B8.
+	var table = _discount_table()
+	BotPolicy.continuation_num = 1
+	BotPolicy.continuation_den = 2
+	var cash_now := BotPolicy.decide(table)
+	BotPolicy.continuation_num = 3
+	BotPolicy.continuation_den = 4
+	var setup := BotPolicy.decide(table)
+	var again := BotPolicy.decide(table)
+	_restore_score_defaults()
+	print("M8_DISCOUNT half %s threeq %s" % [str(cash_now.get("coordinate", "")), str(setup.get("coordinate", ""))])
+	if str(cash_now.get("coordinate", "")) != "B1":
+		_fail("half discount %s" % str(cash_now))
+	if str(setup.get("coordinate", "")) != "B8":
+		_fail("three quarter setup %s" % str(setup))
+	if str(again.get("coordinate", "")) != "B8":
+		_fail("three quarter drifted %s" % str(again))
+
+
+func _discount_table():
+	var table = OfflineMatch.create(7710, ["Rowan", "Ada"], ["Ada"])
+	var ada := _seat(table, "Ada")
+	table.turn_index = int(ada["turn_order_index"])
+	ada["hand"] = ["B1", "B8", "C8", "D8", "E8"]
+	ada["shares"]["nova_ai"] = 2
+	ada["shares"]["orbit_pay"] = 4
+	_plant(table, "nova_ai", ["A8", "A9"])
+	_plant(table, "orbit_pay", ["A1", "A2"])
+	_plant(table, "volt_grid", ["C4", "C5"])
+	_plant(table, "pulse_media", ["I1", "I2"])
+	_plant(table, "evermart", ["A4", "A5"])
+	for column in ["F", "G"]:
+		for row in range(5, 10):
+			table.occupied["%s%s" % [column, str(row)]] = true
+	for row in range(6, 10):
+		table.occupied["H%s" % str(row)] = true
+	return table
+
+
+func _check_new_reply_outweighs_a_small_growth() -> void:
+	# B1 grows NOVA ($100) and lets Rowan merge it into ORBIT on the next ply.
+	# A quarter of every reply, including the growth Rowan already has, ties B1 with I9,
+	# and the lower coordinate plays B1. Half of only the new merger prefers I9.
+	var table = _reply_table()
+	BotPolicy.threat_div = 4
+	BotPolicy.threat_uses_marginal = false
+	var absolute := BotPolicy.decide(table)
+	BotPolicy.threat_div = 2
+	BotPolicy.threat_uses_marginal = true
+	var marginal := BotPolicy.decide(table)
+	var again := BotPolicy.decide(table)
+	_restore_score_defaults()
+	print("M8_REPLY absolute %s marginal %s" % [str(absolute.get("coordinate", "")), str(marginal.get("coordinate", ""))])
+	if str(absolute.get("coordinate", "")) != "B1":
+		_fail("absolute reply %s" % str(absolute))
+	if str(marginal.get("coordinate", "")) != "I9":
+		_fail("marginal reply %s" % str(marginal))
+	if str(again.get("coordinate", "")) != "I9":
+		_fail("marginal reply drifted %s" % str(again))
+
+
+func _reply_table():
+	var table = OfflineMatch.create(7710, ["Rowan", "Ada"], ["Ada"])
+	var ada := _seat(table, "Ada")
+	var rowan := _seat(table, "Rowan")
+	table.turn_index = int(ada["turn_order_index"])
+	ada["hand"] = ["B1", "I9"]
+	ada["shares"]["nova_ai"] = 2
+	rowan["shares"]["orbit_pay"] = 4
+	_plant(table, "nova_ai", ["A1", "A2"])
+	_plant(table, "orbit_pay", ["D1", "D2"])
+	_plant(table, "volt_grid", ["A8", "A9"])
+	_plant(table, "pulse_media", ["I1", "I2"])
+	_plant(table, "evermart", ["H5", "H6"])
+	return table
+
+
 func _check_full_matches() -> void:
+	_restore_score_defaults()
 	var first := _play(7710, ["Rowan", "Ada", "Bo"], ["Ada", "Bo"])
 	var second := _play(7710, ["Rowan", "Ada", "Bo"], ["Ada", "Bo"])
 	if not bool(first.get("ok", false)):

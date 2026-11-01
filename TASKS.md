@@ -105,6 +105,7 @@ Not a spec milestone. The specification left bots until after launch. This is lo
 - [x] Same seed, same computer decisions, and a finished match for three seats and for four (`M8_CLIENT_OK`)
 - [x] Computers buy and sell shares and BYTE when the dollar score is positive, still at most two actions (`M8_CLIENT_OK`)
 - [x] Placement searches five tiles of the computer's hand, with a 500-evaluation cap, and one ply of opponent frontier threats (`M8_CLIENT_OK`)
+- [x] Dollar scores buy BYTE at $450 or below, sell BYTE at $700 or above, stop at three shares, and weight a new opponent reply (`M8_CLIENT_OK`)
 - [ ] Computer seats in an online room
 
 ## Known limits
@@ -116,4 +117,4 @@ Not a spec milestone. The specification left bots until after launch. This is lo
 - GDScript rejection for prices is −1 or an empty list; the offline table returns `{ok: false, error}`. Python raises (assumption A13).
 - The web export and the API image were exercised on loopback (assumption A15). `docker compose` was not started. No browser, HTTPS page, or physical phone/tablet was tested. PostgreSQL is a SQL file, not a driver.
 - A 420×800 window stacks the watchlist under the board. That does not establish mobile support.
-- Local computers do not join online rooms. Placement looks at five tiles in that computer's hand and at most 24 frontier replies for the other seats. A later tile is dropped when its immediate value plus $20,000 still cannot beat the best continuation. That ceiling rarely binds. A tile worth $0 that touches neither the board nor another tile in hand is not expanded. The search stops at 500 evaluations. It can still misread a position. It does not sell a modest holding unless cash is under $500. It buys BYTE only at $400 or below, and it sells BYTE below $800 only when cash is under $500.
+- Local computers do not join online rooms. Placement looks at five tiles in that computer's hand. Each later tile keeps three quarters of the previous one. The search stops at 500 evaluations. A later tile is dropped when its immediate value plus $20,000 still cannot beat the best continuation. That ceiling rarely binds. At most 24 frontier cells are scored, and half of any increase in the opponent's reply is subtracted. BYTE from $460 to $690 is left alone when cash is at least $500. A fourth share of one company is not bought. A one-share holding is sold only when cash is under $500. The heuristic can still misread a position.

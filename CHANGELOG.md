@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.13.0 — 2026-11-01
+
+Tuned local dollar scores. Protocol version stays `0.1.0`. Client `config/version` is `0.13.0`. The five-tile search, 500-evaluation cap, 24-cell frontier, and $20,000 branch ceiling from 0.12.0 stay. Founding still picks the highest free-share price. A tied survivor still picks the higher payout, then the larger own holding, then the earlier option. Pass-and-play and online rooms are unchanged.
+
+### Changed
+
+- Each later tile in the placement search keeps three quarters of the one before it. Version 0.12.0 kept half, which let a $200 growth beat a longer NOVA line whose payoff sat on the fourth tile.
+- The opponent penalty is half of how much the reply improved, instead of a quarter of the best reply on the board. A reply the opponent could already make is not charged to every tile. Hidden hands are still not read.
+- A computer buys at most three shares of one company. The second share of a company it already holds gets a small bonus, not a stacking bonus on every extra share. It does not buy a third share of a size-8 or larger company when it already leads by two. It sells one share of a size-10 or larger company when it holds four and leads, and it sells one share of a size-6 or larger company when sector sentiment is +2. The size-16 sale and the cash-under-$500 sale stay.
+- BYTE at $450 or below is bought when the purchase leaves at least $500. BYTE at $700 or above is sold. BYTE from $460 to $690 is still left alone when cash is at least $500. A share buy that scores higher still wins the action.
+
+### Evidence
+
+- `./scripts/check_client.sh` printed `M0_CLIENT_OK` through `M8_CLIENT_OK`. Seed 7710 with Rowan, Ada, and Bo still completed twice with the same trace. Seed 4 with three computers still completed. The mixed game still finished.
+- Before this weighting, keeping half of each later tile placed B1 on the discount position below. Three quarters places B8. NOVA is A8–A9 and Ada holds two shares. ORBIT PAY is A1–A2 and Ada holds four. The hand is B1, B8, C8, D8, and E8. Columns F–G, rows 5–9, plus H6–H9, are an unincorporated block that meets the path at E8. The suite prints `M8_DISCOUNT`.
+- Before this reply weight, a quarter of every frontier reply tied B1 with I9, and the lower coordinate played B1. Half of only the new reply plays I9. NOVA is A1–A2 and Ada holds two shares. ORBIT PAY is D1–D2 and Rowan holds four. B1 grows NOVA and lets Rowan merge the two on the next ply. The suite prints `M8_REPLY`.
+- M8 keeps the earlier placement cases. The C1–C4 chain still places E3. The larger block from 0.12.0 still places B1 at three tiles and B8 at five. A second call matches.
+- Market cases that were already right stayed right. An empty market at BYTE $500 still passes. Two NOVA AI buys at $200 still use both actions. A size-18 PULSE MEDIA share at media +2 still sells, and the next action buys NOVA AI. BYTE at $300 is still bought twice. BYTE at $1,000 is still sold. Cash of $400 still sells the share or the coin it must. New cases: BYTE at $440 is bought, BYTE at $640 passes, and BYTE at $720 with one coin is sold. BYTE at $440 is refused when cash is $900. A $200 NOVA AI share beats BYTE at $440. A third NOVA AI share is the last buy; the fourth passes. Four ORBIT PAY shares in a size-12 company at $700 are trimmed by a sale. Two VOLT GRID shares at energy +2, size 8, and $600 are sold. Two ORBIT PAY shares no longer outrank the first NOVA AI share.
+- During `./scripts/check_client.sh` the suite printed `M8_PLACEMENT_50_US 211712 nodes 64` (about 4 ms each), `M8_FIVE_PLIES shallow B1 nodes 85 deep B8 nodes 325 us 511486` (about 26 ms each over 20 repeats), `M8_DISCOUNT half B1 threeq B8`, and `M8_REPLY absolute B1 marginal I9`. Caps are unchanged. A separate four-seat timing pass, not part of the suite, measured 60 placement decisions in a seed-4 game at 30.8 ms on average and 108 ms at the worst (232 tile evaluations on average, 325 at the worst). The same pass a minute earlier was 30.5 ms and 106 ms.
+- `docs/bots-table.png` is still seed 7710 after Bo's opening turn. Rowan sees B5, G4, I8, C1, and I9. The log still says Bo placed B6 and passed both market actions.
+
+### Not in this version
+
+Computer seats in an online room, a search past five tiles or into hidden hands, a neural model, and trades of BYTE from $460 to $690 while cash is at least $500.
+
 ## 0.12.0 — 2026-11-01
 
 Longer local placement search. Protocol version stays `0.1.0`. Client `config/version` is `0.12.0`. Market, founding, and merger choices from 0.10.0 are unchanged. The one-ply opponent reply from 0.11.0 is unchanged. Pass-and-play and online rooms are unchanged.

@@ -103,6 +103,7 @@ Not a spec milestone. The specification left bots until after launch. This is lo
 - [x] Setup: one human plus one, two, or three computers (`docs/bots-setup.png`)
 - [x] Computers take the turn on this device. The human hand stays visible on the human turn. Computer hands are counts (`docs/bots-table.png`)
 - [x] Same seed, same computer decisions, and a finished match for three seats and for four (`M8_CLIENT_OK`)
+- [x] Computers buy and sell shares and BYTE when the dollar score is positive, still at most two actions, and place with a one-tile lookahead (`M8_CLIENT_OK`)
 - [ ] Computer seats in an online room
 
 ## Known limits
@@ -114,4 +115,4 @@ Not a spec milestone. The specification left bots until after launch. This is lo
 - GDScript rejection for prices is −1 or an empty list; the offline table returns `{ok: false, error}`. Python raises (assumption A13).
 - The web export and the API image were exercised on loopback (assumption A15). `docker compose` was not started. No browser, HTTPS page, or physical phone/tablet was tested. PostgreSQL is a SQL file, not a driver.
 - A 420×800 window stacks the watchlist under the board. That does not establish mobile support.
-- Local computers do not join online rooms. Their market play buys at most one share and then passes. They do not sell or trade BYTE.
+- Local computers do not join online rooms. Their policy scores one follow-up tile and fictional dollars. It can still misread a position. It does not sell a modest holding unless cash is under $500. It buys BYTE only at $400 or below, and it sells BYTE below $800 only when cash is under $500.

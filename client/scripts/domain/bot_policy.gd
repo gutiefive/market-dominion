@@ -1,13 +1,24 @@
 extends RefCounted
 class_name BotPolicy
 
-## Deterministic local computer. Ties use the same safe order as a timed
-## autopass: lowest coordinate, fixture order, or the first listed survivor.
-## The match generator is not advanced here, so event draws stay on the deal seed.
+## Deterministic local computer. Placement scores fictional dollars for a
+## founding, a growth, or a merger, then adds half of the best follow-up
+## tile still in hand. Market buys and sells shares and BYTE when that
+## score is positive, at most two actions, and never spends the cash floor.
+## Ties break by lowest coordinate, fixture order, or the earlier survivor.
+## The match generator is not advanced here.
 
 
-const CASH_RESERVE := 1000
-const SHARE_CAP := 4
+const CASH_FLOOR := 500
+const BUY_MAX_SIZE := 14
+const BUY_MAX_SENTIMENT := 1
+const BUY_OWNED_LIMIT := 5
+const SELL_MIN_SIZE := 16
+const SELL_MIN_SENTIMENT := 1
+const SELL_MIN_OWNED := 2
+const BYTE_BUY_MAX := 400
+const BYTE_SELL_MIN := 800
+const END_FEED_PENALTY := -100000
 
 
 static func decide(match: OfflineMatch) -> Dictionary:
@@ -23,12 +34,7 @@ static func decide(match: OfflineMatch) -> Dictionary:
 			return {"ok": true, "command": "pass_turn"}
 		return {"ok": true, "command": "place", "coordinate": _tile(match, hand)}
 	if match.phase == "market":
-		if match.market_actions_left <= 0 or match.market_actions_left < match.market_limit:
-			return {"ok": true, "command": "pass_market"}
-		var corp_id := _buy_target(match)
-		if corp_id == "":
-			return {"ok": true, "command": "pass_market"}
-		return {"ok": true, "command": "buy_share", "corporation_id": corp_id}
+		return _market(match)
 	return {"ok": false, "error": "no computer action for this step"}
 
 
@@ -46,6 +52,12 @@ static func apply(match: OfflineMatch, decision: Dictionary) -> Dictionary:
 		return match.choose_survivor(str(decision["corporation_id"]))
 	if command == "buy_share":
 		return match.buy_share(str(decision["corporation_id"]))
+	if command == "sell_share":
+		return match.sell_share(str(decision["corporation_id"]))
+	if command == "buy_byte":
+		return match.buy_byte()
+	if command == "sell_byte":
+		return match.sell_byte()
 	if command == "pass_market":
 		return match.pass_market()
 	return {"ok": false, "error": "unknown computer command"}
@@ -55,158 +67,384 @@ static func act(match: OfflineMatch) -> Dictionary:
 	return apply(match, decide(match))
 
 
-static func _tile(match: OfflineMatch, hand: Array) -> String:
-	var best := ""
-	var best_key: Array = []
-	for coordinate in hand:
-		var key := _tile_key(match, str(coordinate))
-		if best == "" or _before(key, best_key):
-			best = str(coordinate)
-			best_key = key
+static func _market(match: OfflineMatch) -> Dictionary:
+	if match.market_actions_left <= 0:
+		return {"ok": true, "command": "pass_market"}
+	var player := match.active_player()
+	var cash := int(player["cash"])
+	var shares: Dictionary = player["shares"]
+	var best_score := 0
+	var best := {"ok": true, "command": "pass_market"}
+	for index in match.corporations.size():
+		var corp: Dictionary = match.corporations[index]
+		var corp_id := str(corp["id"])
+		var owned := int(shares.get(corp_id, 0))
+		var buy_score := _buy_share_score(match, corp, owned, cash)
+		if buy_score > best_score:
+			best_score = buy_score
+			best = {"ok": true, "command": "buy_share", "corporation_id": corp_id}
+		var sell_score := _sell_share_score(match, corp, owned, cash)
+		if sell_score > best_score:
+			best_score = sell_score
+			best = {"ok": true, "command": "sell_share", "corporation_id": corp_id}
+	var byte_buy := _buy_byte_score(match, cash)
+	if byte_buy > best_score:
+		best_score = byte_buy
+		best = {"ok": true, "command": "buy_byte"}
+	var byte_sell := _sell_byte_score(match, player, cash)
+	if byte_sell > best_score:
+		best = {"ok": true, "command": "sell_byte"}
 	return best
 
 
-static func _tile_key(match: OfflineMatch, coordinate: String) -> Array:
-	var filled := {}
-	for cell in match.occupied.keys():
-		if bool(match.occupied[cell]):
-			filled[str(cell)] = true
-	filled[coordinate] = true
-	var touched := BoardGraph.component(coordinate, filled)
-	var company_ids: Array[String] = []
-	for cell in touched:
-		var corp_id := str(match.company_of.get(str(cell), ""))
-		if corp_id != "" and not company_ids.has(corp_id):
-			company_ids.append(corp_id)
+static func _buy_share_score(match: OfflineMatch, corp: Dictionary, owned: int, cash: int) -> int:
+	if not bool(corp["active"]) or int(corp["bank_shares"]) < 1 or int(corp["share_price"]) <= 0:
+		return 0
+	var size := int(corp["size"])
+	var sentiment := int(match.sentiment.get(str(corp["sector"]), 0))
+	var price := int(corp["share_price"])
+	if size > BUY_MAX_SIZE or sentiment > BUY_MAX_SENTIMENT or owned >= BUY_OWNED_LIMIT:
+		return 0
+	if cash - price < CASH_FLOOR:
+		return 0
+	return (15 - size) * 30 + (1 - sentiment) * 40 - Pricing.div_nonneg(price, 20) + owned * 80
+
+
+static func _sell_share_score(match: OfflineMatch, corp: Dictionary, owned: int, cash: int) -> int:
+	if not bool(corp["active"]) or int(corp["share_price"]) <= 0 or owned < 1:
+		return 0
+	var size := int(corp["size"])
+	var sentiment := int(match.sentiment.get(str(corp["sector"]), 0))
+	var price := int(corp["share_price"])
+	var profit := 0
+	if owned >= SELL_MIN_OWNED and size >= SELL_MIN_SIZE and sentiment >= SELL_MIN_SENTIMENT:
+		profit = (size - 14) * 50 + sentiment * 80 + Pricing.div_nonneg(price, 10)
+	var liquidity := 500 if cash < CASH_FLOOR else 0
+	return maxi(profit, liquidity)
+
+
+static func _buy_byte_score(match: OfflineMatch, cash: int) -> int:
+	var price := int(match.byte_price)
+	if price > BYTE_BUY_MAX or match.byte_exchange < 1 or cash - price < CASH_FLOOR:
+		return 0
+	return (BYTE_BUY_MAX - price) + 50
+
+
+static func _sell_byte_score(match: OfflineMatch, player: Dictionary, cash: int) -> int:
+	if int(player["byte_count"]) < 1:
+		return 0
+	var price := int(match.byte_price)
+	var profit := 0
+	if price >= BYTE_SELL_MIN:
+		profit = (price - 700) + 30
+	var liquidity := 500 if cash < CASH_FLOOR else 0
+	return maxi(profit, liquidity)
+
+
+static func _tile(match: OfflineMatch, hand: Array) -> String:
+	var filled := _filled(match)
+	var company := _company_map(match)
+	var best := ""
+	var best_score := 0
+	var chosen := false
+	for coordinate in hand:
+		var text := str(coordinate)
+		var score := _placement_score(match, text, hand, filled, company)
+		if not chosen or score > best_score or (score == best_score and text < best):
+			chosen = true
+			best = text
+			best_score = score
+	return best
+
+
+static func _placement_score(match: OfflineMatch, coordinate: String, hand: Array, filled: Dictionary, company: Dictionary) -> int:
+	var immediate := _immediate(match, coordinate, filled, company, {})
+	var projected := _project(match, coordinate, filled, company, {})
+	var bonus := 0
+	var next_filled: Dictionary = projected["filled"]
+	var next_company: Dictionary = projected["company"]
+	var next_extra: Dictionary = projected["extra"]
+	for other in hand:
+		var follow := str(other)
+		if follow == coordinate or bool(next_filled.get(follow, false)):
+			continue
+		var value := _immediate(match, follow, next_filled, next_company, next_extra)
+		if value > bonus:
+			bonus = value
+	if bonus > 0:
+		immediate += Pricing.div_nonneg(bonus, 2)
+	return immediate
+
+
+static func _immediate(match: OfflineMatch, coordinate: String, filled: Dictionary, company: Dictionary, extra: Dictionary) -> int:
+	if bool(filled.get(coordinate, false)):
+		return END_FEED_PENALTY
+	var board := filled.duplicate()
+	board[coordinate] = true
+	var touched := BoardGraph.component(coordinate, board)
+	var company_ids := _ids_in(touched, company)
 	if company_ids.size() >= 2:
-		return _merger_key(match, coordinate, company_ids)
+		return _merger_tile(match, company_ids, touched.size(), company, extra)
 	if company_ids.size() == 1:
-		return _growth_key(match, coordinate, company_ids[0], touched.size())
-	if touched.size() >= 2 and _has_inactive(match):
-		return [0, -touched.size(), 0, coordinate]
-	return [3, 0, 0, coordinate]
+		return _growth_value(match, company_ids[0], touched.size(), company, extra)
+	if touched.size() >= 2 and not _inactive_ids(match, company).is_empty():
+		return _found_value(match, touched.size(), company)
+	return 0
 
 
-static func _growth_key(match: OfflineMatch, coordinate: String, corp_id: String, cluster: int) -> Array:
-	var corp := _corp(match, corp_id)
-	var own := _own(match, corp_id)
-	var opp := _max_other(match, corp_id)
-	var growth := cluster - int(corp.get("size", 0))
-	var feeds_end := cluster >= match.end_size and own == 0 and opp > 0
-	var feeds_holder := own == 0 and opp >= 3
-	if feeds_end or feeds_holder:
-		return [5, 0, 0, coordinate]
-	if own > 0:
-		return [1, -own, -growth, coordinate]
-	return [4, growth, 0, coordinate]
+static func _project(match: OfflineMatch, coordinate: String, filled: Dictionary, company: Dictionary, extra: Dictionary) -> Dictionary:
+	var board := filled.duplicate()
+	board[coordinate] = true
+	var owners := company.duplicate()
+	var granted := extra.duplicate()
+	var touched := BoardGraph.component(coordinate, board)
+	var company_ids := _ids_in(touched, owners)
+	if company_ids.size() >= 2:
+		var survivor := _best_merger_id(match, company_ids, touched.size(), owners, granted)
+		for cell in touched:
+			owners[str(cell)] = survivor
+	elif company_ids.size() == 1:
+		var grown := str(company_ids[0])
+		for cell in touched:
+			owners[str(cell)] = grown
+	elif touched.size() >= 2:
+		var founder := _best_founder_id(match, touched.size(), owners)
+		if founder != "":
+			for cell in touched:
+				owners[str(cell)] = founder
+			granted[founder] = int(granted.get(founder, 0)) + 1
+	return {"filled": board, "company": owners, "extra": granted}
 
 
-static func _merger_key(match: OfflineMatch, coordinate: String, company_ids: Array[String]) -> Array:
+static func _found_value(match: OfflineMatch, cluster: int, company: Dictionary) -> int:
+	var best := 0
+	for corp_id in _inactive_ids(match, company):
+		var price := _quoted(match, corp_id, cluster)
+		if price > best:
+			best = price
+	return best
+
+
+static func _growth_value(match: OfflineMatch, corp_id: String, new_size: int, company: Dictionary, extra: Dictionary) -> int:
+	var old_size := int(_sizes(company).get(corp_id, 0))
+	var delta := _quoted(match, corp_id, new_size) - _quoted(match, corp_id, old_size)
+	var ours := _held(match, corp_id, extra)
+	var others := _others(match, corp_id)
+	if new_size >= match.end_size and ours == 0 and others > 0:
+		return END_FEED_PENALTY
+	return ours * delta - others * delta
+
+
+static func _merger_tile(match: OfflineMatch, company_ids: Array, new_size: int, company: Dictionary, extra: Dictionary) -> int:
+	var sizes := _sizes(company)
 	var top := 0
 	for corp_id in company_ids:
-		top = maxi(top, int(_corp(match, corp_id).get("size", 0)))
-	var tied: Array[String] = []
+		top = maxi(top, int(sizes.get(str(corp_id), 0)))
+	var best := END_FEED_PENALTY
+	var found := false
+	for index in match.corporations.size():
+		var corp_id := str(match.corporations[index]["id"])
+		if not company_ids.has(corp_id) or int(sizes.get(corp_id, 0)) != top:
+			continue
+		var value := _merger_value(match, corp_id, company_ids, new_size, sizes, extra)
+		if not found or value > best:
+			found = true
+			best = value
+	return best
+
+
+static func _best_merger_id(match: OfflineMatch, company_ids: Array, new_size: int, company: Dictionary, extra: Dictionary) -> String:
+	var sizes := _sizes(company)
+	var top := 0
 	for corp_id in company_ids:
-		if int(_corp(match, corp_id).get("size", 0)) == top:
-			tied.append(corp_id)
-	if tied.size() != 1:
-		return [3, 0, 0, coordinate]
-	var survivor := tied[0]
-	var held := _own(match, survivor)
-	var losers := 0
+		top = maxi(top, int(sizes.get(str(corp_id), 0)))
+	var best_id := ""
+	var best := 0
+	var found := false
+	for index in match.corporations.size():
+		var corp_id := str(match.corporations[index]["id"])
+		if not company_ids.has(corp_id) or int(sizes.get(corp_id, 0)) != top:
+			continue
+		var value := _merger_value(match, corp_id, company_ids, new_size, sizes, extra)
+		if not found or value > best:
+			found = true
+			best = value
+			best_id = corp_id
+	return best_id
+
+
+static func _merger_value(match: OfflineMatch, survivor: String, company_ids: Array, new_size: int, sizes: Dictionary, extra: Dictionary) -> int:
+	var old_size := int(sizes.get(survivor, 0))
+	var delta := _quoted(match, survivor, new_size) - _quoted(match, survivor, old_size)
+	var ours := _held(match, survivor, extra)
+	var value := ours * delta - _others(match, survivor) * delta
+	var self_id := str(match.active_player()["id"])
 	for corp_id in company_ids:
-		if corp_id != survivor:
-			losers += _own(match, corp_id)
-	var opponent := _max_other(match, survivor)
-	if losers > held and opponent > held:
-		return [5, 0, 0, coordinate]
-	if held > 0 and held >= losers:
-		return [2, -held, 0, coordinate]
-	return [3, 0, 0, coordinate]
+		var loser := str(corp_id)
+		if loser == survivor:
+			continue
+		var holdings := _holdings(match, loser, extra)
+		var payouts := Mergers.bonus_payouts(_quoted(match, loser, int(sizes.get(loser, 0))), holdings)
+		for player in match.players:
+			var amount := int(payouts.get(str(player["id"]), 0))
+			if str(player["id"]) == self_id:
+				value += amount
+			else:
+				value -= amount
+	return value
 
 
 static func _founder(match: OfflineMatch) -> String:
+	var cluster := match.pending.size()
+	if cluster < 2:
+		cluster = 2
+	return _best_founder_id(match, cluster, _company_map(match))
+
+
+static func _best_founder_id(match: OfflineMatch, cluster: int, company: Dictionary) -> String:
+	var inactive := _inactive_ids(match, company)
 	var best_id := ""
-	var best_sentiment := -99
+	var best_price := -1
 	var best_index := 999
 	for index in match.corporations.size():
-		var corp: Dictionary = match.corporations[index]
-		if bool(corp["active"]):
+		var corp_id := str(match.corporations[index]["id"])
+		if not inactive.has(corp_id):
 			continue
-		var sentiment := int(match.sentiment.get(str(corp["sector"]), 0))
-		if sentiment > best_sentiment or (sentiment == best_sentiment and index < best_index):
-			best_id = str(corp["id"])
-			best_sentiment = sentiment
+		var price := _quoted(match, corp_id, cluster)
+		if price > best_price or (price == best_price and index < best_index):
+			best_id = corp_id
+			best_price = price
 			best_index = index
 	return best_id
 
 
 static func _survivor(match: OfflineMatch) -> String:
-	var player := match.active_player()
-	var shares: Dictionary = player["shares"]
 	var best := str(match.pending_options[0]) if not match.pending_options.is_empty() else ""
+	var best_score := 0
 	var best_shares := -1
-	var best_sentiment := -99
 	var best_index := 999
+	var chosen := false
+	var involved := _involved(match)
 	for index in match.pending_options.size():
 		var corp_id := str(match.pending_options[index])
-		var held := int(shares.get(corp_id, 0))
-		var sentiment := int(match.sentiment.get(str(_corp(match, corp_id).get("sector", "")), 0))
-		var better := held > best_shares
-		if not better and held == best_shares and sentiment > best_sentiment:
+		var score := _survivor_score(match, corp_id, involved)
+		var held := _own(match, corp_id)
+		var better := not chosen or score > best_score
+		if chosen and score == best_score and held > best_shares:
 			better = true
-		if not better and held == best_shares and sentiment == best_sentiment and index < best_index:
+		if chosen and score == best_score and held == best_shares and index < best_index:
 			better = true
 		if better:
+			chosen = true
 			best = corp_id
+			best_score = score
 			best_shares = held
-			best_sentiment = sentiment
 			best_index = index
 	return best
 
 
-static func _buy_target(match: OfflineMatch) -> String:
-	var player := match.active_player()
-	var shares: Dictionary = player["shares"]
-	var cash := int(player["cash"])
-	var held_best := ""
-	var held_count := 0
-	var held_price := 1 << 30
-	var held_index := 999
-	var cheap_id := ""
-	var cheap_price := 1 << 30
-	var cheap_index := 999
-	for index in match.corporations.size():
-		var corp: Dictionary = match.corporations[index]
-		if not bool(corp["active"]) or int(corp["bank_shares"]) < 1 or int(corp["share_price"]) <= 0:
+static func _survivor_score(match: OfflineMatch, survivor: String, involved: Array) -> int:
+	var new_size := match.pending.size()
+	var corp := _corp(match, survivor)
+	var old_price := int(corp.get("share_price", 0))
+	var new_price := _quoted(match, survivor, new_size) if new_size > 0 else 0
+	var delta := new_price - old_price
+	var ours := _own(match, survivor)
+	var value := ours * delta - _others(match, survivor) * delta
+	var self_id := str(match.active_player()["id"])
+	for corp_id in involved:
+		var loser := str(corp_id)
+		if loser == survivor:
 			continue
-		var corp_id := str(corp["id"])
-		var price := int(corp["share_price"])
-		if cash - price < CASH_RESERVE:
-			continue
-		var owned := int(shares.get(corp_id, 0))
-		if owned >= SHARE_CAP:
-			continue
-		if price < cheap_price or (price == cheap_price and index < cheap_index):
-			cheap_id = corp_id
-			cheap_price = price
-			cheap_index = index
-		if owned > held_count or (owned == held_count and owned > 0 and (price < held_price or (price == held_price and index < held_index))):
-			if owned > 0:
-				held_best = corp_id
-				held_count = owned
-				held_price = price
-				held_index = index
-	if held_best != "":
-		return held_best
-	return cheap_id
+		var loser_corp := _corp(match, loser)
+		var holdings := _holdings(match, loser, {})
+		var payouts := Mergers.bonus_payouts(int(loser_corp.get("share_price", 0)), holdings)
+		for player in match.players:
+			var amount := int(payouts.get(str(player["id"]), 0))
+			if str(player["id"]) == self_id:
+				value += amount
+			else:
+				value -= amount
+	return value
 
 
-static func _has_inactive(match: OfflineMatch) -> bool:
+static func _involved(match: OfflineMatch) -> Array:
+	var involved: Array = []
+	for corp_id in match.pending_options:
+		var text := str(corp_id)
+		if not involved.has(text):
+			involved.append(text)
+	for cell in match.pending:
+		var owner := str(match.company_of.get(str(cell), ""))
+		if owner != "" and not involved.has(owner):
+			involved.append(owner)
+	return involved
+
+
+static func _ids_in(touched: PackedStringArray, company: Dictionary) -> Array:
+	var company_ids: Array = []
+	for cell in touched:
+		var corp_id := str(company.get(str(cell), ""))
+		if corp_id != "" and not company_ids.has(corp_id):
+			company_ids.append(corp_id)
+	return company_ids
+
+
+static func _inactive_ids(match: OfflineMatch, company: Dictionary) -> Array:
+	var sizes := _sizes(company)
+	var inactive: Array = []
 	for corp in match.corporations:
-		if not bool(corp["active"]):
-			return true
-	return false
+		var corp_id := str(corp["id"])
+		if int(sizes.get(corp_id, 0)) < 2:
+			inactive.append(corp_id)
+	return inactive
+
+
+static func _sizes(company: Dictionary) -> Dictionary:
+	var sizes := {}
+	for cell in company.keys():
+		var corp_id := str(company[cell])
+		if corp_id == "":
+			continue
+		sizes[corp_id] = int(sizes.get(corp_id, 0)) + 1
+	return sizes
+
+
+static func _filled(match: OfflineMatch) -> Dictionary:
+	var filled := {}
+	for cell in match.occupied.keys():
+		if bool(match.occupied[cell]):
+			filled[str(cell)] = true
+	return filled
+
+
+static func _company_map(match: OfflineMatch) -> Dictionary:
+	var company := {}
+	for cell in match.company_of.keys():
+		company[str(cell)] = str(match.company_of[cell])
+	return company
+
+
+static func _quoted(match: OfflineMatch, corp_id: String, size: int) -> int:
+	if size <= 0:
+		return 0
+	var sentiment := int(match.sentiment.get(str(_corp(match, corp_id).get("sector", "")), 0))
+	var price := Pricing.share_price(size, sentiment)
+	if price < 0:
+		return 0
+	return price
+
+
+static func _holdings(match: OfflineMatch, corp_id: String, extra: Dictionary) -> Dictionary:
+	var self_id := str(match.active_player()["id"])
+	var holdings := {}
+	for player in match.players:
+		var shares: Dictionary = player["shares"]
+		var count := int(shares.get(corp_id, 0))
+		if str(player["id"]) == self_id:
+			count += int(extra.get(corp_id, 0))
+		holdings[str(player["id"])] = count
+	return holdings
 
 
 static func _corp(match: OfflineMatch, corp_id: String) -> Dictionary:
@@ -221,24 +459,16 @@ static func _own(match: OfflineMatch, corp_id: String) -> int:
 	return int(shares.get(corp_id, 0))
 
 
-static func _max_other(match: OfflineMatch, corp_id: String) -> int:
+static func _held(match: OfflineMatch, corp_id: String, extra: Dictionary) -> int:
+	return _own(match, corp_id) + int(extra.get(corp_id, 0))
+
+
+static func _others(match: OfflineMatch, corp_id: String) -> int:
 	var self_id := str(match.active_player()["id"])
-	var best := 0
+	var total := 0
 	for player in match.players:
 		if str(player["id"]) == self_id:
 			continue
 		var shares: Dictionary = player["shares"]
-		best = maxi(best, int(shares.get(corp_id, 0)))
-	return best
-
-
-static func _before(left: Array, right: Array) -> bool:
-	for index in left.size():
-		var a = left[index]
-		var b = right[index]
-		if str(a) == str(b):
-			continue
-		if a is String or b is String:
-			return str(a) < str(b)
-		return int(a) < int(b)
-	return false
+		total += int(shares.get(corp_id, 0))
+	return total

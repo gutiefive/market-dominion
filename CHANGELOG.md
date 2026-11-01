@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.10.0 — 2026-11-01
+
+Stronger local computers. Protocol version stays `0.1.0`. Client `config/version` is `0.10.0`. Pass-and-play and online rooms are unchanged.
+
+### Changed
+
+- A computer still takes at most two market actions and still does not touch the match generator. It buys a share of a company at size 14 or smaller when sector sentiment is +1 or lower, it would still hold fewer than five shares, and cash after the purchase stays at or above $500. It sells one share of a size-16 company when it holds at least two and sentiment is at least +1. Cash under $500 sells a share it holds, or a BYTE it holds. It buys BYTE at $400 or below and sells BYTE at $800 or above when cash stays at or above $500. A score of zero passes. Equal scores keep fixture order, with a share trade considered before BYTE.
+- Placement scores the fictional dollar result: the free founder share, our growth reprice minus every opponent's, or our merger bonus minus opponents' plus the survivor reprice. Half of the best other tile in hand, scored on that board, is added when it is positive. A tile that only pays an opponent loses to a neutral tile. Equal scores use the lowest coordinate.
+- Founding picks the inactive brand with the highest share price for that cluster, then fixture order. A tied survivor picks the higher payout, then the larger own holding, then the earlier listed option.
+
+### Evidence
+
+- `./scripts/check_client.sh` printed `M0_CLIENT_OK` through `M8_CLIENT_OK`. Seed 7710 with Rowan, Ada, and Bo still completed twice with the same trace, ranking, events, and log. Seed 4 with three computers still completed. The mixed game, where Rowan uses the safe autopass and only Ada and Bo use the computer policy, still finished.
+- M8 also checks the new choices directly. C1 beats an isolated A1 because C2 can found on the next tile. A merger Ada holds is taken; the same merger with Rowan's shares is skipped. With two shares of both tied companies, Ada keeps NOVA AI when ORBIT PAY is listed first and its liquidation bonus is larger. An empty market still passes. Two NOVA AI buys use both actions. Two ORBIT PAY shares outrank that cheaper first buy. A size-18 PULSE MEDIA holding at media sentiment +2 is sold for $1,000 and the second action buys NOVA AI, leaving $6,800. Cash of $400 sells the one NOVA AI share it can. BYTE at $300 is bought twice, leaving $5,400 and two coins. BYTE at $1,000 is sold. BYTE at $300 is refused when the purchase would leave less than $500. Cash of $400 with one BYTE at $500 sells that coin and leaves $900.
+- `docs/bots-table.png` is seed 7710 after Bo's opening turn. Rowan sees B5, G4, I8, C1, and I9. Bo and Ada are listed as computer with five tiles each, not the coordinates. The log says Bo placed B6, passed both market actions, and drew. Nothing is on the market and BYTE is $500, so that opening does not trade.
+
+### Not in this version
+
+Computer seats in an online room, a search deeper than the next tile in hand, and a neural model.
+
 ## 0.9.0 — 2026-11-01
 
 Local solo play. Protocol version stays `0.1.0`. Client `config/version` is `0.9.0`. Online rooms are unchanged.

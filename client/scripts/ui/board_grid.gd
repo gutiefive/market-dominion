@@ -3,6 +3,7 @@ extends GridContainer
 ## Labeled 9×9 district grid. Every cell shows its coordinate.
 
 signal cell_pressed(coordinate: String)
+signal cell_hovered(coordinate: String)
 
 const MARKS := {
 	"nova_ai": "NA",
@@ -10,6 +11,20 @@ const MARKS := {
 	"volt_grid": "VG",
 	"pulse_media": "PM",
 	"evermart": "EM",
+}
+const SYMBOLS := {
+	"nova_ai": "◆",
+	"orbit_pay": "●",
+	"volt_grid": "▲",
+	"pulse_media": "■",
+	"evermart": "★",
+}
+const SYMBOL_NAMES := {
+	"nova_ai": "diamond",
+	"orbit_pay": "circle",
+	"volt_grid": "triangle",
+	"pulse_media": "square",
+	"evermart": "star",
 }
 const NAMES := {
 	"nova_ai": "NOVA AI",
@@ -45,6 +60,8 @@ func _build() -> void:
 			button.text = coordinate
 			button.focus_mode = Control.FOCUS_ALL
 			button.pressed.connect(_on_cell.bind(coordinate))
+			button.mouse_entered.connect(_on_hover.bind(coordinate))
+			button.focus_entered.connect(_on_hover.bind(coordinate))
 			_buttons[coordinate] = button
 			add_child(button)
 	set_cell_size(_cell_size)
@@ -69,7 +86,7 @@ func set_cell_size(px: int) -> void:
 			child.custom_minimum_size = Vector2(_cell_size, 22)
 	for button in _buttons.values():
 		button.custom_minimum_size = Vector2(_cell_size, _cell_size)
-		button.add_theme_font_size_override("font_size", 9 if _cell_size < 44 else font)
+		button.add_theme_font_size_override("font_size", Palette.px(9 if _cell_size < 44 else font))
 
 
 func set_state(occupied: Dictionary, companies: Dictionary, legal: Array, selected: String) -> void:
@@ -85,14 +102,23 @@ func set_state(occupied: Dictionary, companies: Dictionary, legal: Array, select
 		button.disabled = false
 		button.focus_mode = Control.FOCUS_ALL if is_legal else Control.FOCUS_NONE
 		button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if is_legal else Control.CURSOR_ARROW
-		button.text = coordinate if corp_id == "" else "%s\n%s" % [coordinate, str(MARKS.get(corp_id, corp_id))]
+		var symbol := str(SYMBOLS.get(corp_id, ""))
+		var mark := str(MARKS.get(corp_id, ""))
+		button.text = coordinate if corp_id == "" else "%s\n%s %s" % [coordinate, symbol, mark]
 		button.tooltip_text = _tip(coordinate, is_occupied, is_legal, corp_id)
+		button.accessibility_name = button.tooltip_text
 		_paint(button, is_occupied, is_legal, is_selected, corp_id)
 
 
 func _tip(coordinate: String, is_occupied: bool, is_legal: bool, corp_id: String) -> String:
 	if corp_id != "":
-		return "%s · %s (%s)." % [coordinate, str(NAMES.get(corp_id, corp_id)), str(MARKS.get(corp_id, ""))]
+		return "%s · %s %s, %s (%s)." % [
+			coordinate,
+			str(SYMBOLS.get(corp_id, "")),
+			str(SYMBOL_NAMES.get(corp_id, "mark")),
+			str(NAMES.get(corp_id, corp_id)),
+			str(MARKS.get(corp_id, "")),
+		]
 	if is_occupied:
 		return "%s is an unincorporated district." % coordinate
 	if is_legal:
@@ -128,7 +154,8 @@ func _paint(button: Button, is_occupied: bool, is_legal: bool, is_selected: bool
 		width = 2
 	var normal := _box(fill, border, width)
 	button.add_theme_stylebox_override("normal", normal)
-	button.add_theme_stylebox_override("hover", _box(fill.lightened(0.08), border, width))
+	var hover_fill := fill if Palette.reduced_motion else fill.lightened(0.08)
+	button.add_theme_stylebox_override("hover", _box(hover_fill, border, width))
 	button.add_theme_stylebox_override("pressed", _box(fill.darkened(0.08), border, width))
 	button.add_theme_stylebox_override("disabled", normal)
 	button.add_theme_stylebox_override("focus", _box(fill, Color("fbbf24"), 3))
@@ -169,3 +196,7 @@ func _box(fill: Color, border: Color, width: int) -> StyleBoxFlat:
 func _on_cell(coordinate: String) -> void:
 	if _legal.has(coordinate):
 		cell_pressed.emit(coordinate)
+
+
+func _on_hover(coordinate: String) -> void:
+	cell_hovered.emit(coordinate)

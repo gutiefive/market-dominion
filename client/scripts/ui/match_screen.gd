@@ -45,10 +45,31 @@ var _merger_buttons: VBoxContainer
 var _seed_input: LineEdit
 var _name_inputs: Array[LineEdit] = []
 var _seat_checks: Array[CheckBox] = []
+var _cash_label: Label
+var _net_label: Label
+var _badge: Label
+var _checklist: Label
+var _preview: Label
+var _watch: MarketWatch
+var _rules: RulesPanel
+var _founder_layer: Control
+var _founder_copy: Label
+var _founder_buttons: VBoxContainer
+var _confirm_layer: Control
+var _confirm_copy: Label
+var _confirm_kind := ""
+var _event_layer: Control
+var _event_copy: Label
+var _dismissed_event := ""
+var _error_layer: Control
+var _error_title: Label
+var _error_body: Label
+var _zoom_steps := 0
 
 
 func _ready() -> void:
 	set_anchors_preset(PRESET_FULL_RECT)
+	Palette.load_settings()
 	_build()
 	var args := OS.get_cmdline_user_args()
 	if args.size() >= 1 and str(args[0]) == "--shot":
@@ -79,6 +100,18 @@ func _build() -> void:
 	add_child(scroll)
 	_merger_layer = _build_merger_modal()
 	add_child(_merger_layer)
+	_founder_layer = _build_choice_layer("Found a company")
+	_founder_copy = _choice_copy(_founder_layer)
+	_founder_buttons = _choice_buttons(_founder_layer)
+	add_child(_founder_layer)
+	_confirm_layer = _build_confirm_layer()
+	add_child(_confirm_layer)
+	_event_layer = _build_event_layer()
+	add_child(_event_layer)
+	_error_layer = _build_error_layer()
+	add_child(_error_layer)
+	_rules = RulesPanel.new()
+	add_child(_rules)
 
 	var root := VBoxContainer.new()
 	root.add_theme_constant_override("separation", 6)
@@ -191,6 +224,40 @@ func _build_play() -> VBoxContainer:
 	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	panel.add_theme_constant_override("separation", 6)
 
+	var top := VBoxContainer.new()
+	top.add_theme_constant_override("separation", 4)
+	panel.add_child(top)
+	var identity := HBoxContainer.new()
+	identity.add_theme_constant_override("separation", 12)
+	top.add_child(identity)
+	_badge = _label("No seat", 14, AMBER)
+	_badge.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_badge.autowrap_mode = TextServer.AUTOWRAP_OFF
+	identity.add_child(_badge)
+	_cash_label = _label("Cash", 14, TEXT)
+	_cash_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	identity.add_child(_cash_label)
+	_net_label = _label("Net", 14, TEAL)
+	_net_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	identity.add_child(_net_label)
+	var tools := HBoxContainer.new()
+	tools.add_theme_constant_override("separation", 8)
+	top.add_child(tools)
+	var smaller := _button("Text", false)
+	smaller.tooltip_text = "Cycle text size. The bracket keys do the same."
+	smaller.pressed.connect(_cycle_text)
+	tools.add_child(smaller)
+	var motion := _button("Motion", false)
+	motion.tooltip_text = "Toggle reduced motion. The M key does the same."
+	motion.pressed.connect(_toggle_motion)
+	tools.add_child(motion)
+	var rules_button := _button("Rules", false)
+	rules_button.pressed.connect(func() -> void: _rules.show_panel())
+	tools.add_child(rules_button)
+	var leave := _button("Leave", false)
+	leave.pressed.connect(_show_setup)
+	tools.add_child(leave)
+
 	_banner = _card()
 	_banner.visible = false
 	panel.add_child(_banner)
@@ -207,7 +274,7 @@ func _build_play() -> VBoxContainer:
 	banner_row.add_child(continue_button)
 
 	_column = VBoxContainer.new()
-	_column.add_theme_constant_override("separation", 8)
+	_column.add_theme_constant_override("separation", 6)
 	_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_column.size_flags_vertical = Control.SIZE_EXPAND_FILL
 
@@ -216,17 +283,32 @@ func _build_play() -> VBoxContainer:
 	_column.add_child(_score_card)
 	_score_box = _box_of(_score_card)
 
-	_event_label = _label("", 15, AMBER)
-	_event_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_event_label = _label("", 14, AMBER)
 	_event_label.visible = false
 	_column.add_child(_event_label)
+
+	_checklist = _label("Turn", 13, TEXT)
+	_column.add_child(_checklist)
+	var preview_row := HBoxContainer.new()
+	preview_row.add_theme_constant_override("separation", 8)
+	_column.add_child(preview_row)
+	_preview = _label("Hover or focus a district for its coordinate.", 13, MUTED)
+	_preview.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	preview_row.add_child(_preview)
+	var zoom_out := _button("Zoom −", false)
+	zoom_out.pressed.connect(func() -> void: _nudge_zoom(-1))
+	var zoom_in := _button("Zoom +", false)
+	zoom_in.pressed.connect(func() -> void: _nudge_zoom(1))
+	preview_row.add_child(zoom_out)
+	preview_row.add_child(zoom_in)
 
 	_board_card = _card()
 	_column.add_child(_board_card)
 	var board_box := _box_of(_board_card)
-	board_box.add_child(_label("District grid  ·  A–I across, 1–9 down. Teal matches the hand. Amber is selected.", 14, TEXT))
+	board_box.add_child(_label("Districts A–I, rows 1–9. Teal outline plus the word legal. Amber focus ring. Company cells show a symbol and letters.", 13, MUTED))
 	_board = BoardGrid.new()
 	_board.cell_pressed.connect(_on_cell_pressed)
+	_board.cell_hovered.connect(_on_cell_hovered)
 	board_box.add_child(_board)
 
 	var hand_card := _card()
@@ -234,7 +316,7 @@ func _build_play() -> VBoxContainer:
 	var hand_box := _box_of(hand_card)
 	var hand_header := HBoxContainer.new()
 	hand_box.add_child(hand_header)
-	hand_header.add_child(_label("Active hand", 14, TEXT))
+	hand_header.add_child(_label("Tile hand", 14, TEXT))
 	_hand_note = _label("", 13, MUTED)
 	_hand_note.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_hand_note.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -246,26 +328,26 @@ func _build_play() -> VBoxContainer:
 	_place_button = _button("Place selected", true)
 	_place_button.pressed.connect(_place_selected)
 	hand_box.add_child(_place_button)
+	_action_row = HFlowContainer.new()
+	_action_row.add_theme_constant_override("h_separation", 6)
+	_action_row.add_theme_constant_override("v_separation", 6)
+	hand_box.add_child(_action_row)
 
 	_side = _card()
 	_side.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_side.custom_minimum_size = Vector2(280, 0)
 	var side_box := _box_of(_side)
-	side_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	side_box.add_child(_label("Market", 15, TEXT))
-	_action_row = HFlowContainer.new()
-	_action_row.add_theme_constant_override("separation", 6)
-	_action_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	side_box.add_child(_action_row)
+	side_box.add_child(_label("Market watchlist", 15, TEXT))
+	_watch = MarketWatch.new()
+	side_box.add_child(_watch)
+	side_box.add_child(_label("Activity", 14, TEXT))
 	_side_text = RichTextLabel.new()
 	_side_text.bbcode_enabled = true
 	_side_text.fit_content = true
 	_side_text.scroll_active = false
-	_side_text.custom_minimum_size = Vector2(0, 160)
-	_side_text.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_side_text.custom_minimum_size = Vector2(0, 72)
+	Palette.remember(_side_text, 13)
 	side_box.add_child(_side_text)
-	var leave := _button("Leave table", false)
-	leave.pressed.connect(_show_setup)
-	side_box.add_child(leave)
 	return panel
 
 
@@ -291,6 +373,16 @@ func _show_setup() -> void:
 	_status.text = "No table open. The deal stays on this device."
 	if _merger_layer != null:
 		_merger_layer.visible = false
+	if _founder_layer != null:
+		_founder_layer.visible = false
+	if _confirm_layer != null:
+		_confirm_layer.visible = false
+	if _event_layer != null:
+		_event_layer.visible = false
+	if _error_layer != null:
+		_error_layer.visible = false
+	if _rules != null:
+		_rules.visible = false
 
 
 func _on_deal_pressed() -> void:
@@ -422,10 +514,16 @@ func _refresh() -> void:
 		_status.text = "No tiles remain. Market actions are still available on an empty hand."
 	if _match.final_round and _match.phase != "completed":
 		_status.text = "Final round. " + _status.text
-	_side_text.text = _side_bbcode()
+	_fill_chrome(player)
+	_fill_watch(player)
+	_side_text.text = _activity_bbcode()
 	_refresh_event()
 	_refresh_score()
 	_sync_merger_modal()
+	_sync_founder_modal()
+	_sync_error()
+	if _match.phase != "market":
+		_confirm_layer.visible = false
 	if _concealed:
 		_hand_note.text = "Covered"
 	else:
@@ -479,13 +577,8 @@ func _rebuild_actions() -> void:
 		child.queue_free()
 	if _concealed or _match == null or _match.phase == "completed":
 		return
-	if _match.phase == "choose_founder":
-		for corp in _match.corporations:
-			if bool(corp["active"]):
-				continue
-			var brand := _button("%s  %s" % [str(corp["name"]), str(BoardGrid.MARKS.get(corp["id"], ""))], true)
-			brand.pressed.connect(_choose_brand.bind(str(corp["id"])))
-			_action_row.add_child(brand)
+	if _match.phase == "choose_founder" or _match.phase == "choose_survivor":
+		_action_row.add_child(_label("Choose in the dialog. Esc does not cancel a required choice.", 13, MUTED))
 		return
 	if _match.phase != "market":
 		return
@@ -502,17 +595,17 @@ func _rebuild_actions() -> void:
 		_action_row.add_child(choice)
 	if not active_ids.is_empty():
 		var buy := _button("Buy share", true)
-		buy.pressed.connect(_buy_share)
+		buy.pressed.connect(func() -> void: _open_confirm("buy_share"))
 		var sell := _button("Sell share", false)
-		sell.pressed.connect(_sell_share)
+		sell.pressed.connect(func() -> void: _open_confirm("sell_share"))
 		_action_row.add_child(buy)
 		_action_row.add_child(sell)
 	var buy_byte := _button("Buy BYTE", true)
-	buy_byte.pressed.connect(_buy_byte)
+	buy_byte.pressed.connect(func() -> void: _open_confirm("buy_byte"))
 	var sell_byte := _button("Sell BYTE", false)
-	sell_byte.pressed.connect(_sell_byte)
+	sell_byte.pressed.connect(func() -> void: _open_confirm("sell_byte"))
 	var pass_action := _button("Pass action", false)
-	pass_action.pressed.connect(_pass_market)
+	pass_action.pressed.connect(func() -> void: _open_confirm("pass"))
 	_action_row.add_child(buy_byte)
 	_action_row.add_child(sell_byte)
 	_action_row.add_child(pass_action)
@@ -554,50 +647,149 @@ func _pass_market() -> void:
 		_apply(_match.pass_market())
 
 
-func _side_bbcode() -> String:
+func _activity_bbcode() -> String:
 	var lines: PackedStringArray = []
-	var active: Dictionary = _match.active_player()
-	var shares: Dictionary = active["shares"]
 	var round_note := "final" if _match.final_round else str(_match.round_number)
-	lines.append("[color=#93a0b8]Seed[/color]  %d    [color=#93a0b8]Round[/color]  %s    [color=#93a0b8]Bag[/color]  %d" % [
-		_match.seed, round_note, _match.bag.size()
+	lines.append("[color=#93a0b8]Round[/color] %s   [color=#93a0b8]Bag[/color] %d   [color=#93a0b8]Seed[/color] %d" % [
+		round_note, _match.bag.size(), _match.seed
 	])
-	lines.append(_sentiment_line())
-	lines.append("[color=#93a0b8]BYTE[/color]  $%d    exchange %d    you %d" % [
-		_match.byte_price, _match.byte_exchange, int(active["byte_count"])
-	])
-	if _match.phase == "market":
-		lines.append("[color=#fbbf24]Market actions left[/color]  %d" % _match.market_actions_left)
-	lines.append("")
-	for corp in _match.corporations:
-		var mark := str(BoardGrid.MARKS.get(corp["id"], ""))
-		if bool(corp["active"]):
-			lines.append("[b]%s[/b]  %s   $%d   size %d   bank %d   you %d" % [
-				str(corp["name"]), mark, int(corp["share_price"]), int(corp["size"]),
-				int(corp["bank_shares"]), int(shares.get(corp["id"], 0))
-			])
-	var available: PackedStringArray = []
-	for corp in _match.corporations:
-		if not bool(corp["active"]):
-			available.append(str(corp["name"]))
-	if not available.is_empty():
-		lines.append("[color=#93a0b8]Available to found[/color]  %s" % ", ".join(available))
-	lines.append("")
-	for index in range(_match.players.size()):
-		var info: Dictionary = _match.players[index]
-		var playing := _match.phase != "completed" and str(info["id"]) == str(active["id"])
-		var mark := "  [color=#fbbf24]playing[/color]" if playing else ""
-		lines.append("%d. %s  [color=#93a0b8]%s · cash $%d · net $%d[/color]%s" % [
-			index + 1, str(info["display_name"]), str(info["id"]), int(info["cash"]), _player_net(info), mark
-		])
-	if not _match.log.is_empty():
-		lines.append("")
-		var start := maxi(0, _match.log.size() - 6)
+	if _match.log.is_empty():
+		lines.append("[color=#93a0b8]No actions yet.[/color]")
+	else:
+		var start := maxi(0, _match.log.size() - 4)
 		for index in range(start, _match.log.size()):
-			lines.append(_match.log[index])
-	lines.append("")
-	lines.append("[color=#93a0b8]Local only. One event is drawn after every player has taken a turn. The final ledger uses cash, active shares, and BYTE.[/color]")
+			lines.append(str(_match.log[index]))
 	return "\n".join(lines)
+
+
+func _fill_chrome(player: Dictionary) -> void:
+	var covered := " · hand covered" if _concealed else ""
+	var turn := " · playing" if _match.phase != "completed" else " · finished"
+	_badge.text = "%s  %s%s%s" % [str(player["display_name"]), str(player["id"]), turn, covered]
+	_cash_label.text = "Cash $%d" % int(player["cash"])
+	_net_label.text = "Net $%d" % _player_net(player)
+	var place_mark := "Now" if _match.phase == "place" else "Done" if _match.phase != "choose_founder" and _match.phase != "choose_survivor" else "Wait"
+	var resolve_mark := "Now" if _match.phase == "choose_founder" or _match.phase == "choose_survivor" else "After place"
+	var market_mark := "Now %d left" % _match.market_actions_left if _match.phase == "market" else "Up to 2"
+	_checklist.text = "1 %s place   ·   2 %s resolve   ·   3 %s market" % [place_mark, resolve_mark, market_mark]
+
+
+func _fill_watch(player: Dictionary) -> void:
+	var shares: Dictionary = player["shares"]
+	var rows: Array = []
+	rows.append({
+		"active": true,
+		"symbol": "¤",
+		"mark": "BYTE",
+		"name": "BYTE coin",
+		"detail": "$%d   exchange %d   you %d" % [_match.byte_price, _match.byte_exchange, int(player["byte_count"])],
+	})
+	for corp in _match.corporations:
+		var sector := str(corp["sector"])
+		var sentiment := int(_match.sentiment.get(sector, 0))
+		var shown := "+%d" % sentiment if sentiment > 0 else str(sentiment)
+		rows.append({
+			"active": bool(corp["active"]),
+			"symbol": str(BoardGrid.SYMBOLS.get(corp["id"], "")),
+			"mark": str(BoardGrid.MARKS.get(corp["id"], "")),
+			"name": str(corp["name"]),
+			"price": int(corp["share_price"]),
+			"sentiment": "%s %s" % [sector, shown],
+			"size": int(corp["size"]),
+			"bank": int(corp["bank_shares"]),
+			"yours": int(shares.get(corp["id"], 0)),
+		})
+	_watch.show_rows(rows)
+
+
+func _on_cell_hovered(coordinate: String) -> void:
+	if _board == null:
+		return
+	_preview.text = _board._tip(coordinate, bool(_match.occupied.get(coordinate, false)) if _match != null else false, _board._legal.has(coordinate), str(_match.company_of.get(coordinate, "")) if _match != null else "")
+
+
+func _cycle_text() -> void:
+	Palette.cycle_scale()
+	Palette.restyle(self)
+	_fit_board()
+
+
+func _toggle_motion() -> void:
+	Palette.toggle_motion()
+	_status.text = "Reduced motion is on. Hover no longer brightens." if Palette.reduced_motion else "Motion is on. Hover brightens a cell."
+	if _match != null:
+		_refresh()
+
+
+func _nudge_zoom(step: int) -> void:
+	_zoom_steps = clampi(_zoom_steps + step, 0, 3)
+	_fit_board()
+	_preview.text = "Zoom step %d. Scroll the page to pan when the grid is larger than the window." % _zoom_steps
+
+
+func _open_confirm(kind: String) -> void:
+	if _match == null or _match.phase != "market":
+		return
+	_confirm_kind = kind
+	var corp_name := _corp_name(_market_corp)
+	var price := 0
+	for corp in _match.corporations:
+		if str(corp["id"]) == _market_corp:
+			price = int(corp["share_price"])
+	var cash := int(_match.active_player()["cash"])
+	match kind:
+		"buy_share":
+			_confirm_copy.text = "Buy 1 %s at the posted $%d? Cash is $%d. This does not change the price." % [corp_name, price, cash]
+		"sell_share":
+			_confirm_copy.text = "Sell 1 %s at the posted $%d? Cash is $%d." % [corp_name, price, cash]
+		"buy_byte":
+			_confirm_copy.text = "Buy 1 BYTE at the posted $%d? Cash is $%d. The exchange holds %d." % [_match.byte_price, cash, _match.byte_exchange]
+		"sell_byte":
+			_confirm_copy.text = "Sell 1 BYTE at the posted $%d? Cash is $%d." % [_match.byte_price, cash]
+		"pass":
+			_confirm_copy.text = "Pass this market action? %d remain after this pass, counting the one you are skipping." % _match.market_actions_left
+	_confirm_layer.visible = true
+	_confirm_layer.move_to_front()
+
+
+func _apply_confirm() -> void:
+	_confirm_layer.visible = false
+	var kind := _confirm_kind
+	_confirm_kind = ""
+	if _match == null:
+		return
+	match kind:
+		"buy_share":
+			_apply(_match.buy_share(_market_corp))
+		"sell_share":
+			_apply(_match.sell_share(_market_corp))
+		"buy_byte":
+			_apply(_match.buy_byte())
+		"sell_byte":
+			_apply(_match.sell_byte())
+		"pass":
+			_apply(_match.pass_market())
+
+
+func _corp_name(corp_id: String) -> String:
+	for corp in _match.corporations:
+		if str(corp["id"]) == corp_id:
+			return str(corp["name"])
+	return corp_id
+
+
+func _sync_error() -> void:
+	var message := _error.text.strip_edges()
+	_error_layer.visible = message != ""
+	_error_body.text = message
+	if message != "":
+		_error_title.text = "Action not applied"
+		_error_layer.move_to_front()
+
+
+func _dismiss_error() -> void:
+	_error.text = ""
+	_error_layer.visible = false
 
 
 func _sentiment_line() -> String:
@@ -633,8 +825,13 @@ func _refresh_event() -> void:
 	for line in _match.log:
 		if str(line).begins_with("Round event:"):
 			latest = str(line)
-	_event_label.visible = latest != ""
-	_event_label.text = latest
+	var choosing := _match.phase == "choose_founder" or _match.phase == "choose_survivor"
+	var show_overlay := latest != "" and latest != _dismissed_event and _match.phase != "completed" and not choosing
+	_event_label.visible = false
+	_event_layer.visible = show_overlay
+	_event_copy.text = latest
+	if show_overlay:
+		_event_layer.move_to_front()
 
 
 func _refresh_score() -> void:
@@ -696,10 +893,10 @@ func _fit_board() -> void:
 	# Taller windows can use a larger cell; narrow windows are width-limited.
 	var cell_h := 46
 	if window.y < 760.0:
-		cell_h = 30 if _banner.visible else 32
+		cell_h = 28 if _banner.visible else 30
 	elif window.y >= 900.0:
 		cell_h = 52
-	_board.set_cell_size(mini(cell_w, cell_h))
+	_board.set_cell_size(mini(cell_w, cell_h) + _zoom_steps * 6)
 
 
 func _ensure_table(wide: bool) -> void:
@@ -776,8 +973,9 @@ func _sync_merger_modal() -> void:
 			if str(corp["id"]) != str(corp_id):
 				continue
 			var mark := str(BoardGrid.MARKS.get(corp_id, ""))
-			var choice := _button("%s   %s     size %d     $%d" % [
-				str(corp["name"]), mark, int(corp["size"]), int(corp["share_price"])
+			var symbol := str(BoardGrid.SYMBOLS.get(corp_id, ""))
+			var choice := _button("%s  %s   %s     size %d     $%d" % [
+				symbol, str(corp["name"]), mark, int(corp["size"]), int(corp["share_price"])
 			], true)
 			choice.pressed.connect(_choose_survivor.bind(str(corp_id)))
 			_merger_buttons.add_child(choice)
@@ -786,6 +984,194 @@ func _sync_merger_modal() -> void:
 func _choose_survivor(corp_id: String) -> void:
 	if _match != null:
 		_apply(_match.choose_survivor(corp_id))
+
+
+func _sync_founder_modal() -> void:
+	if _founder_layer == null:
+		return
+	var open := _match != null and _match.phase == "choose_founder" and not _concealed
+	_founder_layer.visible = open
+	if not open:
+		return
+	for child in _founder_buttons.get_children():
+		child.queue_free()
+	_founder_copy.text = "This cluster is not part of a company yet. Pick an inactive brand. You receive one share when that bank has a share left. The symbol on the button is the same mark used on the grid."
+	for corp in _match.corporations:
+		if bool(corp["active"]):
+			continue
+		var corp_id := str(corp["id"])
+		var choice := _button("%s  %s  %s" % [
+			str(BoardGrid.SYMBOLS.get(corp_id, "")),
+			str(corp["name"]),
+			str(BoardGrid.MARKS.get(corp_id, "")),
+		], true)
+		choice.pressed.connect(_choose_brand.bind(corp_id))
+		_founder_buttons.add_child(choice)
+	_founder_layer.move_to_front()
+
+
+func _build_choice_layer(title: String) -> Control:
+	var layer := _dim_layer()
+	var box := _modal_box(layer)
+	box.add_child(_label(title, 20, TEXT))
+	var copy := _label("", 14, MUTED)
+	copy.custom_minimum_size = Vector2(420, 0)
+	box.add_child(copy)
+	var buttons := VBoxContainer.new()
+	buttons.add_theme_constant_override("separation", 8)
+	box.add_child(buttons)
+	return layer
+
+
+func _choice_copy(layer: Control) -> Label:
+	return _modal_box(layer).get_child(1) as Label
+
+
+func _choice_buttons(layer: Control) -> VBoxContainer:
+	return _modal_box(layer).get_child(2) as VBoxContainer
+
+
+func _build_confirm_layer() -> Control:
+	var layer := _dim_layer()
+	var box := _modal_box(layer)
+	box.add_child(_label("Confirm market action", 20, TEXT))
+	_confirm_copy = _label("", 14, TEXT)
+	_confirm_copy.custom_minimum_size = Vector2(420, 0)
+	box.add_child(_confirm_copy)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	box.add_child(row)
+	var yes := _button("Confirm", true)
+	yes.pressed.connect(_apply_confirm)
+	var no := _button("Cancel", false)
+	no.pressed.connect(func() -> void: _confirm_layer.visible = false)
+	row.add_child(yes)
+	row.add_child(no)
+	return layer
+
+
+func _build_event_layer() -> Control:
+	var layer := _dim_layer()
+	var box := _modal_box(layer)
+	box.add_child(_label("Round event", 20, AMBER))
+	_event_copy = _label("", 15, TEXT)
+	_event_copy.custom_minimum_size = Vector2(460, 0)
+	box.add_child(_event_copy)
+	box.add_child(_label("Prices moved because sector sentiment changed, or BYTE's posted price changed. Rules explains the formula. A trade does not do this.", 13, MUTED))
+	var dismiss := _button("Continue", true)
+	dismiss.pressed.connect(_dismiss_event)
+	box.add_child(dismiss)
+	return layer
+
+
+func _dismiss_event() -> void:
+	_dismissed_event = _event_copy.text
+	_event_layer.visible = false
+
+
+func _build_error_layer() -> Control:
+	var layer := _dim_layer()
+	var box := _modal_box(layer)
+	_error_title = _label("Action not applied", 20, DANGER)
+	box.add_child(_error_title)
+	_error_body = _label("", 15, TEXT)
+	_error_body.custom_minimum_size = Vector2(420, 0)
+	box.add_child(_error_body)
+	box.add_child(_label("Cash, tiles, and the board were not changed.", 13, MUTED))
+	var dismiss := _button("Dismiss", true)
+	dismiss.pressed.connect(_dismiss_error)
+	box.add_child(dismiss)
+	return layer
+
+
+func _dim_layer() -> Control:
+	var layer := Control.new()
+	layer.set_anchors_preset(PRESET_FULL_RECT)
+	layer.visible = false
+	layer.mouse_filter = Control.MOUSE_FILTER_STOP
+	var dim := ColorRect.new()
+	dim.color = Color(0.04, 0.06, 0.12, 0.72)
+	dim.set_anchors_preset(PRESET_FULL_RECT)
+	layer.add_child(dim)
+	var center := CenterContainer.new()
+	center.set_anchors_preset(PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(center)
+	var card := _card()
+	card.custom_minimum_size = Vector2(480, 0)
+	center.add_child(card)
+	return layer
+
+
+func _modal_box(layer: Control) -> VBoxContainer:
+	var center := layer.get_child(1) as CenterContainer
+	var card := center.get_child(0) as PanelContainer
+	return _box_of(card)
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not (event is InputEventKey) or not event.pressed or event.echo:
+		return
+	var key := event as InputEventKey
+	var line_edit := get_viewport().gui_get_focus_owner()
+	if line_edit is LineEdit or line_edit is TextEdit:
+		return
+	if key.keycode == KEY_ESCAPE:
+		if _rules.visible:
+			_rules.hide_panel()
+		elif _confirm_layer.visible:
+			_confirm_layer.visible = false
+		elif _event_layer.visible:
+			_dismiss_event()
+		elif _error_layer.visible:
+			_dismiss_error()
+		get_viewport().set_input_as_handled()
+		return
+	if key.keycode == KEY_R:
+		_rules.show_panel()
+		get_viewport().set_input_as_handled()
+		return
+	if key.keycode == KEY_BRACKETLEFT or key.keycode == KEY_BRACKETRIGHT:
+		if key.keycode == KEY_BRACKETRIGHT:
+			Palette.cycle_scale()
+		else:
+			var index := Palette.SCALES.find(Palette.text_scale)
+			Palette.text_scale = Palette.SCALES[(index - 1 + Palette.SCALES.size()) % Palette.SCALES.size()]
+			Palette.save_settings()
+		Palette.restyle(self)
+		_fit_board()
+		get_viewport().set_input_as_handled()
+		return
+	if key.keycode == KEY_M:
+		_toggle_motion()
+		get_viewport().set_input_as_handled()
+		return
+	if _rules.visible or _confirm_layer.visible or _event_layer.visible or _error_layer.visible or _founder_layer.visible or _merger_layer.visible:
+		return
+	if _match == null or _concealed or not _play.visible or _online.visible:
+		return
+	if _match.phase != "place":
+		return
+	var hand: Array = _match.active_player()["hand"]
+	if key.keycode >= KEY_1 and key.keycode <= KEY_5:
+		var index := key.keycode - KEY_1
+		if index < hand.size():
+			_select_tile(str(hand[index]))
+			get_viewport().set_input_as_handled()
+		return
+	if key.keycode == KEY_LEFT or key.keycode == KEY_RIGHT:
+		if hand.is_empty():
+			return
+		var current := hand.find(_selected)
+		var step := -1 if key.keycode == KEY_LEFT else 1
+		var next := 0 if current < 0 else (current + step + hand.size()) % hand.size()
+		_selected = str(hand[next])
+		_refresh()
+		get_viewport().set_input_as_handled()
+		return
+	if key.keycode == KEY_ENTER or key.keycode == KEY_KP_ENTER:
+		_place_selected()
+		get_viewport().set_input_as_handled()
 
 
 func _shot_pull(coordinate: String) -> void:
@@ -804,6 +1190,38 @@ func _shot_pull(coordinate: String) -> void:
 func _shot_pass_market() -> void:
 	while _match.phase == "market" and _match.market_actions_left > 0:
 		_match.pass_market()
+
+
+func _shot_founder() -> void:
+	_shot_pull("A1")
+	_match.place("A1")
+	_shot_pass_market()
+	_shot_pull("A2")
+	_match.place("A2")
+	_concealed = false
+	_refresh()
+
+
+func _shot_confirm() -> void:
+	_shot_pull("A1")
+	_match.place("A1")
+	_shot_pass_market()
+	_shot_pull("E9")
+	_match.place("E9")
+	_shot_pass_market()
+	_shot_pull("A2")
+	_match.place("A2")
+	_match.choose_founder("nova_ai")
+	_shot_pass_market()
+	_shot_pull("C1")
+	_match.place("C1")
+	_shot_pass_market()
+	_shot_pull("B1")
+	_match.place("B1")
+	_concealed = false
+	_market_corp = "nova_ai"
+	_refresh()
+	_open_confirm("buy_share")
 
 
 func _shot_economy() -> void:
@@ -887,7 +1305,7 @@ func _shot_online(match_id: String, token: String) -> void:
 		client.poll()
 	var body := JSON.stringify({
 		"match_id": match_id,
-		"client_action_id": "shot",
+		"client_action_id": "shot_%d" % Time.get_ticks_msec(),
 		"expected_state_version": 0,
 		"session_token": token,
 		"command": "request_snapshot",
@@ -1002,10 +1420,19 @@ func _run_shot(path: String, phase: String) -> void:
 		_shot_merger()
 	elif phase == "tie":
 		_shot_tie()
+	elif phase == "founder":
+		_shot_founder()
 	elif phase == "event":
 		_shot_event()
 	elif phase == "score":
 		_shot_score()
+	elif phase == "rules":
+		_rules.show_panel()
+	elif phase == "confirm":
+		_shot_confirm()
+	elif phase == "error":
+		_error.text = "That tile is not in the active hand."
+		_sync_error()
 	await get_tree().process_frame
 	await get_tree().process_frame
 	_fit_board()
@@ -1063,7 +1490,7 @@ func _label(text: String, size: int, color: Color) -> Label:
 	label.text = text
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	label.add_theme_font_size_override("font_size", size)
+	Palette.remember(label, size)
 	label.add_theme_color_override("font_color", color)
 	return label
 
@@ -1075,11 +1502,13 @@ func _button(text: String, primary: bool) -> Button:
 	button.custom_minimum_size = Vector2(0, 36)
 	var fill := TEAL if primary else Color("243044")
 	var font := Color("06211c") if primary else TEXT
+	var hover_fill := fill if Palette.reduced_motion else fill.lightened(0.08)
 	button.add_theme_stylebox_override("normal", _box(fill, fill, 6))
-	button.add_theme_stylebox_override("hover", _box(fill.lightened(0.08), fill, 6))
+	button.add_theme_stylebox_override("hover", _box(hover_fill, fill, 6))
 	button.add_theme_stylebox_override("pressed", _box(fill.darkened(0.08), fill, 6))
 	button.add_theme_stylebox_override("focus", _box(fill, AMBER, 6))
 	button.add_theme_color_override("font_color", font)
 	button.add_theme_color_override("font_hover_color", font)
 	button.add_theme_color_override("font_focus_color", font)
+	Palette.remember(button, 14)
 	return button

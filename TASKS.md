@@ -1,6 +1,6 @@
 # Milestones
 
-M5 is the stage this tree claims as playable. A box is checked only where a command was run and the result is recorded in [CHANGELOG.md](CHANGELOG.md).
+M6 is the stage this tree claims as playable. A box is checked only where a command was run and the result is recorded in [CHANGELOG.md](CHANGELOG.md).
 
 ## M0 Foundation
 
@@ -70,8 +70,15 @@ Local pass-and-play only. The HTTP API does not apply these moves.
 
 ## M6 Production UI
 
-- [ ] Board layout, rules overlay, keyboard path, reduced motion, error screens
-- [ ] Tablet landscape pass
+Desktop Godot windows only. No browser and no physical tablet were tested.
+
+- [x] Board center-left, hand below, watchlist on the right, cash and net worth on the top bar, activity feed, action bar (`docs/m6-table.png`)
+- [x] Legal cells outlined, company cells labeled with a symbol and letters, hover and focus preview
+- [x] Active-player badge, turn checklist, founding modal, survivor modal, market confirmation, event overlay
+- [x] Online lobby: invite code, ready list, host start disabled until 2–4 players are ready (`docs/m6-lobby.png`)
+- [x] Rules overlay: turn, glossary, price changes, merger payouts (`docs/m6-rules.png`)
+- [x] Keyboard path, focus rings, three text sizes, reduced motion, error screens for a rejected action, a dead socket, and a server error
+- [x] Narrow viewport still stacks the watchlist under the board (`docs/m6-narrow.png`, 420×800). That is a window-size check, not a device test.
 
 ## M7 Ship
 
@@ -86,4 +93,5 @@ Local pass-and-play only. The HTTP API does not apply these moves.
 - A disconnected seat is autopassed on the next command after the grace window, not by a background timer (assumption A21).
 - Room rate limits live in process memory. Restarting the API clears them. SQLite keeps the rooms.
 - GDScript rejection for prices is −1 or an empty list; the offline table returns `{ok: false, error}`. Python raises (assumption A13).
-- Docker and web export were not executed (assumption A15). Production UI layout is M6.
+- Docker and web export were not executed (assumption A15). No browser or physical phone/tablet was tested.
+- A 420×800 window stacks the watchlist under the board. That does not establish mobile support.

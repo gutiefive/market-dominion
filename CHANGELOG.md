@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.7.0 — 2026-11-01
+
+M6 production UI on the desktop Godot client. Protocol version stays `0.1.0`. Local pass-and-play and online rooms both use the new chrome. No browser export was run.
+
+### Added
+
+- The table is board center-left, tile hand and action bar underneath, market watchlist and a short activity feed on the right, and cash plus net worth on the top bar.
+- Company cells show a symbol and two letters: diamond NA, circle OP, triangle VG, square PM, star EM. Legal cells use a teal outline and the word legal. Hover and keyboard focus preview the coordinate in text.
+- Turn chrome: active-player badge, a three-step checklist, a founding modal, a survivor modal, a market confirmation, and a round-event overlay.
+- The online lobby shows the invite code, a ready list with a check or a dot, and a host Start button that stays disabled until 2–4 players are ready. A dropped socket shows a connection-lost screen and reconnects with the same session token. Rejected commands name their error code.
+- Rules overlay: how a turn works, a glossary, why prices change, and how merger pools are paid. R opens it. Esc closes overlays.
+- Text size cycles through 100%, 115%, and 130% (`[` and `]`). Reduced motion (M) stops hover brightening. Focus rings stay amber. Settings are stored in `user://market_ui.cfg`.
+- Zoom + and Zoom − enlarge the grid. The page scrolls to pan. A window under 980 px wide stacks the watchlist under the board.
+
+### Evidence
+
+- `.venv/bin/python -m pytest -q` passed (71 tests). The room security tests are unchanged.
+- `./scripts/check_client.sh` prints `M0_CLIENT_OK` through `M6_CLIENT_OK`.
+- Desktop captures: `docs/m6-table.png`, `docs/m6-rules.png`, `docs/m6-founder.png`, `docs/m6-tie.png`, `docs/m6-confirm.png`, `docs/m6-merger.png` (event overlay after a resolved merger), `docs/m6-error.png`.
+- `docs/m6-narrow.png` is a 420×800 window, not a phone or tablet.
+- `docs/m6-lobby.png` is a live room where Start stays off because Quinn is not ready. `docs/m6-online.png` is the same API after start: the host hand is on screen and the other seat is only a name in the feed.
+
+### Not in this version
+
+Web export, browser smoke tests, a physical tablet pass, Docker, HTTPS, and a PostgreSQL migration.
+
 ## 0.6.0 — 2026-11-01
 
 M5 private rooms. Protocol version stays `0.1.0`. `POST /v1/protocol/commands/validate` still returns `applied: false`. Play goes through the room API.

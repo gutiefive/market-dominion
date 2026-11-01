@@ -2,7 +2,7 @@
 
 A fictional tile-and-market strategy game for 2–4 players. Cash, shares, and BYTE coins are game currency. This repository does not take bets, hold wallets, or trade real assets.
 
-**M5 adds private online rooms on top of the local table.** The board still deals, founds, merges, trades, draws events, and scores in pass-and-play. An online room is a separate match: the Python server owns the seed, the tiles, and the cash. See [TASKS.md](TASKS.md).
+**M6 is the desktop table.** Local pass-and-play and private rooms share one layout: board, hand, watchlist, and a rules panel. The Python server still owns an online match. See [TASKS.md](TASKS.md). No browser build has been run.
 
 ## Tested Godot build
 
@@ -43,7 +43,7 @@ In a second terminal:
 .tools/godot/Godot_v4.7.2-stable_linux.x86_64 --path client
 ```
 
-The Godot window is the local table, plus an Online room panel. Locally, deal with a seed, pass the device, place a tile, choose a brand when a chain reaches size 2, choose a survivor when the largest chains tie, then take up to two market actions. Hands stay covered between seats. Online, two windows share one invite code. Each window shows only its own tiles. Verified captures: `docs/m5-room.png` (live room, private hand), `docs/m4-event.png`, `docs/m4-score.png`, `docs/m3-merger.png`, `docs/m3-tie.png`, `docs/m2-economy.png`, `docs/m1-opening.png`, `docs/m1-placed.png` (1280×720), and `docs/m1-narrow.png` (420×800).
+The Godot window is the local table, plus an Online room panel. Keys: 1–5 select a tile, Enter places it, arrow keys move along the hand, R opens the rules, Esc closes a panel, `[` and `]` change text size, M toggles reduced motion. Online, two windows share one invite code. Each window shows only its own tiles. The host Start control stays off until every joined player is ready. Verified desktop captures include `docs/m6-table.png`, `docs/m6-rules.png`, `docs/m6-lobby.png`, and `docs/m6-online.png`. `docs/m6-narrow.png` is a 420×800 window, not a device.
 
 ## Tests
 

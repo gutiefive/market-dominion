@@ -1,6 +1,6 @@
 # Milestones
 
-M0 is the only stage this tree claims. A box is checked only where a command was run and the result is recorded in [CHANGELOG.md](CHANGELOG.md).
+M1 is the stage this tree claims as playable. A box is checked only where a command was run and the result is recorded in [CHANGELOG.md](CHANGELOG.md).
 
 ## M0 Foundation
 
@@ -18,14 +18,14 @@ M0 is the only stage this tree claims. A box is checked only where a command was
 
 ## M1 Offline board
 
-Not started as a playable surface. The catalog, conservation checker, and Godot project are the pieces M1 should build on.
+Local pass-and-play only. The HTTP API does not apply these moves.
 
-- [ ] Interactive 9×9 labeled grid in `client/`
-- [ ] Seeded bag shuffle and a deal of five unique tiles per seat
-- [ ] Local pass-and-play turn ownership
-- [ ] Legal-cell highlight for the active hand
-- [ ] Conservation test that walks a scripted deal, not only a static partition
-- [ ] Screenshot of a real placement
+- [x] Interactive 9×9 labeled grid in `client/` (`docs/m1-opening.png`)
+- [x] Seeded bag shuffle and a deal of five unique tiles per seat (`golden_deals.json`, `M1_CLIENT_OK`)
+- [x] Local pass-and-play turn ownership, with the hand covered between seats
+- [x] Legal-cell highlight for the active hand
+- [x] Conservation test that walks a scripted deal and a full 81-tile placement
+- [x] Screenshot of a real placement (`docs/m1-placed.png`, seed 7710, Rowan places C1)
 
 ## M2 Economy
 
@@ -75,8 +75,9 @@ The HTTP validator is not multiplayer.
 - [ ] Container backend with a real database migration and health checks
 - [ ] Smoke on current desktop Chrome, Firefox, and Safari
 
-## Known M0 limits
+## Known limits
 
-- Validate never mutates a match. There is no match.
-- GDScript rejection is −1 or an empty list; Python raises (assumption A13).
+- Validate never mutates a match. The offline table lives in the client and in `OfflineMatch`; it is not a server room.
+- Placed cells stay unincorporated. Founding, growth, mergers, and market actions are M2+.
+- GDScript rejection for prices is −1 or an empty list; the offline table returns `{ok: false, error}`. Python raises (assumption A13).
 - Docker and web export were not executed (assumption A15).

@@ -2,12 +2,12 @@
 
 This is the project rulebook for implementation. It restates the game specification in project language. It is not a copy of any published board-game rulebook. All money is fictional integer dollars.
 
-M0 ships the numbers, the price formula, sentiment clamping, tile conservation, and the public-state checks as tested functions. It does not deal tiles, run turns, found companies, merge them, or score a finished match. Those gaps are listed in [TASKS.md](TASKS.md). Assumptions that close spec gaps are numbered in [ARCHITECTURE.md](ARCHITECTURE.md).
+M1 deals a local pass-and-play table and places tiles. The price formula, sentiment clamp, tile conservation, and public-state checks from M0 stay tested. M1 does not found companies, merge them, run market actions, draw events, or score a finished match. Those gaps are listed in [TASKS.md](TASKS.md). Assumptions that close spec gaps are numbered in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Players and opening
 
-- 2 to 4 players. Turn order is a shuffle of the match seed, shown before the first turn. M0 does not shuffle.
-- Each player starts with $6,000, no shares, no BYTE, and five private coordinate tiles once a match deals. M0 does not deal.
+- 2 to 4 players. Turn order is a shuffle of the match seed (assumption A16), shown before the first tile is revealed. The same seed deals the same seats and the same hands.
+- Each player starts with $6,000 fictional cash, no shares, and no BYTE. M1 deals five private coordinate tiles and does not move cash. On one device the hand stays covered until that player continues. Online hands are not implemented.
 - Hands stay private in online play. A public snapshot may show `hand_count` only.
 
 ## Board and tiles
@@ -35,11 +35,13 @@ Sector sentiment starts at 0 for each sector and stays inside −2…+2.
 
 ## Turn
 
-1. Place one tile from hand onto its matching empty cell. With no tile and an empty bag, skip placement.
-2. Resolve growth, founding, or a merger, including payouts, before market actions.
+1. Place one tile from hand onto its matching empty cell. With no tile, skip placement. M1 does this step and leaves the cell unincorporated (assumption A17).
+2. Resolve growth, founding, or a merger, including payouts, before market actions. M1 does not resolve this step.
 3. Up to two market actions, either of which may be passed: buy one share, sell one share, buy one BYTE, or sell one BYTE, at the price currently posted. No loans, shorts, fractions, or negative cash.
 4. Draw one tile if the bag has one. The hand returns to five when the bag allows it. A hand never exceeds five (assumption A5).
-5. After every remaining player has taken one turn, apply exactly one round event, reprice, and check the end of the game.
+5. After every remaining player has taken one turn, apply exactly one round event, reprice, and check the end of the game. M1 does not do this.
+
+M1 runs steps 1 and 4 only. Because steps 2 and 3 do not run, the draw happens as soon as the tile is placed. The hand stays at five while the bag can refill it.
 
 A player may place with $0. Buying needs cash and inventory. A timer, when enabled later, plays a deterministic legal tile, takes safe defaults, and passes leftover market actions.
 

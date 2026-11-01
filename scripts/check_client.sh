@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Download Godot 4.7.2 if needed, import the project, and run the headless M0 check.
+# Download Godot 4.7.2 if needed, import the project, and run the headless M0 and M1 checks.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -32,3 +32,5 @@ echo "Godot: $("$BIN" --version)"
 "$BIN" --headless --path "$ROOT/client" --import
 "$BIN" --headless --path "$ROOT/client" --check-only --script res://tests/m0_check.gd
 "$BIN" --headless --path "$ROOT/client" --script res://tests/m0_check.gd
+"$BIN" --headless --path "$ROOT/client" --check-only --script res://tests/m1_check.gd
+"$BIN" --headless --path "$ROOT/client" --script res://tests/m1_check.gd

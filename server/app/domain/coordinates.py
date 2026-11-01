@@ -1,8 +1,8 @@
 """Canonical unshuffled district coordinates.
 
 Assumption A1: columns A–I run left to right, rows 1–9 run top to bottom,
-and the catalog is row-major (A1, B1, … I1, A2, … I9). Seeded shuffle is
-not implemented.
+and the catalog is row-major (A1, B1, … I1, A2, … I9). The bag
+shuffle is a separate generator (assumption A16), not part of this list.
 """
 
 from __future__ import annotations

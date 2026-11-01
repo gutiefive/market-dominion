@@ -41,7 +41,7 @@ var end_occupied: int
 var log: Array[String] = []
 
 
-static func create(seed_value: int, names: Array) -> OfflineMatch:
+static func create(seed_value: int, names: Array, bot_names: Array = []) -> OfflineMatch:
 	var rules = SharedFiles.read_json("fixtures/rules_constants.json")
 	var roster_file = SharedFiles.read_json("fixtures/corporations.json")
 	if rules == null or roster_file == null or seed_value < 0:
@@ -84,14 +84,19 @@ static func create(seed_value: int, names: Array) -> OfflineMatch:
 		})
 		share_template[corp_id] = 0
 	var rng := MatchRng.new(seed_value)
+	var bots := {}
+	for entry in bot_names:
+		bots[str(entry)] = true
 	var roster: Array = []
 	for index in names.size():
+		var display_name := str(names[index])
 		roster.append({
 			"id": "p%d" % [index + 1],
-			"display_name": str(names[index]),
+			"display_name": display_name,
 			"hand": [],
 			"shares": share_template.duplicate(true),
 			"byte_count": 0,
+			"bot": bool(bots.get(display_name, false)),
 		})
 	table.players = MatchRng.shuffle(roster, rng)
 	for index in table.players.size():

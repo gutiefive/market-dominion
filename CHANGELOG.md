@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.9.0 — 2026-11-01
+
+Local solo play. Protocol version stays `0.1.0`. Client `config/version` is `0.9.0`. Online rooms are unchanged.
+
+### Added
+
+- The local table can seat one human and one to three computers (Ada, Bo, Cy). Pass-and-play is still the unchecked setup.
+- A computer plays its own turn on the device: place a tile, choose a founder or a tied survivor, then at most one share purchase and a passed second market action. Equal choices use the autopass order (lowest coordinate, fixture order, or the first listed survivor). The match generator is not used for those choices.
+- Founding beats an isolated tile. Growing a company an opponent already holds heavily is skipped when another tile is safe. A higher sector sentiment wins a founding choice. The computer's own shares win a survivor tie.
+- The human hand is shown on the human turn. Computer seats are labeled computer, and the activity list shows a tile count rather than the tiles. The device is not passed for a computer seat.
+
+### Evidence
+
+- `./scripts/check_client.sh` printed `M0_CLIENT_OK` through `M8_CLIENT_OK`. Seed 7710 with Rowan, Ada, and Bo completed twice with the same decision trace, ranking, events, and log. Seed 4 with four seats, three of them computers, also completed with empty economy and tile errors.
+- `docs/bots-setup.png` is the setup with You, Ada, and Bo. `docs/bots-table.png` is seed 7710 after Bo's opening turn: Rowan sees B5, G4, I8, C1, and I9. Bo's tiles are not listed. The log says Bo placed B6 and passed both market actions.
+
+### Not in this version
+
+Computer seats in an online room, BYTE trades by the computer, selling shares, and a stronger search than this heuristic.
+
 ## 0.8.0 — 2026-11-01
 
 M7 packaging. Protocol version stays `0.1.0`. Client `config/version` is `0.8.0`. No public URL was deployed.

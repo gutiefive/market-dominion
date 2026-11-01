@@ -1,6 +1,6 @@
 extends Control
-## Local pass-and-play table. Hands stay covered between seats.
-## This is one device, not an online match.
+## Local table. Pass-and-play covers every hand. A solo table keeps one human
+## and lets computers play their own seats. Online rooms are unchanged.
 
 const BG := Color("0e1525")
 const CARD := Color("162033")
@@ -45,6 +45,10 @@ var _merger_buttons: VBoxContainer
 var _seed_input: LineEdit
 var _name_inputs: Array[LineEdit] = []
 var _seat_checks: Array[CheckBox] = []
+var _vs_bots: CheckBox
+var _setup_blurb: Label
+var _order_help: Label
+var _order_go: Button
 var _cash_label: Label
 var _net_label: Label
 var _badge: Label
@@ -125,7 +129,7 @@ func _build() -> void:
 	titles.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(titles)
 	titles.add_child(_label("Market Dominion", 22, TEXT))
-	titles.add_child(_label("Local pass-and-play, or a private room on the game server.", 13, MUTED))
+	titles.add_child(_label("Local pass-and-play, computers on this device, or a private room.", 13, MUTED))
 	var fresh := _button("New table", false)
 	fresh.pressed.connect(_show_setup)
 	header.add_child(fresh)
@@ -156,10 +160,17 @@ func _build_setup() -> VBoxContainer:
 	panel.add_child(card)
 	var box := _box_of(card)
 	box.add_child(_label("Open a table", 20, TEXT))
-	box.add_child(_label(
+	_setup_blurb = _label(
 		"Two to four seats. The seed shuffles turn order, then the 81-tile bag, then deals five private tiles to each seat. The same seed deals the same hands. Nothing is sent to a server.",
 		14, MUTED
-	))
+	)
+	box.add_child(_setup_blurb)
+	_vs_bots = CheckBox.new()
+	_vs_bots.text = "One human versus computers"
+	_vs_bots.button_pressed = false
+	_vs_bots.accessibility_name = "Play alone against computers"
+	_vs_bots.toggled.connect(func(_on: bool) -> void: _sync_seat_mode())
+	box.add_child(_vs_bots)
 	var seed_row := HBoxContainer.new()
 	seed_row.add_theme_constant_override("separation", 8)
 	box.add_child(seed_row)
@@ -206,15 +217,16 @@ func _build_order() -> VBoxContainer:
 	panel.add_child(card)
 	var box := _box_of(card)
 	box.add_child(_label("Turn order", 20, TEXT))
-	box.add_child(_label(
+	_order_help = _label(
 		"Seats were shuffled before the bag. Tiles stay covered until the first player takes the device.",
 		14, MUTED
-	))
+	)
+	box.add_child(_order_help)
 	_order_list = _label("", 16, TEXT)
 	box.add_child(_order_list)
-	var go := _button("Pass the device", true)
-	go.pressed.connect(_reveal)
-	box.add_child(go)
+	_order_go = _button("Pass the device", true)
+	_order_go.pressed.connect(_reveal)
+	box.add_child(_order_go)
 	return panel
 
 
@@ -385,6 +397,34 @@ func _show_setup() -> void:
 		_rules.visible = false
 
 
+func _sync_seat_mode() -> void:
+	_error.text = ""
+	var solo := _vs_bots.button_pressed
+	var human_names := ["Rowan", "Quinn", "Avery", "Blake"]
+	var computer_names := ["Ada", "Bo", "Cy"]
+	if solo:
+		_setup_blurb.text = "You play one seat. Add one, two, or three computers. They take their own turns on this device. Your tiles stay private. Computer tiles stay hidden."
+		_seat_checks[0].text = "You"
+		_seat_checks[0].button_pressed = true
+		_seat_checks[0].disabled = true
+		_name_inputs[0].editable = true
+		for index in range(1, 4):
+			_seat_checks[index].text = "Computer"
+			_seat_checks[index].disabled = index == 1
+			_seat_checks[index].button_pressed = true if index == 1 else _seat_checks[index].button_pressed
+			_name_inputs[index].text = computer_names[index - 1]
+			_name_inputs[index].editable = false
+	else:
+		_setup_blurb.text = "Two to four seats. The seed shuffles turn order, then the 81-tile bag, then deals five private tiles to each seat. The same seed deals the same hands. Nothing is sent to a server."
+		for index in range(4):
+			_seat_checks[index].text = "Seat %d" % (index + 1)
+			_seat_checks[index].disabled = index < 2
+			_seat_checks[index].button_pressed = true if index < 2 else _seat_checks[index].button_pressed
+			_name_inputs[index].editable = true
+			if _name_inputs[index].text in computer_names or _name_inputs[index].text == "":
+				_name_inputs[index].text = human_names[index]
+
+
 func _on_deal_pressed() -> void:
 	_error.text = ""
 	if not _seed_input.text.is_valid_int():
@@ -392,15 +432,23 @@ func _on_deal_pressed() -> void:
 		return
 	var seed := int(_seed_input.text)
 	var names: Array[String] = []
+	var bot_names: Array[String] = []
 	for index in range(4):
 		if index >= 2 and not _seat_checks[index].button_pressed:
+			continue
+		if index == 1 and _vs_bots.button_pressed and not _seat_checks[index].button_pressed:
 			continue
 		var nickname := _name_inputs[index].text.strip_edges()
 		if nickname == "":
 			_error.text = "Every included seat needs a display name."
 			return
 		names.append(nickname)
-	var created = OfflineMatch.create(seed, names)
+		if _vs_bots.button_pressed and index > 0:
+			bot_names.append(nickname)
+	if _vs_bots.button_pressed and bot_names.is_empty():
+		_error.text = "Add at least one computer."
+		return
+	var created = OfflineMatch.create(seed, names, bot_names)
 	if created == null:
 		_error.text = "Use 2 to 4 unique names, 1–24 characters: letters, numbers, spaces, hyphens, or underscores. The seed must be zero or greater."
 		return
@@ -415,18 +463,65 @@ func _begin_match(table: OfflineMatch) -> void:
 	_order.visible = true
 	_concealed = true
 	var lines: PackedStringArray = []
+	var solo := _solo()
 	for index in range(_match.players.size()):
 		var info: Dictionary = _match.players[index]
-		lines.append("%d. %s (%s) — five tiles face down" % [index + 1, str(info["display_name"]), str(info["id"])])
+		var kind := "computer, tiles hidden" if bool(info.get("bot", false)) else "you, tiles face down" if solo else "five tiles face down"
+		lines.append("%d. %s (%s) — %s" % [index + 1, str(info["display_name"]), str(info["id"]), kind])
 	_order_list.text = "\n".join(lines)
-	var first := str(_match.active_player()["display_name"])
-	_status.text = "Seed %d. Bag holds %d tiles. Pass the device to %s before anyone looks at a hand." % [_match.seed, _match.bag.size(), first]
+	var first: Dictionary = _match.active_player()
+	if solo:
+		_order_help.text = "The seed shuffled the seats. Computers play themselves. Your hand is the only one shown."
+		if bool(first.get("bot", false)):
+			_order_go.text = "Start — computers play first"
+			_status.text = "Seed %d. %s plays first and will not show a hand." % [_match.seed, str(first["display_name"])]
+		else:
+			_order_go.text = "Look at your tiles"
+			_status.text = "Seed %d. Your tiles stay on this device. Computers play when it is their turn." % _match.seed
+	else:
+		_order_help.text = "Seats were shuffled before the bag. Tiles stay covered until the first player takes the device."
+		_order_go.text = "Pass the device"
+		_status.text = "Seed %d. Bag holds %d tiles. Pass the device to %s before anyone looks at a hand." % [_match.seed, _match.bag.size(), str(first["display_name"])]
 	_error.text = ""
 
 
 func _reveal() -> void:
 	if _match == null:
 		return
+	_concealed = false
+	_selected = ""
+	_order.visible = false
+	_play.visible = true
+	if _solo() and _match.phase != "completed" and bool(_match.active_player().get("bot", false)):
+		_run_bots()
+		return
+	_refresh()
+	_fit_board()
+
+
+func _solo() -> bool:
+	if _match == null:
+		return false
+	for player in _match.players:
+		if bool(player.get("bot", false)):
+			return true
+	return false
+
+
+func _viewing_bot() -> bool:
+	return _solo() and _match.phase != "completed" and bool(_match.active_player().get("bot", false))
+
+
+func _run_bots() -> void:
+	var guard := 0
+	while _match != null and _match.phase != "completed" and bool(_match.active_player().get("bot", false)) and guard < 48:
+		guard += 1
+		var result := BotPolicy.act(_match)
+		if not bool(result.get("ok", false)):
+			_error.text = str(result.get("error", "The computer could not move."))
+			break
+	if guard >= 48 and _match != null and bool(_match.active_player().get("bot", false)) and _match.phase != "completed":
+		_error.text = "The computer turn did not finish."
 	_concealed = false
 	_selected = ""
 	_order.visible = false
@@ -470,8 +565,17 @@ func _apply(result: Dictionary) -> void:
 
 
 func _conceal_for_next(last_log: String) -> void:
-	_concealed = true
 	_selected = ""
+	if _solo() and bool(_match.active_player().get("bot", false)):
+		_run_bots()
+		return
+	if _solo():
+		_concealed = false
+		_order.visible = false
+		_play.visible = true
+		_refresh()
+		return
+	_concealed = true
 	var nxt := str(_match.active_player()["display_name"])
 	_banner_label.text = "Pass the device to %s. Their tiles stay covered. %s" % [nxt, last_log]
 	_refresh()
@@ -482,7 +586,7 @@ func _refresh() -> void:
 		return
 	var player := _match.active_player()
 	var hand: Array = player["hand"]
-	var placing := _match.phase == "place" and not _concealed
+	var placing := _match.phase == "place" and not _concealed and not _viewing_bot()
 	var legal: Array = hand.duplicate() if placing else []
 	_board.set_state(_match.occupied, _match.company_of, legal, "" if not placing else _selected)
 	_banner.visible = _concealed
@@ -496,6 +600,8 @@ func _refresh() -> void:
 		_place_button.text = "Place selected"
 	if _match.phase == "completed":
 		_status.text = _winner_line()
+	elif _viewing_bot():
+		_status.text = "%s is a computer. The tiles stay hidden while that seat plays." % str(player["display_name"])
 	elif _concealed:
 		_status.text = "Hand covered. Prices stay visible. The next player continues when they have the device."
 	elif _match.phase == "choose_founder":
@@ -509,7 +615,10 @@ func _refresh() -> void:
 	elif hand.is_empty():
 		_status.text = "%s has no tile to place. Skip placement, then take up to two market actions." % str(player["display_name"])
 	else:
-		_status.text = "%s places one tile. A chain of two or more can found a company. Connecting two companies merges them." % str(player["display_name"])
+		if _solo():
+			_status.text = "Your turn, %s. Place one tile. Computers play themselves and keep their tiles hidden." % str(player["display_name"])
+		else:
+			_status.text = "%s places one tile. A chain of two or more can found a company. Connecting two companies merges them." % str(player["display_name"])
 	if finished and _match.phase != "completed":
 		_status.text = "No tiles remain. Market actions are still available on an empty hand."
 	if _match.final_round and _match.phase != "completed":
@@ -524,8 +633,12 @@ func _refresh() -> void:
 	_sync_error()
 	if _match.phase != "market":
 		_confirm_layer.visible = false
-	if _concealed:
+	if _viewing_bot():
+		_hand_note.text = "%d hidden" % hand.size()
+	elif _concealed:
 		_hand_note.text = "Covered"
+	elif _solo():
+		_hand_note.text = "Your tiles · %d" % hand.size()
 	else:
 		_hand_note.text = "%d tile%s" % [hand.size(), "" if hand.size() == 1 else "s"]
 	if _play.visible:
@@ -544,6 +657,9 @@ func _rebuild_hand(hand: Array) -> void:
 		child.queue_free()
 	if _match.phase == "completed":
 		_hand_row.add_child(_label("The match is over. The ledger above is the final score.", 14, MUTED))
+		return
+	if _viewing_bot():
+		_hand_row.add_child(_label("%s is a computer. %d tiles stay hidden. This seat does not use the device." % [str(_match.active_player()["display_name"]), hand.size()], 14, MUTED))
 		return
 	if _concealed:
 		_hand_row.add_child(_label("Tiles stay face down until this player continues.", 14, MUTED))
@@ -575,7 +691,7 @@ func _rebuild_actions() -> void:
 		return
 	for child in _action_row.get_children():
 		child.queue_free()
-	if _concealed or _match == null or _match.phase == "completed":
+	if _concealed or _viewing_bot() or _match == null or _match.phase == "completed":
 		return
 	if _match.phase == "choose_founder" or _match.phase == "choose_survivor":
 		_action_row.add_child(_label("Choose in the dialog. Esc does not cancel a required choice.", 13, MUTED))
@@ -653,6 +769,10 @@ func _activity_bbcode() -> String:
 	lines.append("[color=#93a0b8]Round[/color] %s   [color=#93a0b8]Bag[/color] %d   [color=#93a0b8]Seed[/color] %d" % [
 		round_note, _match.bag.size(), _match.seed
 	])
+	if _solo():
+		for player in _match.players:
+			var role := "computer" if bool(player.get("bot", false)) else "you"
+			lines.append("[color=#93a0b8]%s[/color] · %s · %d tiles" % [str(player["display_name"]), role, (player["hand"] as Array).size()])
 	if _match.log.is_empty():
 		lines.append("[color=#93a0b8]No actions yet.[/color]")
 	else:
@@ -665,7 +785,12 @@ func _activity_bbcode() -> String:
 func _fill_chrome(player: Dictionary) -> void:
 	var covered := " · hand covered" if _concealed else ""
 	var turn := " · playing" if _match.phase != "completed" else " · finished"
-	_badge.text = "%s  %s%s%s" % [str(player["display_name"]), str(player["id"]), turn, covered]
+	var role := ""
+	if bool(player.get("bot", false)):
+		role = " · computer"
+	elif _solo():
+		role = " · you"
+	_badge.text = "%s  %s%s%s%s" % [str(player["display_name"]), str(player["id"]), role, turn, covered]
 	_cash_label.text = "Cash $%d" % int(player["cash"])
 	_net_label.text = "Net $%d" % _player_net(player)
 	var place_mark := "Now" if _match.phase == "place" else "Done" if _match.phase != "choose_founder" and _match.phase != "choose_survivor" else "Wait"
@@ -1148,7 +1273,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if _rules.visible or _confirm_layer.visible or _event_layer.visible or _error_layer.visible or _founder_layer.visible or _merger_layer.visible:
 		return
-	if _match == null or _concealed or not _play.visible or _online.visible:
+	if _match == null or _concealed or _viewing_bot() or not _play.visible or _online.visible:
 		return
 	if _match.phase != "place":
 		return
@@ -1402,6 +1527,19 @@ func _run_shot(path: String, phase: String) -> void:
 	if phase == "online":
 		var shot_args := OS.get_cmdline_user_args()
 		_shot_online(str(shot_args[3]), str(shot_args[4]))
+	elif phase == "bots-setup":
+		_vs_bots.button_pressed = true
+		_seat_checks[2].button_pressed = true
+		_sync_seat_mode()
+		_show_setup()
+	elif phase == "bots":
+		var created = OfflineMatch.create(7710, ["Rowan", "Ada", "Bo"], ["Ada", "Bo"])
+		if created == null:
+			push_error("screenshot deal failed")
+			get_tree().quit(1)
+			return
+		_begin_match(created)
+		_reveal()
 	else:
 		var created = OfflineMatch.create(7710, ["Rowan", "Quinn"])
 		if created == null:

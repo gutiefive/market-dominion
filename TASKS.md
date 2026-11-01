@@ -96,6 +96,15 @@ Local packaging only. Nothing here is a public HTTPS deploy.
 - [ ] Smoke on current desktop Chrome, Firefox, and Safari
 - [ ] Section 10: 2–4 people, one invite URL, a full match, a reconnect, one winner
 
+## Local computers
+
+Not a spec milestone. The specification left bots until after launch. This is local only.
+
+- [x] Setup: one human plus one, two, or three computers (`docs/bots-setup.png`)
+- [x] Computers take the turn on this device. The human hand stays visible on the human turn. Computer hands are counts (`docs/bots-table.png`)
+- [x] Same seed, same computer decisions, and a finished match for three seats and for four (`M8_CLIENT_OK`)
+- [ ] Computer seats in an online room
+
 ## Known limits
 
 - `POST /v1/protocol/commands/validate` never mutates a match. Authoritative play goes through the room API.
@@ -105,3 +114,4 @@ Local packaging only. Nothing here is a public HTTPS deploy.
 - GDScript rejection for prices is −1 or an empty list; the offline table returns `{ok: false, error}`. Python raises (assumption A13).
 - The web export and the API image were exercised on loopback (assumption A15). `docker compose` was not started. No browser, HTTPS page, or physical phone/tablet was tested. PostgreSQL is a SQL file, not a driver.
 - A 420×800 window stacks the watchlist under the board. That does not establish mobile support.
+- Local computers do not join online rooms. Their market play buys at most one share and then passes. They do not sell or trade BYTE.

@@ -88,7 +88,8 @@ Tables are `schema_meta` and `rooms`. The file is `server/data/market.db`, or `M
 ## What was run in this environment
 
 - `./scripts/export_web.sh` wrote `build/web/` (gitignored). The template archive SHA-512 matched the pin in that script. `GODOT_TEMPLATES_TPZ` pointed at the already downloaded file, so the script checked the hash and unzipped it instead of fetching it a second time.
-- `./scripts/smoke_web.sh` printed `WEB_SMOKE_OK http://127.0.0.1:8097/index.html`. Loopback HTTP. The process then exited. No browser, no HTTPS.
+- `./scripts/smoke_web.sh` printed `WEB_SMOKE_OK http://127.0.0.1:8097/index.html`. Loopback HTTP. The smoke process then exited.
+- On 2026-11-01 for client 0.20.0, `./scripts/export_web.sh` printed `WEB_EXPORT_OK` for Godot `4.7.2.stable.official.ed1daf0bf`, and `.venv/bin/python scripts/browser_smoke.py --port 8098 --debug-port 9333` printed `BROWSER_SMOKE_OK` for headless Chrome. That was a canvas and `Engine` load, not a match and not HTTPS. Firefox was not installed. The API image was not rebuilt.
 - `docker build -f infra/Dockerfile -t market-dominion-api:local .` produced image `0e9f554b751a`. `docker run -p 8751:8741` answered `/health`, `/ready` (schema `1`, backend `sqlite`), and a create-room POST 200. The server process was uid 10001. `/data/market.db` was owned by 10001. Logs started with a JSON `api_start` line. The container was removed. Nothing is still listening on 8751.
 - A container started with `DATABASE_URL=postgresql://...` exited 1 and named `infra/migrations/0001_rooms.sql`.
 - `./scripts/apply_postgres_migration.sh` exited 1 because `psql` is not installed. A `sqlite:///` URL is rejected by that script. The SQL file was not applied.
@@ -96,7 +97,15 @@ Tables are `schema_meta` and `rooms`. The file is `server/data/market.db`, or `M
 
 ## Production
 
-Not deployed. No public URL, DNS name, TLS certificate, or Cloudflare Pages project exists. No Origin namespace was configured.
+Not deployed. No public URL, DNS name, TLS certificate, or hosting project was created in this pass. The public HTTPS gate is blocked until someone with an account opens the deployed URL.
+
+`MD_ENV` is `local`, `container`, `staging`, or `production`. Production requires `MD_PUBLIC_API_URL` to start with `https://`, the WebSocket URL to start with `wss://`, a non-loopback host, and a non-empty `MD_CORS_ORIGINS`. The example that `load_settings()` accepts is [infra/deploy/production.env.example](infra/deploy/production.env.example). Do not commit a filled copy.
+
+Static files: upload `build/web/` including `md-config.js` and `_headers`. The header rules are [infra/deploy/cloudflare/_headers](infra/deploy/cloudflare/_headers). Set `window.MD_SERVER` in `md-config.js` to the public `https://` API origin, or tell players to open `?server=`. Do not put a session token in that file.
+
+API process: run the container or `uvicorn` on a host that stays up for the life of a match. [infra/deploy/caddy/Caddyfile](infra/deploy/caddy/Caddyfile) is an example that terminates HTTPS and proxies to `127.0.0.1:8741`, including WebSocket upgrades. Do not put the socket on a short-lived serverless function. One API process owns the room lock and the deadline loop. Do not add a second worker until that coordination moves out of the process.
+
+`MD_GRACE_SECONDS` defaults to 120. `MD_DEADLINE_POLL_SECONDS` defaults to 2. `MD_SESSION_TTL_SECONDS` defaults to 86400. Logs omit fields named password, secret, token, session_token, database_url, or authorization. The deadline log line is `turn_timed_out` with `match_id` and `event_count` only.
 
 On a machine that already has a running Docker engine and the compose plugin:
 
@@ -154,11 +163,11 @@ Do not add COOP or COEP for this single-threaded export.
 
 ## What a public deploy still requires
 
-1. Run the API on an always-on host that keeps WebSocket connections open. Do not put it on a short-lived serverless function. Terminate TLS in front of it.
+1. Run the API on an always-on host that keeps WebSocket connections open. Do not put it on a short-lived serverless function. Terminate TLS in front of it. Set `MD_ENV=production` and the variables in `infra/deploy/production.env.example`.
 2. Set `MD_CORS_ORIGINS` to the exact `https` origin of the static page. Restart the API.
-3. Upload `build/web/` with the MIME and cache headers above.
-4. Open `https://<pages-host>/index.html?server=https://<api-host>`. The client then uses `wss`.
-5. Play from current desktop Chrome, Firefox, and Safari before claiming those browsers. Mobile is still untested.
-6. Two to four people must finish a real match on that invite URL, including a reconnect, before section 10 of the spec is met.
+3. Upload `build/web/` with the MIME and cache headers above. Edit `md-config.js` so `window.MD_SERVER` is the public API origin, or rely on `?server=`.
+4. Open `https://<pages-host>/index.html`. Copy invitation link should produce a URL with `invite` and without a session token.
+5. Play from current desktop Chrome, Firefox, and Safari before claiming those browsers. A headless Chrome load of the loopback page is recorded in [CHANGELOG.md](CHANGELOG.md). Firefox, Safari, and phones were not opened.
+6. Two to four people must finish a real match on that invite URL, including a refresh, before M9 is complete. The server-side two-player test is not that match.
 
 No secret belongs in the repository. `.env.example` lists the variable names only.

@@ -160,4 +160,6 @@ def test_ci_runs_pytest_and_pins_godot():
     assert "pytest" in workflow
     assert "4.7.2" in workflow
     assert "check_client.sh" in workflow
-    assert "does not download Godot export templates" in workflow
+    assert "export_web.sh" in workflow
+    assert "upload-artifact" in workflow
+    assert "This job does not export the web build" in workflow

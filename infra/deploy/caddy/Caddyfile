@@ -1,0 +1,7 @@
+# Persistent API host. Caddy terminates HTTPS and forwards WebSocket upgrades.
+# Replace the hostname. Do not put this process on a short-lived serverless function.
+# The game page is static files on another host. Point MD_CORS_ORIGINS at that origin.
+
+api.example.com {
+	reverse_proxy 127.0.0.1:8741
+}

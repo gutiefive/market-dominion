@@ -1,0 +1,18 @@
+# Cloudflare Pages headers for the Godot 4.7.2 single-threaded Compatibility export.
+# Copy this file into the published build/web directory. The export script does that.
+# This build does not use threads, so do not add COOP or COEP.
+
+/index.html
+  Cache-Control: no-cache
+
+/*.js
+  Content-Type: text/javascript; charset=utf-8
+  Cache-Control: no-cache
+
+/*.wasm
+  Content-Type: application/wasm
+  Cache-Control: public, max-age=3600, must-revalidate
+
+/*.pck
+  Content-Type: application/octet-stream
+  Cache-Control: public, max-age=3600, must-revalidate

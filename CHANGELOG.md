@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.20.0 — 2026-11-01
+
+Browser beta code for a static page and a long-lived API. Protocol version stays `0.1.0`. Client `config/version` is `0.20.0`. Classic rules, bot difficulty, and the market pass are unchanged. This is not a completed public launch.
+
+### Changed
+
+- The API reads `MD_ENV` (`local`, `container`, `staging`, `production`). Production refuses a non-HTTPS public URL, a loopback URL, and an empty CORS list. `GET /health` includes `environment`.
+- A lifespan task calls `sweep_due` on the room lock. A disconnected active seat takes the same safe action as before once `MD_GRACE_SECONDS` elapses, without waiting for another player command. A sweep that changes nothing does not bump the version. `turn_changed` then includes `reason` `grace_elapsed`. Restart keeps an existing disconnect deadline and starts a missing one at the new process clock.
+- `GET /v1/rooms/invites/{code}` returns the room id, code, phase, and seat names. The body has no session token. The web client copies a link with `invite` and drops `session_token` and `token`. A web build does not default the server field to `127.0.0.1`; it uses `?server=` or `window.MD_SERVER` from `md-config.js`. The session token, when saved, stays in `localStorage` under `md.session`.
+- `scripts/export_web.sh` checks Godot 4.7.2, the shared JSON, `index.js`, the wasm, and the pck, then writes `md-config.js`, `_headers`, and `BUILD.txt`. `scripts/web_build.py verify` checks those files and the PCK markers. Narrow local and online layouts keep a 28px cell floor and stack the online market column under the board below 980px. Online play has Zoom in and Zoom out.
+
+### Evidence
+
+- `.venv/bin/pytest -q` — 86 passed.
+- `./scripts/check_client.sh` printed `M0_CLIENT_OK` through `M9_CLIENT_OK`. The suite printed `M8_PLACEMENT_50_US 211007 nodes 64`, `M8_FIVE_PLIES shallow B1 nodes 85 deep B8 nodes 325 us 489455`, `M8_DISCOUNT half B1 threeq B8`, `M8_REPLY absolute B1 marginal I9`, `M8_EASY chain B1 blob B1 contest pass byte pass us 61685`, `M8_HARD chain E3 blob B8 size16 buy size19 pass`, and `M8_DIFFICULTY easy 207 normal 227 hard 227 hard_vs_normal same first 6 easy pass_market: normal buy_share:nova_ai`.
+- `./scripts/export_web.sh` printed `WEB_FINISH_OK`, `WEB_VERIFY_OK`, and `WEB_EXPORT_OK` for Godot `4.7.2.stable.official.ed1daf0bf`. `BUILD.txt` records `threads=false`. The pck contains `export_shared` and `0.20.0`.
+- `./scripts/smoke_web.sh` printed `WEB_SMOKE_OK http://127.0.0.1:8097/index.html`. Loopback HTTP. Wasm was `application/wasm`. That process exited.
+- `.venv/bin/python scripts/browser_smoke.py --port 8098 --debug-port 9333` printed `BROWSER_SMOKE_OK /opt/google/chrome/chrome http://127.0.0.1:8098/index.html`. Chrome created the canvas and the Godot `Engine` object. It did not play a match, send touch input, or use a phone.
+- The restarted API on `127.0.0.1:8741` returned `/health` with `"environment":"local"`. A create followed by `GET /v1/rooms/invites/{code}` returned phase `lobby` and the response did not contain the session token.
+- `test_two_players_play_to_a_winner_and_public_events_hide_hands` drove two server sessions to `game_ended`. `test_deadline_advances_without_another_command_and_does_not_repeat` covered the grace sweep, a second sweep, and a new process on the same SQLite file. Those are server tests, not a browser match.
+
+### Not in this version
+
+A public HTTPS URL. Firefox, Safari, iPad, iPhone, and Android were not opened. A two-browser match, a browser refresh, and a phone layout were not played. GitHub Actions did not run the new web job from this environment. The container image was not rebuilt. Computer seats in an online room, Dominion mode, accounts, and rankings are not in this version.
+
 ## 0.19.0 — 2026-11-01
 
 The table says what just happened, and the end of the match shows who won. Protocol version stays `0.1.0`. Client `config/version` is `0.19.0`. Rules, bot difficulty, and the market pass are unchanged.

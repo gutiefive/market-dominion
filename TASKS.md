@@ -1,6 +1,6 @@
 # Milestones
 
-M7 packages a local web export and a container. The playable game is still the M6 desktop table plus the M5 rooms. A box is checked only where a command was run and the result is recorded in [CHANGELOG.md](CHANGELOG.md). This is not a public release.
+M9 is a browser-beta slice at client `0.20.0`. A box is checked only where a command was run and the result is recorded in [CHANGELOG.md](CHANGELOG.md). The public HTTPS gate is blocked. This is not a completed launch. Detail is in [docs/milestones/M9_PUBLIC_BETA.md](docs/milestones/M9_PUBLIC_BETA.md).
 
 ## M0 Foundation
 
@@ -109,13 +109,33 @@ Not a spec milestone. The specification left bots until after launch. This is lo
 - [x] Local lobby picks Easy, Normal, or Hard. Normal is the five-tile policy. Easy looks one tile ahead. Hard buys a size 15–18 company to tie or take the lead (`M8_CLIENT_OK`, `docs/bots-setup.png`)
 - [ ] Computer seats in an online room
 
+## M9 Public browser beta
+
+Client `0.20.0`. Protocol stays `0.1.0`. Not complete.
+
+- [x] `MD_ENV` profiles, production URL checks, and `GET /health` `environment` (`pytest`, 86 passed)
+- [x] Server deadline sweep without a second command, no duplicate sweep, restart keeps the advanced turn (`test_deadline_advances_without_another_command_and_does_not_repeat`)
+- [x] Public invite lookup without a session token (`GET /v1/rooms/invites/{code}` on the live API and in pytest)
+- [x] Two server sessions play to `game_ended` without putting `your_hand` or a session token on public events (`test_two_players_play_to_a_winner_and_public_events_hide_hands`)
+- [x] Web export checks Godot 4.7.2, writes `md-config.js` with no loopback URL, and verifies html, js, wasm, pck, and `_headers` (`WEB_EXPORT_OK`, `WEB_VERIFY_OK`)
+- [x] Loopback MIME smoke (`WEB_SMOKE_OK http://127.0.0.1:8097/index.html`)
+- [x] Headless Chrome created the canvas and the Godot `Engine` object (`BROWSER_SMOKE_OK`). Not a match
+- [x] Invitation link builder drops `session_token` (`M9_CLIENT_OK`)
+- [ ] Public HTTPS URL (blocked: no hosting account was used)
+- [ ] Two browsers join one room and play to standings
+- [ ] Browser refresh and reconnect played in a browser
+- [ ] Firefox, Safari, iPad, iPhone, Android
+- [ ] Phone layout on a phone. A width under 720px in code is not that test
+- [ ] GitHub Actions web job executed
+- [ ] Container image rebuilt with `MD_ENV=container`
+
 ## Known limits
 
 - `POST /v1/protocol/commands/validate` never mutates a match. Authoritative play goes through the room API.
 - The local pass-and-play table still deals and scores on the device. It is a separate copy of the rules.
-- A disconnected seat is autopassed on the next command after the grace window, not by a background timer (assumption A21).
+- A disconnected seat is autopassed by the server deadline loop after the grace window. The fallback is still the lowest sorted tile, the first legal choice, or a market pass (assumption A21). Another player's command is not required.
 - Room rate limits live in process memory. Restarting the API clears them. SQLite keeps the rooms.
 - GDScript rejection for prices is −1 or an empty list; the offline table returns `{ok: false, error}`. Python raises (assumption A13).
-- The web export and the API image were exercised on loopback (assumption A15). `docker compose` was not started. No browser, HTTPS page, or physical phone/tablet was tested. PostgreSQL is a SQL file, not a driver.
+- The web export was loaded by headless Chrome on loopback HTTP. That check created the Godot engine object and did not play a match. Firefox, Safari, phones, tablets, and HTTPS were not tested. The API image was not rebuilt in this pass. `docker compose` was not started. PostgreSQL is a SQL file, not a driver (assumption A15).
 - A 420×800 window stacks the watchlist under the board. That does not establish mobile support.
 - Local computers do not join online rooms. The lobby difficulty is Easy, Normal, or Hard, and it starts on Normal. Easy looks one tile ahead and mostly passes the market. Normal and Hard look at five tiles. Each later tile keeps three quarters of the previous one. The search stops at 500 evaluations. A later tile is dropped when its immediate value plus $20,000 still cannot beat the best continuation. That ceiling rarely binds. At most 24 frontier cells are scored, and half of any increase in the opponent's reply is subtracted. BYTE at exactly $500 is left alone. Hard will buy a company of size 15 through 18 to tie or take the lead. Size 19 or more is still refused, including a contest. Sentiment +2 is still not bought. A tied holding is not sold unless cash is under $500. The heuristic can still misread a position.

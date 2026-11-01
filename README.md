@@ -2,7 +2,7 @@
 
 A fictional tile-and-market strategy game for 2–4 players. Cash, shares, and BYTE coins are game currency. This repository does not take bets, hold wallets, or trade real assets.
 
-**M7 packages a local web export and a container.** The desktop table from M6 is unchanged. A Godot 4.7.2 Compatibility export was produced in this checkout and smoke-checked over loopback HTTP. The API image was built and probed on loopback, then removed. There is no public site. See [TASKS.md](TASKS.md) and [RUNBOOK.md](RUNBOOK.md).
+**Client 0.20.0 is a browser-beta slice.** The page is a Godot 4.7.2 Compatibility single-threaded export. The API is a long-lived FastAPI process with SQLite. Headless Chrome loaded the canvas on loopback HTTP. There is no public HTTPS site. See [TASKS.md](TASKS.md), [docs/ROADMAP_M9_M12.md](docs/ROADMAP_M9_M12.md), and [RUNBOOK.md](RUNBOOK.md).
 
 ## Tested Godot build
 
@@ -74,13 +74,13 @@ The preset is `client/export_presets.cfg`. `variant/thread_support` is false. Th
 | `*.wasm` | `application/wasm` | `public, max-age=3600, must-revalidate` |
 | `*.pck` | `application/octet-stream` | `public, max-age=3600, must-revalidate` |
 
-The filenames are not content-hashed. Do not mark them immutable. `./scripts/smoke_web.sh` started that server on `http://127.0.0.1:8097/index.html`, checked those headers, and exited. That was loopback HTTP. No browser was opened. It was not HTTPS.
+The filenames are not content-hashed. Do not mark them immutable. `./scripts/export_web.sh` also writes `md-config.js`, `BUILD.txt`, and `_headers`. `md-config.js` does not set a loopback server. Set `window.MD_SERVER` on the host you publish, or open the page with `?server=`. `./scripts/smoke_web.sh` checked the loopback headers and exited. `.venv/bin/python scripts/browser_smoke.py` then loaded that page in headless Chrome far enough to construct Godot's `Engine`. That was not a match and it was not HTTPS.
 
-A page can point at the API with `index.html?server=https://api.example`. Only `http://` and `https://` are accepted. An `https` API URL makes the client open `wss`. The desktop game ignores the query and still defaults to `http://127.0.0.1:8741`.
+A page can point at the API with `index.html?server=https://api.example`. Only `http://` and `https://` are accepted. An `https` API URL makes the client open `wss`. The desktop game ignores the query and still defaults to `http://127.0.0.1:8741`. The web build leaves the server field empty unless the query or `window.MD_SERVER` sets it. Copy invitation link keeps `server` and adds `invite`. It strips `session_token` and `token`.
 
 On the web build the sibling `shared/` directory is not on disk. The export copies it into the pack at `res://export_shared/`, and the client reads that when the external path is missing.
 
-GitHub Actions runs pytest and `scripts/check_client.sh`. It does not download the template archive and it does not run the export.
+GitHub Actions is defined in `.github/workflows/ci.yml`. The server job runs pytest. The client job runs `scripts/check_client.sh`. The web job runs `scripts/export_web.sh`, the MIME smoke, a headless Chrome load, and uploads `build/web`. That workflow was not executed by GitHub from this environment. A green export is not a finished match. Examples for Cloudflare Pages headers and a Caddy reverse proxy are in `infra/deploy/`. Production variable names are in `infra/deploy/production.env.example`. No hosting account was configured.
 
 ## Container
 
@@ -121,7 +121,7 @@ python3 scripts/dump_fixtures.py
 | `server/tests/`, `tests/e2e/` | Automated tests |
 | `infra/` | Dockerfile, compose file, entrypoint, Postgres DDL |
 | `build/web/` | Godot web export (gitignored; produced locally) |
-| `.github/workflows/ci.yml` | Pytest, Godot headless check, script syntax. No template download |
+| `.github/workflows/ci.yml` | Pytest, Godot headless check, and a web export job. The web job was not run from this environment |
 
 More detail: [RULES.md](RULES.md), [ARCHITECTURE.md](ARCHITECTURE.md), [RUNBOOK.md](RUNBOOK.md), [CHANGELOG.md](CHANGELOG.md).
 

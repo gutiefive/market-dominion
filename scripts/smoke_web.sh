@@ -6,8 +6,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WEB="${ROOT}/build/web"
 PORT="${MD_WEB_PORT:-8097}"
 
-if [[ ! -f "${WEB}/index.html" ]]; then
-  echo "build/web/index.html is missing. Run ./scripts/export_web.sh first." >&2
+if [[ ! -f "${WEB}/index.html" || ! -f "${WEB}/index.js" || ! -f "${WEB}/md-config.js" ]]; then
+  echo "build/web is missing index.html, index.js, or md-config.js. Run ./scripts/export_web.sh first." >&2
   exit 1
 fi
 
@@ -60,6 +60,26 @@ fi
 pck_headers="$(curl -sS -D - -o /dev/null "http://127.0.0.1:${PORT}/${pck_name}")"
 if ! printf '%s' "$pck_headers" | awk 'BEGIN{IGNORECASE=1} tolower($1)=="content-type:"{print}' | grep -q "application/octet-stream"; then
   echo "${pck_name} was not served as application/octet-stream" >&2
+  exit 1
+fi
+
+js_headers="$(curl -sS -D - -o /dev/null "http://127.0.0.1:${PORT}/index.js")"
+if ! printf '%s' "$js_headers" | awk 'BEGIN{IGNORECASE=1} tolower($1)=="content-type:"{print}' | grep -qi "javascript"; then
+  echo "index.js was not served as javascript" >&2
+  exit 1
+fi
+if ! printf '%s' "$js_headers" | awk 'BEGIN{IGNORECASE=1} tolower($1)=="cache-control:"{print}' | grep -q "no-cache"; then
+  echo "index.js is missing Cache-Control: no-cache" >&2
+  exit 1
+fi
+
+config_headers="$(curl -sS -D - -o /tmp/market-web-config.js "http://127.0.0.1:${PORT}/md-config.js")"
+if ! printf '%s' "$config_headers" | awk 'BEGIN{IGNORECASE=1} /^HTTP/{code=$2} END{exit !(code==200)}'; then
+  echo "md-config.js was not served" >&2
+  exit 1
+fi
+if grep -q "127.0.0.1\|session_token" /tmp/market-web-config.js; then
+  echo "md-config.js contains a loopback address or a session token" >&2
   exit 1
 fi
 

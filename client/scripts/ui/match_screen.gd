@@ -26,6 +26,8 @@ var _board: BoardGrid
 var _hand_row: HBoxContainer
 var _hand_note: Label
 var _place_button: Button
+var _action_row: Container
+var _market_corp := "nova_ai"
 var _banner: PanelContainer
 var _banner_label: Label
 var _status: Label
@@ -223,7 +225,11 @@ func _build_play() -> VBoxContainer:
 	_side.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var side_box := _box_of(_side)
 	side_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	side_box.add_child(_label("Table", 15, TEXT))
+	side_box.add_child(_label("Market", 15, TEXT))
+	_action_row = HFlowContainer.new()
+	_action_row.add_theme_constant_override("separation", 6)
+	_action_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	side_box.add_child(_action_row)
 	_side_text = RichTextLabel.new()
 	_side_text.bbcode_enabled = true
 	_side_text.fit_content = true
@@ -306,27 +312,30 @@ func _on_cell_pressed(coordinate: String) -> void:
 
 
 func _place_selected() -> void:
-	if _match == null or _concealed:
+	if _match == null or _concealed or _match.phase != "place":
 		return
 	var player := _match.active_player()
 	var hand: Array = player["hand"]
 	if hand.is_empty():
-		var skipped: Dictionary = _match.pass_turn()
-		if not bool(skipped["ok"]):
-			_error.text = str(skipped["error"])
-			return
-		_error.text = ""
-		_conceal_for_next(str(skipped["log"]))
+		_apply(_match.pass_turn())
 		return
 	if _selected == "":
 		_error.text = "Select a tile in the active hand, or press its cell on the grid."
 		return
-	var result: Dictionary = _match.place(_selected)
-	if not bool(result["ok"]):
-		_error.text = str(result["error"])
+	_apply(_match.place(_selected))
+	_selected = ""
+
+
+func _apply(result: Dictionary) -> void:
+	if not bool(result.get("ok", false)):
+		_error.text = str(result.get("error", "That action was rejected."))
+		_refresh()
 		return
 	_error.text = ""
-	_conceal_for_next(str(result["log"]))
+	if _match.phase == "place":
+		_conceal_for_next(str(result["log"]))
+	else:
+		_refresh()
 
 
 func _conceal_for_next(last_log: String) -> void:
@@ -342,25 +351,33 @@ func _refresh() -> void:
 		return
 	var player := _match.active_player()
 	var hand: Array = player["hand"]
-	var legal: Array = [] if _concealed else hand.duplicate()
-	_board.set_state(_match.occupied, legal, "" if _concealed else _selected)
+	var placing := _match.phase == "place" and not _concealed
+	var legal: Array = hand.duplicate() if placing else []
+	_board.set_state(_match.occupied, _match.company_of, legal, "" if not placing else _selected)
 	_banner.visible = _concealed
 	_rebuild_hand(hand)
-	var finished := _match.bag.is_empty() and _hands_empty()
-	_place_button.visible = not _concealed
+	_rebuild_actions()
+	var finished := _match.bag.is_empty() and _hands_empty() and _match.phase == "place"
+	_place_button.visible = placing
 	if hand.is_empty():
-		_place_button.text = "End turn"
+		_place_button.text = "Skip placement"
 	else:
 		_place_button.text = "Place selected"
-	if finished and _match.bag.is_empty() and _hands_empty():
-		_status.text = "All 81 tiles are on the grid as unincorporated districts. Company founding waits for a later milestone."
-	elif _concealed:
-		_status.text = "Hand covered. The grid stays visible so the last placement can be checked."
+	if _concealed:
+		_status.text = "Hand covered. Prices stay visible. The next player continues when they have the device."
+	elif _match.phase == "choose_founder":
+		_status.text = "%s chooses a company for the new cluster. The founder receives one share if the bank has one." % str(player["display_name"])
+	elif _match.phase == "market":
+		_status.text = "%s has %d market action%s left. Prices shown are the prices used for the next trade." % [
+			str(player["display_name"]), _match.market_actions_left, "" if _match.market_actions_left == 1 else "s"
+		]
 	elif hand.is_empty():
-		_status.text = "%s has no tile to place. End the turn to pass the device." % str(player["display_name"])
+		_status.text = "%s has no tile to place. Skip placement, then take up to two market actions." % str(player["display_name"])
 	else:
-		_status.text = "%s to play. Place one tile on its own empty cell, then draw if the bag still has tiles." % str(player["display_name"])
-	_side_text.text = _side_bbcode(finished)
+		_status.text = "%s places one tile. A chain of two or more can found a company. Mergers are not in this build." % str(player["display_name"])
+	if finished:
+		_status.text = "No tiles remain. Market actions are still available on an empty hand."
+	_side_text.text = _side_bbcode()
 	if _concealed:
 		_hand_note.text = "Covered"
 	else:
@@ -404,33 +421,129 @@ func _select_tile(coordinate: String) -> void:
 	_refresh()
 
 
-func _side_bbcode(finished: bool) -> String:
+func _rebuild_actions() -> void:
+	if _action_row == null:
+		return
+	for child in _action_row.get_children():
+		child.queue_free()
+	if _concealed or _match == null:
+		return
+	if _match.phase == "choose_founder":
+		for corp in _match.corporations:
+			if bool(corp["active"]):
+				continue
+			var brand := _button("%s  %s" % [str(corp["name"]), str(BoardGrid.MARKS.get(corp["id"], ""))], true)
+			brand.pressed.connect(_choose_brand.bind(str(corp["id"])))
+			_action_row.add_child(brand)
+		return
+	if _match.phase != "market":
+		return
+	var active_ids: Array[String] = []
+	for corp in _match.corporations:
+		if bool(corp["active"]):
+			active_ids.append(str(corp["id"]))
+	if not active_ids.is_empty() and not active_ids.has(_market_corp):
+		_market_corp = active_ids[0]
+	for corp_id in active_ids:
+		var picked := corp_id == _market_corp
+		var choice := _button(str(BoardGrid.MARKS.get(corp_id, corp_id)), picked)
+		choice.pressed.connect(_select_corp.bind(corp_id))
+		_action_row.add_child(choice)
+	if not active_ids.is_empty():
+		var buy := _button("Buy share", true)
+		buy.pressed.connect(_buy_share)
+		var sell := _button("Sell share", false)
+		sell.pressed.connect(_sell_share)
+		_action_row.add_child(buy)
+		_action_row.add_child(sell)
+	var buy_byte := _button("Buy BYTE", true)
+	buy_byte.pressed.connect(_buy_byte)
+	var sell_byte := _button("Sell BYTE", false)
+	sell_byte.pressed.connect(_sell_byte)
+	var pass_action := _button("Pass action", false)
+	pass_action.pressed.connect(_pass_market)
+	_action_row.add_child(buy_byte)
+	_action_row.add_child(sell_byte)
+	_action_row.add_child(pass_action)
+
+
+func _choose_brand(corp_id: String) -> void:
+	if _match == null:
+		return
+	_apply(_match.choose_founder(corp_id))
+
+
+func _select_corp(corp_id: String) -> void:
+	_market_corp = corp_id
+	_refresh()
+
+
+func _buy_share() -> void:
+	if _match != null:
+		_apply(_match.buy_share(_market_corp))
+
+
+func _sell_share() -> void:
+	if _match != null:
+		_apply(_match.sell_share(_market_corp))
+
+
+func _buy_byte() -> void:
+	if _match != null:
+		_apply(_match.buy_byte())
+
+
+func _sell_byte() -> void:
+	if _match != null:
+		_apply(_match.sell_byte())
+
+
+func _pass_market() -> void:
+	if _match != null:
+		_apply(_match.pass_market())
+
+
+func _side_bbcode() -> String:
 	var lines: PackedStringArray = []
 	var active: Dictionary = _match.active_player()
-	lines.append("[color=#93a0b8]Seed[/color]  %d" % _match.seed)
-	lines.append("[color=#93a0b8]Round[/color]  %d" % _match.round_number)
-	lines.append("[color=#93a0b8]Bag[/color]  %d tiles left" % _match.bag.size())
-	var filled := 0
-	for coordinate in _match.occupied.keys():
-		if bool(_match.occupied[coordinate]):
-			filled += 1
-	lines.append("[color=#93a0b8]On the grid[/color]  %d unincorporated" % filled)
+	var shares: Dictionary = active["shares"]
+	lines.append("[color=#93a0b8]Seed[/color]  %d    [color=#93a0b8]Round[/color]  %d    [color=#93a0b8]Bag[/color]  %d" % [
+		_match.seed, _match.round_number, _match.bag.size()
+	])
+	lines.append("[color=#93a0b8]BYTE[/color]  $%d    exchange %d    you %d" % [
+		_match.byte_price, _match.byte_exchange, int(active["byte_count"])
+	])
+	if _match.phase == "market":
+		lines.append("[color=#fbbf24]Market actions left[/color]  %d" % _match.market_actions_left)
+	lines.append("")
+	for corp in _match.corporations:
+		var mark := str(BoardGrid.MARKS.get(corp["id"], ""))
+		if bool(corp["active"]):
+			lines.append("[b]%s[/b]  %s   $%d   size %d   bank %d   you %d" % [
+				str(corp["name"]), mark, int(corp["share_price"]), int(corp["size"]),
+				int(corp["bank_shares"]), int(shares.get(corp["id"], 0))
+			])
+	var available: PackedStringArray = []
+	for corp in _match.corporations:
+		if not bool(corp["active"]):
+			available.append(str(corp["name"]))
+	if not available.is_empty():
+		lines.append("[color=#93a0b8]Available to found[/color]  %s" % ", ".join(available))
 	lines.append("")
 	for index in range(_match.players.size()):
 		var info: Dictionary = _match.players[index]
-		var playing := str(info["id"]) == str(active["id"]) and not finished
+		var playing := str(info["id"]) == str(active["id"])
 		var mark := "  [color=#fbbf24]playing[/color]" if playing else ""
 		lines.append("%d. %s  [color=#93a0b8]%s · $%d fictional[/color]%s" % [
 			index + 1, str(info["display_name"]), str(info["id"]), int(info["cash"]), mark
 		])
 	if not _match.log.is_empty():
 		lines.append("")
-		lines.append("[color=#93a0b8]Recent[/color]")
-		var start := maxi(0, _match.log.size() - 4)
+		var start := maxi(0, _match.log.size() - 3)
 		for index in range(start, _match.log.size()):
 			lines.append(_match.log[index])
 	lines.append("")
-	lines.append("[color=#93a0b8]Local only. Companies, prices, and mergers are not resolved in this build.[/color]")
+	lines.append("[color=#93a0b8]Local only. A placement that would merge two companies is rejected. Round events are not drawn.[/color]")
 	return "\n".join(lines)
 
 
@@ -481,6 +594,46 @@ func _ensure_table(wide: bool) -> void:
 	_column.size_flags_stretch_ratio = 1.7
 
 
+func _shot_pull(coordinate: String) -> void:
+	for player in _match.players:
+		var hand: Array = player["hand"]
+		var index := hand.find(coordinate)
+		if index != -1:
+			hand.remove_at(index)
+			_match.active_player()["hand"].append(coordinate)
+			return
+	var bag_index: int = _match.bag.find(coordinate)
+	_match.bag.remove_at(bag_index)
+	_match.active_player()["hand"].append(coordinate)
+
+
+func _shot_pass_market() -> void:
+	while _match.phase == "market" and _match.market_actions_left > 0:
+		_match.pass_market()
+
+
+func _shot_economy() -> void:
+	_shot_pull("A1")
+	_match.place("A1")
+	_shot_pass_market()
+	_shot_pull("E9")
+	_match.place("E9")
+	_shot_pass_market()
+	_shot_pull("A2")
+	_match.place("A2")
+	_match.choose_founder("nova_ai")
+	_shot_pass_market()
+	_shot_pull("C1")
+	_match.place("C1")
+	_shot_pass_market()
+	_shot_pull("B1")
+	_match.place("B1")
+	_match.buy_share("nova_ai")
+	_concealed = false
+	_market_corp = "nova_ai"
+	_refresh()
+
+
 func _run_shot(path: String, phase: String) -> void:
 	var created = OfflineMatch.create(7710, ["Rowan", "Quinn"])
 	if created == null:
@@ -493,6 +646,8 @@ func _run_shot(path: String, phase: String) -> void:
 		var hand: Array = _match.active_player()["hand"]
 		_selected = str(hand[0])
 		_place_selected()
+	elif phase == "economy":
+		_shot_economy()
 	await get_tree().process_frame
 	await get_tree().process_frame
 	_fit_board()

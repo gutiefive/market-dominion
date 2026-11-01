@@ -6,37 +6,92 @@
   ],
   "steps": [
     {
+      "op": "place",
       "actor": "Rowan",
       "placed": "C1",
+      "phase": "market",
+      "round_number": 1,
+      "active_player": "Rowan",
+      "bag_size": 71,
+      "occupied": [
+        "C1"
+      ],
+      "log": [
+        "Rowan placed C1. The district stays unincorporated."
+      ]
+    },
+    {
+      "op": "pass_market",
+      "phase": "market",
+      "round_number": 1,
+      "active_player": "Rowan",
+      "bag_size": 71,
+      "occupied": [
+        "C1"
+      ],
+      "log": [
+        "Rowan placed C1. The district stays unincorporated.",
+        "Rowan passed a market action."
+      ]
+    },
+    {
+      "op": "pass_market",
+      "phase": "place",
       "round_number": 1,
       "active_player": "Quinn",
       "bag_size": 70,
       "occupied": [
         "C1"
       ],
-      "hands": {
-        "Rowan": [
-          "D4",
-          "B9",
-          "E9",
-          "E6",
-          "H8"
-        ],
-        "Quinn": [
-          "F8",
-          "I8",
-          "G6",
-          "H5",
-          "H9"
-        ]
-      },
       "log": [
-        "Rowan placed C1 and drew from the bag."
+        "Rowan placed C1. The district stays unincorporated.",
+        "Rowan passed a market action.",
+        "Rowan passed a market action.",
+        "Rowan drew from the bag."
       ]
     },
     {
+      "op": "place",
       "actor": "Quinn",
       "placed": "F8",
+      "phase": "market",
+      "round_number": 1,
+      "active_player": "Quinn",
+      "bag_size": 70,
+      "occupied": [
+        "C1",
+        "F8"
+      ],
+      "log": [
+        "Rowan placed C1. The district stays unincorporated.",
+        "Rowan passed a market action.",
+        "Rowan passed a market action.",
+        "Rowan drew from the bag.",
+        "Quinn placed F8. The district stays unincorporated."
+      ]
+    },
+    {
+      "op": "pass_market",
+      "phase": "market",
+      "round_number": 1,
+      "active_player": "Quinn",
+      "bag_size": 70,
+      "occupied": [
+        "C1",
+        "F8"
+      ],
+      "log": [
+        "Rowan placed C1. The district stays unincorporated.",
+        "Rowan passed a market action.",
+        "Rowan passed a market action.",
+        "Rowan drew from the bag.",
+        "Quinn placed F8. The district stays unincorporated.",
+        "Quinn passed a market action."
+      ]
+    },
+    {
+      "op": "pass_market",
+      "phase": "place",
       "round_number": 2,
       "active_player": "Rowan",
       "bag_size": 69,
@@ -44,93 +99,15 @@
         "C1",
         "F8"
       ],
-      "hands": {
-        "Rowan": [
-          "D4",
-          "B9",
-          "E9",
-          "E6",
-          "H8"
-        ],
-        "Quinn": [
-          "I8",
-          "G6",
-          "H5",
-          "H9",
-          "C3"
-        ]
-      },
       "log": [
-        "Rowan placed C1 and drew from the bag.",
-        "Quinn placed F8 and drew from the bag."
-      ]
-    },
-    {
-      "actor": "Rowan",
-      "placed": "D4",
-      "round_number": 2,
-      "active_player": "Quinn",
-      "bag_size": 68,
-      "occupied": [
-        "C1",
-        "D4",
-        "F8"
-      ],
-      "hands": {
-        "Rowan": [
-          "B9",
-          "E9",
-          "E6",
-          "H8",
-          "H3"
-        ],
-        "Quinn": [
-          "I8",
-          "G6",
-          "H5",
-          "H9",
-          "C3"
-        ]
-      },
-      "log": [
-        "Rowan placed C1 and drew from the bag.",
-        "Quinn placed F8 and drew from the bag.",
-        "Rowan placed D4 and drew from the bag."
-      ]
-    },
-    {
-      "actor": "Quinn",
-      "placed": "I8",
-      "round_number": 3,
-      "active_player": "Rowan",
-      "bag_size": 67,
-      "occupied": [
-        "C1",
-        "D4",
-        "F8",
-        "I8"
-      ],
-      "hands": {
-        "Rowan": [
-          "B9",
-          "E9",
-          "E6",
-          "H8",
-          "H3"
-        ],
-        "Quinn": [
-          "G6",
-          "H5",
-          "H9",
-          "C3",
-          "A6"
-        ]
-      },
-      "log": [
-        "Rowan placed C1 and drew from the bag.",
-        "Quinn placed F8 and drew from the bag.",
-        "Rowan placed D4 and drew from the bag.",
-        "Quinn placed I8 and drew from the bag."
+        "Rowan placed C1. The district stays unincorporated.",
+        "Rowan passed a market action.",
+        "Rowan passed a market action.",
+        "Rowan drew from the bag.",
+        "Quinn placed F8. The district stays unincorporated.",
+        "Quinn passed a market action.",
+        "Quinn passed a market action.",
+        "Quinn drew from the bag."
       ]
     }
   ]

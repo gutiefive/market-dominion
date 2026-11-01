@@ -1,13 +1,12 @@
-"""Local pass-and-play deal and placement.
+"""Local pass-and-play deal, founding, growth, and two market actions.
 
-Assumption A16: shuffle players in entry order, then shuffle the coordinate
-catalog into the bag, then deal round-robin one tile at a time for five rounds.
-Bag index 0 is the next draw.
+Assumption A16: shuffle seats, then the bag, then deal five tiles round-robin.
 
-Assumption A17: a placement marks the cell occupied and leaves it unincorporated.
-Founding, growth, mergers, and market actions are not resolved here. A turn
-places one held tile, draws one bag tile when any remain, then advances. An
-empty hand is the only skip. Display names are unique nicknames.
+Assumption A18: a turn places one tile (or skips an empty hand), resolves
+founding or growth, then allows two market actions, then draws. A placement
+that would join two active companies is rejected and does not change the
+board. That rejection is a legality stub, not a merger. Sector sentiment
+stays 0 and no round event is drawn.
 """
 
 from __future__ import annotations
@@ -15,7 +14,10 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from app.domain.board import component
 from app.domain.coordinates import all_coordinates
+from app.domain.corporations import load_corporations
+from app.domain.pricing import share_price
 from app.domain.rng import MatchRng, shuffle
 from app.domain.tiles import conservation_errors
 from app.files import load_rules
@@ -38,15 +40,41 @@ class OfflineMatch:
             if name in seen:
                 raise ValueError("duplicate name")
             seen.add(name)
+        self.rules = rules
         self.seed = seed
         self.hand_size = int(rules["starting_hand_size"])
         self.starting_cash = int(rules["starting_cash"])
+        self.market_limit = int(rules["market_actions_per_turn"])
+        self.share_supply = int(rules["corporation_share_supply"])
+        self.byte_supply = int(rules["byte_supply"])
+        self.byte_price = int(rules["byte_initial_price"])
+        self.byte_exchange = self.byte_supply
+        self.sentiment = {str(sector): 0 for sector in rules["sectors"]}
+        self.corporations: list[dict[str, Any]] = []
+        share_template: dict[str, int] = {}
+        for source in load_corporations():
+            corp_id = str(source["id"])
+            self.corporations.append(
+                {
+                    "id": corp_id,
+                    "name": str(source["name"]),
+                    "sector": str(source["sector"]),
+                    "active": False,
+                    "bank_shares": self.share_supply,
+                    "share_price": 0,
+                    "size": 0,
+                    "cells": [],
+                }
+            )
+            share_template[corp_id] = 0
         rng = MatchRng(seed)
         roster = [
             {
                 "id": f"p{index + 1}",
                 "display_name": name,
                 "hand": [],
+                "shares": dict(share_template),
+                "byte_count": 0,
             }
             for index, name in enumerate(cleaned)
         ]
@@ -56,6 +84,7 @@ class OfflineMatch:
             player["cash"] = self.starting_cash
         self.bag: list[str] = shuffle(all_coordinates(), rng)
         self.occupied: dict[str, bool] = {coordinate: False for coordinate in all_coordinates()}
+        self.company_of: dict[str, str] = {}
         for _ in range(self.hand_size):
             for player in self.players:
                 if not self.bag:
@@ -63,45 +92,218 @@ class OfflineMatch:
                 player["hand"].append(self.bag.pop(0))
         self.turn_index = 0
         self.round_number = 1
+        self.phase = "place"
+        self.market_actions_left = 0
+        self.pending: list[str] = []
         self.log: list[str] = []
 
     def active_player(self) -> dict[str, Any]:
         return self.players[self.turn_index]
 
     def place(self, coordinate: str) -> dict[str, Any]:
+        if self.phase != "place":
+            raise ValueError("not the placement step")
         player = self.active_player()
         if coordinate not in player["hand"]:
             raise ValueError("tile not in hand")
         if self.occupied.get(coordinate, False):
             raise ValueError("cell occupied")
+        occupied = {cell for cell, filled in self.occupied.items() if filled}
+        occupied.add(coordinate)
+        touched = component(coordinate, occupied)
+        company_ids: list[str] = []
+        for cell in touched:
+            corp_id = self.company_of.get(cell)
+            if corp_id and corp_id not in company_ids:
+                company_ids.append(corp_id)
+        if len(company_ids) >= 2:
+            raise ValueError("merger is not in this build")
         player["hand"].remove(coordinate)
         self.occupied[coordinate] = True
-        drew = False
-        if self.bag:
-            player["hand"].append(self.bag.pop(0))
-            drew = True
-        if drew:
-            message = f"{player['display_name']} placed {coordinate} and drew from the bag."
+        if len(company_ids) == 1:
+            corp = self._corp(company_ids[0])
+            for cell in touched:
+                self.company_of[cell] = corp["id"]
+            self._reprice(corp)
+            self._enter_market()
+            message = (
+                f"{player['display_name']} placed {coordinate} and grew {corp['name']} "
+                f"to size {corp['size']}. Share price is ${corp['share_price']}."
+            )
+            self.log.append(message)
+            return {"placed": coordinate, "resolution": "growth", "log": message}
+        if len(touched) >= 2 and self._inactive():
+            self.pending = list(touched)
+            self.phase = "choose_founder"
+            message = (
+                f"{player['display_name']} placed {coordinate}. "
+                f"Choose a company for the {len(touched)}-district cluster."
+            )
+            self.log.append(message)
+            return {"placed": coordinate, "resolution": "choose_founder", "log": message}
+        if len(touched) >= 2:
+            message = (
+                f"{player['display_name']} placed {coordinate}. "
+                f"The {len(touched)}-district cluster stays unincorporated."
+            )
         else:
-            message = f"{player['display_name']} placed {coordinate}. The bag is empty."
+            message = f"{player['display_name']} placed {coordinate}. The district stays unincorporated."
+        self._enter_market()
         self.log.append(message)
-        self._advance()
-        return {"placed": coordinate, "drew": drew, "log": message}
+        return {"placed": coordinate, "resolution": "unincorporated", "log": message}
+
+    def choose_founder(self, corp_id: str) -> dict[str, Any]:
+        if self.phase != "choose_founder":
+            raise ValueError("no company choice is pending")
+        corp = self._corp(corp_id)
+        if corp is None:
+            raise ValueError("unknown company")
+        if corp["active"]:
+            raise ValueError("company is already active")
+        player = self.active_player()
+        for cell in self.pending:
+            self.company_of[cell] = corp["id"]
+        self.pending = []
+        self._reprice(corp)
+        granted = False
+        if int(corp["bank_shares"]) > 0:
+            corp["bank_shares"] = int(corp["bank_shares"]) - 1
+            player["shares"][corp["id"]] = int(player["shares"][corp["id"]]) + 1
+            granted = True
+        self._enter_market()
+        if granted:
+            message = (
+                f"{player['display_name']} founded {corp['name']} on {corp['size']} districts "
+                "and received one founder share."
+            )
+        else:
+            message = (
+                f"{player['display_name']} founded {corp['name']} on {corp['size']} districts. "
+                "The bank had no share to grant."
+            )
+        self.log.append(message)
+        return {"founded": corp["id"], "granted": granted, "log": message}
 
     def pass_turn(self) -> dict[str, Any]:
+        if self.phase != "place":
+            raise ValueError("not the placement step")
         player = self.active_player()
         if player["hand"]:
             raise ValueError("hand still has a tile")
         message = f"{player['display_name']} has no tile to place."
         self.log.append(message)
-        self._advance()
+        self._enter_market()
         return {"passed": True, "log": message}
 
-    def _advance(self) -> None:
-        self.turn_index += 1
-        if self.turn_index >= len(self.players):
-            self.turn_index = 0
-            self.round_number += 1
+    def buy_share(self, corp_id: str) -> dict[str, Any]:
+        player, corp, price = self._open_share_trade(corp_id)
+        if int(corp["bank_shares"]) < 1:
+            raise ValueError("no share in the bank")
+        if int(player["cash"]) < price:
+            raise ValueError("not enough cash")
+        player["cash"] = int(player["cash"]) - price
+        corp["bank_shares"] = int(corp["bank_shares"]) - 1
+        player["shares"][corp["id"]] = int(player["shares"][corp["id"]]) + 1
+        message = f"{player['display_name']} bought 1 {corp['name']} share for ${price}."
+        return self._spend_action(message)
+
+    def sell_share(self, corp_id: str) -> dict[str, Any]:
+        player, corp, price = self._open_share_trade(corp_id)
+        if int(player["shares"][corp["id"]]) < 1:
+            raise ValueError("no share to sell")
+        player["shares"][corp["id"]] = int(player["shares"][corp["id"]]) - 1
+        corp["bank_shares"] = int(corp["bank_shares"]) + 1
+        player["cash"] = int(player["cash"]) + price
+        message = f"{player['display_name']} sold 1 {corp['name']} share for ${price}."
+        return self._spend_action(message)
+
+    def buy_byte(self) -> dict[str, Any]:
+        player = self._open_market()
+        price = self.byte_price
+        if self.byte_exchange < 1:
+            raise ValueError("no BYTE in the exchange")
+        if int(player["cash"]) < price:
+            raise ValueError("not enough cash")
+        player["cash"] = int(player["cash"]) - price
+        player["byte_count"] = int(player["byte_count"]) + 1
+        self.byte_exchange -= 1
+        message = f"{player['display_name']} bought 1 BYTE for ${price}."
+        return self._spend_action(message)
+
+    def sell_byte(self) -> dict[str, Any]:
+        player = self._open_market()
+        price = self.byte_price
+        if int(player["byte_count"]) < 1:
+            raise ValueError("no BYTE to sell")
+        player["byte_count"] = int(player["byte_count"]) - 1
+        player["cash"] = int(player["cash"]) + price
+        self.byte_exchange += 1
+        message = f"{player['display_name']} sold 1 BYTE for ${price}."
+        return self._spend_action(message)
+
+    def pass_market(self) -> dict[str, Any]:
+        player = self._open_market()
+        message = f"{player['display_name']} passed a market action."
+        return self._spend_action(message)
+
+    def economy_errors(self) -> list[str]:
+        errors = list(self.conservation())
+        catalog = all_coordinates()
+        occupied = {cell for cell, filled in self.occupied.items() if filled}
+        holdings: dict[str, int] = {corp["id"]: 0 for corp in self.corporations}
+        byte_held = 0
+        for player in self.players:
+            if int(player["cash"]) < 0:
+                errors.append(f"negative cash:{player['id']}")
+            if int(player["byte_count"]) < 0:
+                errors.append(f"negative byte:{player['id']}")
+            byte_held += int(player["byte_count"])
+            for corp_id, count in player["shares"].items():
+                if int(count) < 0:
+                    errors.append(f"negative shares:{player['id']}:{corp_id}")
+                holdings[corp_id] = holdings.get(corp_id, 0) + int(count)
+        if self.byte_exchange + byte_held != self.byte_supply:
+            errors.append("byte supply")
+        if self.byte_exchange < 0:
+            errors.append("negative exchange")
+        for corp in self.corporations:
+            corp_id = corp["id"]
+            cells = [cell for cell in catalog if self.company_of.get(cell) == corp_id]
+            if corp["cells"] != cells:
+                errors.append(f"{corp_id}: cells")
+            if int(corp["size"]) != len(cells):
+                errors.append(f"{corp_id}: size")
+            outstanding = holdings.get(corp_id, 0)
+            if int(corp["bank_shares"]) + outstanding != self.share_supply:
+                errors.append(f"{corp_id}: supply")
+            if int(corp["bank_shares"]) < 0:
+                errors.append(f"{corp_id}: negative bank")
+            expected_price = share_price(len(cells), self.sentiment[corp["sector"]]) if cells else 0
+            if int(corp["share_price"]) != expected_price:
+                errors.append(f"{corp_id}: price")
+            if corp["active"] != (len(cells) >= 2):
+                errors.append(f"{corp_id}: active flag")
+            if not corp["active"] and (cells or outstanding or int(corp["bank_shares"]) != self.share_supply):
+                errors.append(f"{corp_id}: inactive inventory")
+        seen: set[str] = set()
+        for coordinate in catalog:
+            if coordinate not in occupied or coordinate in seen:
+                continue
+            touched = component(coordinate, occupied)
+            seen.update(touched)
+            present = []
+            for cell in touched:
+                corp_id = self.company_of.get(cell)
+                if corp_id and corp_id not in present:
+                    present.append(corp_id)
+            if len(present) > 1:
+                errors.append("mixed:" + ",".join(present))
+        for cell, corp_id in self.company_of.items():
+            if not self.occupied.get(cell, False):
+                errors.append(f"empty company cell:{cell}")
+            if corp_id not in holdings:
+                errors.append(f"unknown company on {cell}")
+        return errors
 
     def conservation(self) -> list[str]:
         occupied = [coordinate for coordinate, filled in self.occupied.items() if filled]
@@ -113,12 +315,102 @@ class OfflineMatch:
         return {
             "seed": self.seed,
             "round_number": self.round_number,
+            "phase": self.phase,
+            "market_actions_left": self.market_actions_left,
             "active_player": self.active_player()["display_name"],
             "turn_order": [player["display_name"] for player in self.players],
             "ids": [player["id"] for player in self.players],
             "bag_size": len(self.bag),
             "bag": list(self.bag),
             "occupied": [coordinate for coordinate in catalog if self.occupied[coordinate]],
+            "companies_on_board": [
+                {"coordinate": coordinate, "company_id": self.company_of[coordinate]}
+                for coordinate in catalog
+                if coordinate in self.company_of
+            ],
             "hands": {player["display_name"]: list(player["hand"]) for player in self.players},
+            "cash": {player["display_name"]: int(player["cash"]) for player in self.players},
+            "shares": {
+                player["display_name"]: dict(player["shares"]) for player in self.players
+            },
+            "byte": {player["display_name"]: int(player["byte_count"]) for player in self.players},
+            "byte_price": self.byte_price,
+            "byte_exchange": self.byte_exchange,
+            "corporations": [
+                {
+                    "id": corp["id"],
+                    "active": corp["active"],
+                    "size": corp["size"],
+                    "bank_shares": corp["bank_shares"],
+                    "share_price": corp["share_price"],
+                    "cells": list(corp["cells"]),
+                }
+                for corp in self.corporations
+            ],
+            "pending": list(self.pending),
             "log": list(self.log),
         }
+
+    def _corp(self, corp_id: str) -> dict[str, Any] | None:
+        for corp in self.corporations:
+            if corp["id"] == corp_id:
+                return corp
+        return None
+
+    def _inactive(self) -> list[dict[str, Any]]:
+        return [corp for corp in self.corporations if not corp["active"]]
+
+    def _reprice(self, corp: dict[str, Any]) -> None:
+        catalog = all_coordinates()
+        cells = [cell for cell in catalog if self.company_of.get(cell) == corp["id"]]
+        corp["cells"] = cells
+        corp["size"] = len(cells)
+        corp["active"] = len(cells) >= 2
+        if corp["active"]:
+            corp["share_price"] = share_price(len(cells), self.sentiment[corp["sector"]])
+        else:
+            corp["share_price"] = 0
+
+    def _enter_market(self) -> None:
+        self.phase = "market"
+        self.market_actions_left = self.market_limit
+
+    def _open_market(self) -> dict[str, Any]:
+        if self.phase != "market":
+            raise ValueError("not the market step")
+        if self.market_actions_left <= 0:
+            raise ValueError("no market action left")
+        return self.active_player()
+
+    def _open_share_trade(self, corp_id: str) -> tuple[dict[str, Any], dict[str, Any], int]:
+        player = self._open_market()
+        corp = self._corp(corp_id)
+        if corp is None:
+            raise ValueError("unknown company")
+        if not corp["active"] or int(corp["share_price"]) <= 0:
+            raise ValueError("company is not active")
+        return player, corp, int(corp["share_price"])
+
+    def _spend_action(self, message: str) -> dict[str, Any]:
+        self.log.append(message)
+        self.market_actions_left -= 1
+        finished = False
+        if self.market_actions_left == 0:
+            self._finish_turn()
+            finished = True
+        return {"log": message, "turn_finished": finished}
+
+    def _finish_turn(self) -> None:
+        player = self.active_player()
+        if self.bag:
+            player["hand"].append(self.bag.pop(0))
+            self.log.append(f"{player['display_name']} drew from the bag.")
+        else:
+            self.log.append(f"{player['display_name']} drew nothing. The bag is empty.")
+        self.phase = "place"
+        self.market_actions_left = 0
+        self.pending = []
+        self.turn_index += 1
+        if self.turn_index >= len(self.players):
+            self.turn_index = 0
+            self.round_number += 1

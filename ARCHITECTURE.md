@@ -28,6 +28,7 @@ Public snapshots omit the bag order and private hands. The schema rejects `priva
 | Tile conservation | `server/app/domain/tiles.py` | `client/scripts/domain/tiles.gd` | exercised in tests |
 | Match RNG and shuffle | `server/app/domain/rng.py` | `client/scripts/domain/rng.gd` | `golden_rng.json` |
 | Offline deal and placement | `server/app/domain/offline.py` | `client/scripts/domain/offline_match.gd` | `golden_deals.json`, `golden_placement.json` |
+| Orthogonal chains | `server/app/domain/board.py` | `client/scripts/domain/board.gd` | exercised in economy tests |
 | Lobby snapshot and invariants | `setup.py`, `invariants.py` | not ported | `sample_lobby_state.json` |
 
 GDScript has no exception type in this milestone. Rejected pricing inputs return −1, and a rejected ranking returns an empty list. Python raises `ValueError` or `TypeError`. That split is assumption A13.
@@ -66,8 +67,10 @@ A15. Docker Compose and the Godot web export were not run. The Compatibility ren
 
 A16. The match generator is a 32-bit xorshift, not a language runtime RNG. `state = seed & 0xFFFFFFFF`, and a zero state becomes `0x6D2B79F5`. Each step is `x ^= (x << 13)`, `x ^= x >> 17`, `x ^= (x << 5)`, masked to 32 bits after each xor. `below(n)` is `next_u32() % n`; modulo bias is accepted. Seed 0 and seed 2^32 share a state. A negative seed is rejected. Opening order shuffles the entry-order roster with Fisher-Yates (`i` from `n-1` down to `1`, `j` in `0..i` inclusive), then shuffles the catalog into the bag, then deals one tile at a time round-robin for five rounds. Bag index 0 is the next draw. Player ids `p1`..`pn` stay with entry order. `turn_order_index` is assigned after the seat shuffle.
 
-A17. An M1 placement marks the cell occupied and leaves it unincorporated. There is no `company_id`, founding, growth, merger, or market action. A turn places one held tile, appends one bag tile when any remain, then advances. An empty hand is the only skip. `round_number` starts at 1 and increments after every seat has acted. Local hands are hidden behind a pass-the-device step on one device. This is not an online match. The log lines are `{name} placed {coord} and drew from the bag.`, `{name} placed {coord}. The bag is empty.`, and `{name} has no tile to place.`
+A17. M1 drew immediately after a placement. M2 does not. The current local turn is assumption A18.
+
+A18. A local turn places one held tile, or skips when the hand is empty, then resolves founding or growth, then allows two market actions, then draws. `round_number` starts at 1 and increments after every seat has finished that sequence. Sector sentiment stays 0, so a new company's price is `100 + 50 × size`, already a multiple of $10. The founder receives one share when `bank_shares > 0`. A cluster of size at least 2 stays unincorporated when every brand is already active. A placement whose connected component contains two or more active companies is rejected with `merger is not in this build` and does not change the board, hands, cash, or holdings. That rejection is a legality stub, not a merger. Hands stay covered between seats on one device. This is not an online match.
 
 ## What is intentionally absent
 
-Rooms, WebSockets, reconnect, idempotent command application, founding, growth, trades that move cash, merger payouts, the round-event draw, end-game scoring from a board, accounts, and deployment. The HTTP validator still returns `applied: false`.
+Rooms, WebSockets, reconnect, idempotent command application, merger payouts, the round-event draw, end-game scoring from a board, accounts, and deployment. The HTTP validator still returns `applied: false`.

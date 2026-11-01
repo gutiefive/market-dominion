@@ -1,6 +1,6 @@
 # Milestones
 
-M1 is the stage this tree claims as playable. A box is checked only where a command was run and the result is recorded in [CHANGELOG.md](CHANGELOG.md).
+M2 is the stage this tree claims as playable. A box is checked only where a command was run and the result is recorded in [CHANGELOG.md](CHANGELOG.md).
 
 ## M0 Foundation
 
@@ -24,18 +24,18 @@ Local pass-and-play only. The HTTP API does not apply these moves.
 - [x] Seeded bag shuffle and a deal of five unique tiles per seat (`golden_deals.json`, `M1_CLIENT_OK`)
 - [x] Local pass-and-play turn ownership, with the hand covered between seats
 - [x] Legal-cell highlight for the active hand
-- [x] Conservation test that walks a scripted deal and a full 81-tile placement
+- [x] Conservation test that walks a scripted deal; a longer play keeps cash and inventory until the first rejected merger
 - [x] Screenshot of a real placement (`docs/m1-placed.png`, seed 7710, Rowan places C1)
 
 ## M2 Economy
 
-Price math exists and is tested. Formation, growth, and trades do not.
+Local pass-and-play only. Mergers are rejected instead of resolved. The HTTP API does not apply these moves.
 
-- [ ] Founding when two orthogonal unincorporated squares connect
-- [ ] Free founder share and the 20-share identity after the grant
-- [ ] Growth that absorbs a connected unincorporated cluster
-- [ ] Two market actions that move cash and inventory at the posted price
-- [ ] Reject a third action, an inactive name, and a purchase that would go negative
+- [x] Founding when two orthogonal unincorporated squares connect (`docs/m2-economy.png`, `M2_CLIENT_OK`)
+- [x] Free founder share and the 20-share identity after the grant
+- [x] Growth that absorbs a connected unincorporated cluster and reprices
+- [x] Two market actions that move cash and inventory at the posted price
+- [x] Reject a third action, an inactive name, a short sale, and a purchase that would go negative
 
 ## M3 Mergers
 
@@ -78,6 +78,7 @@ The HTTP validator is not multiplayer.
 ## Known limits
 
 - Validate never mutates a match. The offline table lives in the client and in `OfflineMatch`; it is not a server room.
-- Placed cells stay unincorporated. Founding, growth, mergers, and market actions are M2+.
+- A placement that would merge two companies is rejected. Payouts and liquidation are M3.
+- Sector sentiment stays 0. Round events and end-game scoring are M4.
 - GDScript rejection for prices is −1 or an empty list; the offline table returns `{ok: false, error}`. Python raises (assumption A13).
 - Docker and web export were not executed (assumption A15).

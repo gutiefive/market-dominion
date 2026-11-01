@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.3.0 — 2026-11-01
+
+M2 economy on the local table. Protocol version stays `0.1.0`. The HTTP validator still does not apply moves.
+
+### Added
+
+- Orthogonal chain detection, founding, and growth. A size-2 unincorporated cluster asks the placer to pick an inactive brand. The founder receives one share when the bank has one.
+- Growth absorbs every connected unincorporated square and reprices from `100 + 50 × size` at sentiment 0.
+- Up to two market actions after resolution: buy or sell one active-company share, or buy or sell one BYTE, at the posted price. Cash and the 20-share and 30-coin totals stay intact.
+- A placement that would join two active companies is rejected and does not change the board (assumption A18). That is not a merger.
+- Capture `docs/m2-economy.png`: NOVA AI size 4 at $300, bank 18, Rowan holds 2 after buying one share, cash $5700 fictional, one market action left.
+
+### Evidence
+
+- `.venv/bin/python -m pytest -q` passed (46 tests).
+- `./scripts/check_client.sh` prints `M0_CLIENT_OK`, `M1_CLIENT_OK`, and `M2_CLIENT_OK`.
+
+### Not in this version
+
+Merger bonuses and liquidation, round events, match scoring, WebSockets, web export, and deployment.
+
 ## 0.2.0 — 2026-11-01
 
 M1 offline board. Protocol version stays `0.1.0`. The HTTP validator still does not apply moves.

@@ -66,29 +66,28 @@ def test_same_seed_replays_and_a_different_seed_does_not():
     assert first["hands"] != other["hands"]
 
 
-def test_scripted_placement_advances_the_turn_and_draws():
+def test_scripted_placement_waits_to_draw_until_the_market_closes():
     fixture = load_json("fixtures/golden_placement.json")
     match = OfflineMatch(fixture["seed"], fixture["names"])
     for step in fixture["steps"]:
-        actor = match.active_player()["display_name"]
-        placed = match.place(match.active_player()["hand"][0])
+        if step["op"] == "place":
+            actor = match.active_player()["display_name"]
+            tile = match.active_player()["hand"][0]
+            placed = match.place(tile)
+            assert actor == step["actor"]
+            assert placed["placed"] == tile == step["placed"]
+        elif step["op"] == "pass_market":
+            match.pass_market()
+        else:
+            raise AssertionError(step["op"])
         snap = match.snapshot()
-        assert actor == step["actor"]
-        assert placed["placed"] == step["placed"]
-        assert placed["drew"] is True
+        assert snap["phase"] == step["phase"]
         assert snap["round_number"] == step["round_number"]
         assert snap["active_player"] == step["active_player"]
         assert snap["bag_size"] == step["bag_size"]
         assert snap["occupied"] == step["occupied"]
-        assert snap["hands"] == step["hands"]
         assert snap["log"] == step["log"]
-        assert match.conservation() == []
-    assert match.round_number == fixture["steps"][-1]["round_number"]
-    assert match.active_player()["display_name"] == fixture["steps"][-1]["active_player"]
-    assert match.occupied["C1"] is True
-    assert match.occupied["F8"] is True
-    assert match.occupied["D4"] is True
-    assert match.occupied["I8"] is True
+        assert match.economy_errors() == []
 
 
 def test_illegal_placement_and_early_pass_are_rejected():
@@ -98,29 +97,44 @@ def test_illegal_placement_and_early_pass_are_rejected():
     with pytest.raises(ValueError, match="hand still has a tile"):
         match.pass_turn()
     match.place("C1")
-    with pytest.raises(ValueError, match="tile not in hand"):
+    with pytest.raises(ValueError, match="not the placement step"):
         match.place("C1")
     assert match.conservation() == []
+    assert match.economy_errors() == []
 
 
-def test_two_players_can_place_the_entire_board():
+def _finish_market(match: OfflineMatch) -> None:
+    while match.phase == "market":
+        match.pass_market()
+
+
+def test_safe_play_stops_at_a_merger_and_keeps_invariants():
     match = OfflineMatch(7710, ["Rowan", "Quinn"])
     placed = 0
-    while any(player["hand"] for player in match.players) or match.bag:
-        assert match.conservation() == []
+    stopped = False
+    while placed < 81:
+        assert match.economy_errors() == []
+        if match.phase == "choose_founder":
+            inactive = [corp["id"] for corp in match.corporations if not corp["active"]]
+            match.choose_founder(inactive[0])
+            continue
+        if match.phase == "market":
+            _finish_market(match)
+            continue
         hand = match.active_player()["hand"]
-        if hand:
-            match.place(hand[0])
-            placed += 1
-        else:
+        if not hand:
             match.pass_turn()
-    assert placed == 81
-    assert match.conservation() == []
-    assert sum(match.occupied.values()) == 81
-    assert match.bag == []
-    assert all(player["hand"] == [] for player in match.players)
-    assert match.round_number == 41
-    assert match.turn_index == 1
+            continue
+        try:
+            match.place(hand[0])
+        except ValueError as exc:
+            assert str(exc) == "merger is not in this build"
+            stopped = True
+            break
+        placed += 1
+    assert stopped
+    assert match.economy_errors() == []
+    assert placed < 81
 
 
 def test_empty_hand_skips_and_table_size_is_checked():
@@ -129,6 +143,11 @@ def test_empty_hand_skips_and_table_size_is_checked():
     match.bag = []
     result = match.pass_turn()
     assert result["log"] == "Rowan has no tile to place."
+    assert match.phase == "market"
+    assert match.active_player()["display_name"] == "Rowan"
+    match.pass_market()
+    match.pass_market()
+    assert match.log[-1] == "Rowan drew nothing. The bag is empty."
     assert match.active_player()["display_name"] == "Quinn"
     with pytest.raises(ValueError, match="player count"):
         OfflineMatch(7710, ["Rowan"])

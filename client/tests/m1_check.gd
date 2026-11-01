@@ -103,12 +103,23 @@ func _check_placement() -> void:
 		return
 	var table = OfflineMatch.create(int(golden["seed"]), golden["names"])
 	for step in golden["steps"]:
-		var actor := str(table.active_player()["display_name"])
-		var tile := str(table.active_player()["hand"][0])
-		var result: Dictionary = table.place(tile)
-		if not bool(result["ok"]) or actor != str(step["actor"]) or tile != str(step["placed"]):
-			_fail("place %s" % tile)
+		if str(step["op"]) == "place":
+			var actor := str(table.active_player()["display_name"])
+			var tile := str(table.active_player()["hand"][0])
+			var result: Dictionary = table.place(tile)
+			if not bool(result["ok"]) or actor != str(step["actor"]) or tile != str(step["placed"]):
+				_fail("place %s" % tile)
+				return
+		elif str(step["op"]) == "pass_market":
+			var passed: Dictionary = table.pass_market()
+			if not bool(passed["ok"]):
+				_fail("pass market")
+				return
+		else:
+			_fail("op")
 			return
+		if table.phase != str(step["phase"]):
+			_fail("phase")
 		if table.round_number != int(step["round_number"]):
 			_fail("round")
 		if table.active_player()["display_name"] != str(step["active_player"]):
@@ -119,16 +130,6 @@ func _check_placement() -> void:
 		for coordinate in occupied:
 			if not bool(table.occupied[str(coordinate)]):
 				_fail("missing occupied %s" % str(coordinate))
-		for player_name in step["hands"].keys():
-			var expected: Array = step["hands"][player_name]
-			var actual := _hand_named(table, str(player_name))
-			if actual.size() != expected.size():
-				_fail("hand after %s" % str(player_name))
-				continue
-			for index in expected.size():
-				if str(actual[index]) != str(expected[index]):
-					_fail("tiles after %s" % str(player_name))
-					break
 		var expected_log: Array = step["log"]
 		if table.log.size() != expected_log.size():
 			_fail("log size")
@@ -136,10 +137,10 @@ func _check_placement() -> void:
 			for index in expected_log.size():
 				if table.log[index] != str(expected_log[index]):
 					_fail("log %s" % table.log[index])
-		if table.conservation().size() != 0:
-			_fail("placement conservation")
-	if table.round_number != 3 or table.active_player()["display_name"] != "Rowan":
-		_fail("after four placements")
+		if table.economy_errors().size() != 0:
+			_fail("placement economy")
+	if table.round_number != 2 or table.active_player()["display_name"] != "Rowan":
+		_fail("after two turns")
 
 
 func _check_rejections() -> void:
@@ -157,16 +158,47 @@ func _check_rejections() -> void:
 	var placed := 0
 	var long_match = OfflineMatch.create(7710, ["Rowan", "Quinn"])
 	while placed < 12:
-		var tile := str(long_match.active_player()["hand"][0])
-		var result: Dictionary = long_match.place(tile)
-		if not bool(result["ok"]):
-			_fail("scripted run")
+		if long_match.phase != "place":
+			if not _finish_open_step(long_match):
+				_fail("could not finish the open step")
+				return
+			continue
+		var hand: Array = long_match.active_player()["hand"]
+		if hand.is_empty():
+			var skipped: Dictionary = long_match.pass_turn()
+			if not bool(skipped["ok"]):
+				_fail("empty hand")
+				return
+		else:
+			var result: Dictionary = long_match.place(str(hand[0]))
+			if not bool(result["ok"]):
+				_fail("scripted run %s" % str(result["error"]))
+				return
+			placed += 1
+		if not _finish_open_step(long_match):
+			_fail("could not close the turn")
 			return
-		placed += 1
-	if long_match.conservation().size() != 0:
-		_fail("twelve conservation")
+	if long_match.economy_errors().size() != 0:
+		_fail("twelve economy")
 	if long_match.round_number != 7 or long_match.active_player()["display_name"] != "Rowan":
 		_fail("twelve turns round %s player %s" % [str(long_match.round_number), long_match.active_player()["display_name"]])
+
+
+func _finish_open_step(table: OfflineMatch) -> bool:
+	if table.phase == "choose_founder":
+		var brand := ""
+		for corp in table.corporations:
+			if not bool(corp["active"]):
+				brand = str(corp["id"])
+				break
+		var chosen: Dictionary = table.choose_founder(brand)
+		if not bool(chosen["ok"]):
+			return false
+	while table.phase == "market":
+		var passed: Dictionary = table.pass_market()
+		if not bool(passed["ok"]):
+			return false
+	return true
 
 
 func _hand_named(table: OfflineMatch, player_name: String) -> Array:

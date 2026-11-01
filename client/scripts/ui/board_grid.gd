@@ -4,6 +4,21 @@ extends GridContainer
 
 signal cell_pressed(coordinate: String)
 
+const MARKS := {
+	"nova_ai": "NA",
+	"orbit_pay": "OP",
+	"volt_grid": "VG",
+	"pulse_media": "PM",
+	"evermart": "EM",
+}
+const NAMES := {
+	"nova_ai": "NOVA AI",
+	"orbit_pay": "ORBIT PAY",
+	"volt_grid": "VOLT GRID",
+	"pulse_media": "PULSE MEDIA",
+	"evermart": "EVERMART",
+}
+
 var _buttons: Dictionary = {}
 var _legal: Dictionary = {}
 var _cell_size: int = 52
@@ -14,7 +29,7 @@ func _init() -> void:
 	add_theme_constant_override("h_separation", 3)
 	add_theme_constant_override("v_separation", 3)
 	_build()
-	set_state({}, [], "")
+	set_state({}, {}, [], "")
 
 
 func _build() -> void:
@@ -54,39 +69,49 @@ func set_cell_size(px: int) -> void:
 			child.custom_minimum_size = Vector2(_cell_size, 22)
 	for button in _buttons.values():
 		button.custom_minimum_size = Vector2(_cell_size, _cell_size)
-		button.add_theme_font_size_override("font_size", font)
+		button.add_theme_font_size_override("font_size", 9 if _cell_size < 44 else font)
 
 
-func set_state(occupied: Dictionary, legal: Array, selected: String) -> void:
+func set_state(occupied: Dictionary, companies: Dictionary, legal: Array, selected: String) -> void:
 	_legal.clear()
 	for coordinate in legal:
 		_legal[str(coordinate)] = true
 	for coordinate in Coordinates.catalog():
 		var button: Button = _buttons[coordinate]
 		var is_occupied := bool(occupied.get(coordinate, false))
+		var corp_id := str(companies.get(coordinate, ""))
 		var is_legal := _legal.has(coordinate)
 		var is_selected := coordinate == selected and is_legal
 		button.disabled = false
 		button.focus_mode = Control.FOCUS_ALL if is_legal else Control.FOCUS_NONE
 		button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if is_legal else Control.CURSOR_ARROW
-		button.tooltip_text = _tip(coordinate, is_occupied, is_legal)
-		_paint(button, is_occupied, is_legal, is_selected)
+		button.text = coordinate if corp_id == "" else "%s\n%s" % [coordinate, str(MARKS.get(corp_id, corp_id))]
+		button.tooltip_text = _tip(coordinate, is_occupied, is_legal, corp_id)
+		_paint(button, is_occupied, is_legal, is_selected, corp_id)
 
 
-func _tip(coordinate: String, is_occupied: bool, is_legal: bool) -> String:
+func _tip(coordinate: String, is_occupied: bool, is_legal: bool, corp_id: String) -> String:
+	if corp_id != "":
+		return "%s · %s (%s)." % [coordinate, str(NAMES.get(corp_id, corp_id)), str(MARKS.get(corp_id, ""))]
 	if is_occupied:
-		return "%s is already an unincorporated district." % coordinate
+		return "%s is an unincorporated district." % coordinate
 	if is_legal:
 		return "Place %s. It matches a tile in the active hand." % coordinate
 	return "%s is empty. The active player does not hold this tile." % coordinate
 
 
-func _paint(button: Button, is_occupied: bool, is_legal: bool, is_selected: bool) -> void:
+func _paint(button: Button, is_occupied: bool, is_legal: bool, is_selected: bool, corp_id: String) -> void:
 	var fill := Color("10182a")
 	var border := Color("243044")
 	var text := Color("66758c")
 	var width := 1
-	if is_occupied:
+	if corp_id != "":
+		var style: Dictionary = _company_style(corp_id)
+		fill = style["fill"]
+		border = style["border"]
+		text = style["text"]
+		width = 2
+	elif is_occupied:
 		fill = Color("1a3d42")
 		border = Color("2dd4bf")
 		text = Color("e8eef9")
@@ -111,6 +136,21 @@ func _paint(button: Button, is_occupied: bool, is_legal: bool, is_selected: bool
 	button.add_theme_color_override("font_disabled_color", text)
 	button.add_theme_color_override("font_hover_color", text)
 	button.add_theme_color_override("font_focus_color", text)
+
+
+func _company_style(corp_id: String) -> Dictionary:
+	match corp_id:
+		"nova_ai":
+			return {"fill": Color("2a2150"), "border": Color("c4b5fd"), "text": Color("e8e0ff")}
+		"orbit_pay":
+			return {"fill": Color("123044"), "border": Color("7dd3fc"), "text": Color("e0f6ff")}
+		"volt_grid":
+			return {"fill": Color("3a3014"), "border": Color("fbbf24"), "text": Color("fff4d6")}
+		"pulse_media":
+			return {"fill": Color("3f1d2a"), "border": Color("fb7185"), "text": Color("ffe4ea")}
+		"evermart":
+			return {"fill": Color("143024"), "border": Color("4ade80"), "text": Color("e5ffef")}
+	return {"fill": Color("1a3d42"), "border": Color("2dd4bf"), "text": Color("e8eef9")}
 
 
 func _box(fill: Color, border: Color, width: int) -> StyleBoxFlat:

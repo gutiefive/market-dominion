@@ -35,13 +35,13 @@ Sector sentiment starts at 0 for each sector and stays inside −2…+2.
 
 ## Turn
 
-1. Place one tile from hand onto its matching empty cell. With no tile, skip placement. M1 does this step and leaves the cell unincorporated (assumption A17).
-2. Resolve growth, founding, or a merger, including payouts, before market actions. M1 does not resolve this step.
+1. Place one tile from hand onto its matching empty cell. With no tile, skip placement.
+2. Resolve growth or founding before market actions. M2 does this for a single company. A placement that would join two active companies is rejected and the tile stays in hand (assumption A18). Merger payouts are not resolved.
 3. Up to two market actions, either of which may be passed: buy one share, sell one share, buy one BYTE, or sell one BYTE, at the price currently posted. No loans, shorts, fractions, or negative cash.
-4. Draw one tile if the bag has one. The hand returns to five when the bag allows it. A hand never exceeds five (assumption A5).
-5. After every remaining player has taken one turn, apply exactly one round event, reprice, and check the end of the game. M1 does not do this.
+4. Draw one tile if the bag has one. The hand returns to five when the bag allows it. A hand never exceeds five (assumption A5). The draw happens after the market actions.
+5. After every remaining player has taken one turn, apply exactly one round event, reprice, and check the end of the game. M2 does not do this. Sentiment stays 0 and BYTE stays at its posted price.
 
-M1 runs steps 1 and 4 only. Because steps 2 and 3 do not run, the draw happens as soon as the tile is placed. The hand stays at five while the bag can refill it.
+M2 runs steps 1 through 4. Founding requires a connected unincorporated cluster of size at least 2 and an inactive brand. The founder receives one share when the bank has one. Growth absorbs every connected unincorporated square and reprices from the new size.
 
 A player may place with $0. Buying needs cash and inventory. A timer, when enabled later, plays a deterministic legal tile, takes safe defaults, and passes leftover market actions.
 

@@ -1,25 +1,35 @@
 extends RefCounted
 class_name OfflineMatch
 
-## Local deal and placement. Mirrors server/app/domain/offline.py.
-## Placed cells stay unincorporated. Assumption A17.
+## Local deal, founding, growth, and two market actions.
+## A merger is rejected so the board stays legal. Assumption A18.
 
 var seed: int
 var hand_size: int
 var starting_cash: int
+var market_limit: int
+var share_supply: int
+var byte_supply: int
+var byte_price: int
+var byte_exchange: int
+var sentiment: Dictionary = {}
+var corporations: Array = []
 var players: Array = []
 var bag: Array = []
 var occupied: Dictionary = {}
+var company_of: Dictionary = {}
 var turn_index: int
 var round_number: int
+var phase: String = "place"
+var market_actions_left: int
+var pending: Array = []
 var log: Array[String] = []
 
 
 static func create(seed_value: int, names: Array) -> OfflineMatch:
 	var rules = SharedFiles.read_json("fixtures/rules_constants.json")
-	if rules == null:
-		return null
-	if seed_value < 0:
+	var roster_file = SharedFiles.read_json("fixtures/corporations.json")
+	if rules == null or roster_file == null or seed_value < 0:
 		return null
 	var minimum := int(rules["players_min"])
 	var maximum := int(rules["players_max"])
@@ -35,6 +45,27 @@ static func create(seed_value: int, names: Array) -> OfflineMatch:
 	table.seed = seed_value
 	table.hand_size = int(rules["starting_hand_size"])
 	table.starting_cash = int(rules["starting_cash"])
+	table.market_limit = int(rules["market_actions_per_turn"])
+	table.share_supply = int(rules["corporation_share_supply"])
+	table.byte_supply = int(rules["byte_supply"])
+	table.byte_price = int(rules["byte_initial_price"])
+	table.byte_exchange = table.byte_supply
+	var share_template := {}
+	for sector in rules["sectors"]:
+		table.sentiment[str(sector)] = 0
+	for source in roster_file["corporations"]:
+		var corp_id := str(source["id"])
+		table.corporations.append({
+			"id": corp_id,
+			"name": str(source["name"]),
+			"sector": str(source["sector"]),
+			"active": false,
+			"bank_shares": table.share_supply,
+			"share_price": 0,
+			"size": 0,
+			"cells": [],
+		})
+		share_template[corp_id] = 0
 	var rng := MatchRng.new(seed_value)
 	var roster: Array = []
 	for index in names.size():
@@ -42,6 +73,8 @@ static func create(seed_value: int, names: Array) -> OfflineMatch:
 			"id": "p%d" % [index + 1],
 			"display_name": str(names[index]),
 			"hand": [],
+			"shares": share_template.duplicate(true),
+			"byte_count": 0,
 		})
 	table.players = MatchRng.shuffle(roster, rng)
 	for index in table.players.size():
@@ -60,6 +93,8 @@ static func create(seed_value: int, names: Array) -> OfflineMatch:
 			table.bag.remove_at(0)
 	table.turn_index = 0
 	table.round_number = 1
+	table.phase = "place"
+	table.market_actions_left = 0
 	return table
 
 
@@ -89,46 +124,249 @@ func active_player() -> Dictionary:
 
 
 func place(coordinate: String) -> Dictionary:
+	if phase != "place":
+		return {"ok": false, "error": "not the placement step"}
 	var player := active_player()
 	var hand: Array = player["hand"]
-	var found := hand.find(coordinate)
-	if found == -1:
+	if hand.find(coordinate) == -1:
 		return {"ok": false, "error": "tile not in hand"}
 	if bool(occupied.get(coordinate, false)):
 		return {"ok": false, "error": "cell occupied"}
-	hand.remove_at(found)
+	var filled := {}
+	for cell in occupied.keys():
+		if bool(occupied[cell]):
+			filled[str(cell)] = true
+	filled[coordinate] = true
+	var touched := BoardGraph.component(coordinate, filled)
+	var company_ids: Array[String] = []
+	for cell in touched:
+		var corp_id := str(company_of.get(str(cell), ""))
+		if corp_id != "" and not company_ids.has(corp_id):
+			company_ids.append(corp_id)
+	if company_ids.size() >= 2:
+		return {"ok": false, "error": "merger is not in this build"}
+	hand.remove_at(hand.find(coordinate))
 	occupied[coordinate] = true
-	var drew := false
-	if not bag.is_empty():
-		hand.append(bag[0])
-		bag.remove_at(0)
-		drew = true
+	if company_ids.size() == 1:
+		var grown = _corp(company_ids[0])
+		for cell in touched:
+			company_of[str(cell)] = grown["id"]
+		_reprice(grown)
+		_enter_market()
+		var growth_message := "%s placed %s and grew %s to size %d. Share price is $%d." % [
+			player["display_name"], coordinate, grown["name"], int(grown["size"]), int(grown["share_price"])
+		]
+		log.append(growth_message)
+		return {"ok": true, "placed": coordinate, "resolution": "growth", "log": growth_message}
+	if touched.size() >= 2 and not _inactive().is_empty():
+		pending = []
+		for cell in touched:
+			pending.append(str(cell))
+		phase = "choose_founder"
+		var choice_message := "%s placed %s. Choose a company for the %d-district cluster." % [
+			player["display_name"], coordinate, touched.size()
+		]
+		log.append(choice_message)
+		return {"ok": true, "placed": coordinate, "resolution": "choose_founder", "log": choice_message}
 	var message := ""
-	if drew:
-		message = "%s placed %s and drew from the bag." % [player["display_name"], coordinate]
+	if touched.size() >= 2:
+		message = "%s placed %s. The %d-district cluster stays unincorporated." % [
+			player["display_name"], coordinate, touched.size()
+		]
 	else:
-		message = "%s placed %s. The bag is empty." % [player["display_name"], coordinate]
+		message = "%s placed %s. The district stays unincorporated." % [player["display_name"], coordinate]
+	_enter_market()
 	log.append(message)
-	_advance()
-	return {"ok": true, "placed": coordinate, "drew": drew, "log": message}
+	return {"ok": true, "placed": coordinate, "resolution": "unincorporated", "log": message}
+
+
+func choose_founder(corp_id: String) -> Dictionary:
+	if phase != "choose_founder":
+		return {"ok": false, "error": "no company choice is pending"}
+	var corp := _corp(corp_id)
+	if corp.is_empty():
+		return {"ok": false, "error": "unknown company"}
+	if bool(corp["active"]):
+		return {"ok": false, "error": "company is already active"}
+	var player := active_player()
+	for cell in pending:
+		company_of[str(cell)] = corp["id"]
+	pending = []
+	_reprice(corp)
+	var granted := false
+	if int(corp["bank_shares"]) > 0:
+		corp["bank_shares"] = int(corp["bank_shares"]) - 1
+		var shares: Dictionary = player["shares"]
+		shares[corp["id"]] = int(shares[corp["id"]]) + 1
+		granted = true
+	_enter_market()
+	var message := ""
+	if granted:
+		message = "%s founded %s on %d districts and received one founder share." % [
+			player["display_name"], corp["name"], int(corp["size"])
+		]
+	else:
+		message = "%s founded %s on %d districts. The bank had no share to grant." % [
+			player["display_name"], corp["name"], int(corp["size"])
+		]
+	log.append(message)
+	return {"ok": true, "founded": corp["id"], "granted": granted, "log": message}
 
 
 func pass_turn() -> Dictionary:
+	if phase != "place":
+		return {"ok": false, "error": "not the placement step"}
 	var player := active_player()
 	var hand: Array = player["hand"]
 	if not hand.is_empty():
 		return {"ok": false, "error": "hand still has a tile"}
 	var message := "%s has no tile to place." % player["display_name"]
 	log.append(message)
-	_advance()
+	_enter_market()
 	return {"ok": true, "passed": true, "log": message}
 
 
-func _advance() -> void:
-	turn_index += 1
-	if turn_index >= players.size():
-		turn_index = 0
-		round_number += 1
+func buy_share(corp_id: String) -> Dictionary:
+	var opened: Dictionary = _open_share_trade(corp_id)
+	if not bool(opened["ok"]):
+		return opened
+	var player: Dictionary = opened["player"]
+	var corp: Dictionary = opened["corp"]
+	var price := int(opened["price"])
+	if int(corp["bank_shares"]) < 1:
+		return {"ok": false, "error": "no share in the bank"}
+	if int(player["cash"]) < price:
+		return {"ok": false, "error": "not enough cash"}
+	player["cash"] = int(player["cash"]) - price
+	corp["bank_shares"] = int(corp["bank_shares"]) - 1
+	var shares: Dictionary = player["shares"]
+	shares[corp["id"]] = int(shares[corp["id"]]) + 1
+	return _spend_action("%s bought 1 %s share for $%d." % [player["display_name"], corp["name"], price])
+
+
+func sell_share(corp_id: String) -> Dictionary:
+	var opened: Dictionary = _open_share_trade(corp_id)
+	if not bool(opened["ok"]):
+		return opened
+	var player: Dictionary = opened["player"]
+	var corp: Dictionary = opened["corp"]
+	var price := int(opened["price"])
+	var shares: Dictionary = player["shares"]
+	if int(shares[corp["id"]]) < 1:
+		return {"ok": false, "error": "no share to sell"}
+	shares[corp["id"]] = int(shares[corp["id"]]) - 1
+	corp["bank_shares"] = int(corp["bank_shares"]) + 1
+	player["cash"] = int(player["cash"]) + price
+	return _spend_action("%s sold 1 %s share for $%d." % [player["display_name"], corp["name"], price])
+
+
+func buy_byte() -> Dictionary:
+	var player = _open_market()
+	if player == null:
+		return {"ok": false, "error": _market_error()}
+	if byte_exchange < 1:
+		return {"ok": false, "error": "no BYTE in the exchange"}
+	if int(player["cash"]) < byte_price:
+		return {"ok": false, "error": "not enough cash"}
+	player["cash"] = int(player["cash"]) - byte_price
+	player["byte_count"] = int(player["byte_count"]) + 1
+	byte_exchange -= 1
+	return _spend_action("%s bought 1 BYTE for $%d." % [player["display_name"], byte_price])
+
+
+func sell_byte() -> Dictionary:
+	var player = _open_market()
+	if player == null:
+		return {"ok": false, "error": _market_error()}
+	if int(player["byte_count"]) < 1:
+		return {"ok": false, "error": "no BYTE to sell"}
+	player["byte_count"] = int(player["byte_count"]) - 1
+	player["cash"] = int(player["cash"]) + byte_price
+	byte_exchange += 1
+	return _spend_action("%s sold 1 BYTE for $%d." % [player["display_name"], byte_price])
+
+
+func pass_market() -> Dictionary:
+	var player = _open_market()
+	if player == null:
+		return {"ok": false, "error": _market_error()}
+	return _spend_action("%s passed a market action." % player["display_name"])
+
+
+func economy_errors() -> PackedStringArray:
+	var errors := conservation()
+	var catalog := Coordinates.catalog()
+	var filled := {}
+	for cell in occupied.keys():
+		if bool(occupied[cell]):
+			filled[str(cell)] = true
+	var holdings := {}
+	for corp in corporations:
+		holdings[str(corp["id"])] = 0
+	var byte_held := 0
+	for player in players:
+		if int(player["cash"]) < 0:
+			errors.append("negative cash:%s" % player["id"])
+		if int(player["byte_count"]) < 0:
+			errors.append("negative byte:%s" % player["id"])
+		byte_held += int(player["byte_count"])
+		var shares: Dictionary = player["shares"]
+		for corp_id in shares.keys():
+			if int(shares[corp_id]) < 0:
+				errors.append("negative shares:%s:%s" % [player["id"], str(corp_id)])
+			holdings[str(corp_id)] = int(holdings.get(str(corp_id), 0)) + int(shares[corp_id])
+	if byte_exchange + byte_held != byte_supply:
+		errors.append("byte supply")
+	if byte_exchange < 0:
+		errors.append("negative exchange")
+	for corp in corporations:
+		var corp_id := str(corp["id"])
+		var cells: Array[String] = []
+		for cell in catalog:
+			if str(company_of.get(str(cell), "")) == corp_id:
+				cells.append(str(cell))
+		var stored: Array = corp["cells"]
+		if stored.size() != cells.size():
+			errors.append("%s: cells" % corp_id)
+		else:
+			for index in cells.size():
+				if str(stored[index]) != cells[index]:
+					errors.append("%s: cells" % corp_id)
+					break
+		if int(corp["size"]) != cells.size():
+			errors.append("%s: size" % corp_id)
+		var outstanding := int(holdings.get(corp_id, 0))
+		if int(corp["bank_shares"]) + outstanding != share_supply:
+			errors.append("%s: supply" % corp_id)
+		if int(corp["bank_shares"]) < 0:
+			errors.append("%s: negative bank" % corp_id)
+		var expected_price := 0
+		if not cells.is_empty():
+			expected_price = Pricing.share_price(cells.size(), int(sentiment[str(corp["sector"])]))
+		if int(corp["share_price"]) != expected_price:
+			errors.append("%s: price" % corp_id)
+		if bool(corp["active"]) != (cells.size() >= 2):
+			errors.append("%s: active flag" % corp_id)
+		if not bool(corp["active"]) and (not cells.is_empty() or outstanding != 0 or int(corp["bank_shares"]) != share_supply):
+			errors.append("%s: inactive inventory" % corp_id)
+	var seen := {}
+	for coordinate in catalog:
+		if not filled.has(str(coordinate)) or seen.has(str(coordinate)):
+			continue
+		var touched := BoardGraph.component(str(coordinate), filled)
+		for cell in touched:
+			seen[str(cell)] = true
+		var present: Array[String] = []
+		for cell in touched:
+			var owner := str(company_of.get(str(cell), ""))
+			if owner != "" and not present.has(owner):
+				present.append(owner)
+		if present.size() > 1:
+			errors.append("mixed:%s" % ",".join(present))
+	for cell in company_of.keys():
+		if not bool(occupied.get(str(cell), false)):
+			errors.append("empty company cell:%s" % str(cell))
+	return errors
 
 
 func conservation() -> PackedStringArray:
@@ -140,3 +378,88 @@ func conservation() -> PackedStringArray:
 		if bool(occupied[coordinate]):
 			filled.append(str(coordinate))
 	return Tiles.conservation_errors(bag, hands, filled)
+
+
+func _corp(corp_id: String) -> Dictionary:
+	for corp in corporations:
+		if str(corp["id"]) == corp_id:
+			return corp
+	return {}
+
+
+func _inactive() -> Array:
+	var open: Array = []
+	for corp in corporations:
+		if not bool(corp["active"]):
+			open.append(corp)
+	return open
+
+
+func _reprice(corp: Dictionary) -> void:
+	var cells: Array = []
+	for cell in Coordinates.catalog():
+		if str(company_of.get(str(cell), "")) == str(corp["id"]):
+			cells.append(str(cell))
+	corp["cells"] = cells
+	corp["size"] = cells.size()
+	corp["active"] = cells.size() >= 2
+	if bool(corp["active"]):
+		corp["share_price"] = Pricing.share_price(cells.size(), int(sentiment[str(corp["sector"])]))
+	else:
+		corp["share_price"] = 0
+
+
+func _enter_market() -> void:
+	phase = "market"
+	market_actions_left = market_limit
+
+
+func _market_error() -> String:
+	if phase != "market":
+		return "not the market step"
+	return "no market action left"
+
+
+func _open_market():
+	if phase != "market" or market_actions_left <= 0:
+		return null
+	return active_player()
+
+
+func _open_share_trade(corp_id: String) -> Dictionary:
+	var player = _open_market()
+	if player == null:
+		return {"ok": false, "error": _market_error()}
+	var corp := _corp(corp_id)
+	if corp.is_empty():
+		return {"ok": false, "error": "unknown company"}
+	if not bool(corp["active"]) or int(corp["share_price"]) <= 0:
+		return {"ok": false, "error": "company is not active"}
+	return {"ok": true, "player": player, "corp": corp, "price": int(corp["share_price"])}
+
+
+func _spend_action(message: String) -> Dictionary:
+	log.append(message)
+	market_actions_left -= 1
+	var finished := false
+	if market_actions_left == 0:
+		_finish_turn()
+		finished = true
+	return {"ok": true, "log": message, "turn_finished": finished}
+
+
+func _finish_turn() -> void:
+	var player := active_player()
+	if not bag.is_empty():
+		player["hand"].append(bag[0])
+		bag.remove_at(0)
+		log.append("%s drew from the bag." % player["display_name"])
+	else:
+		log.append("%s drew nothing. The bag is empty." % player["display_name"])
+	phase = "place"
+	market_actions_left = 0
+	pending = []
+	turn_index += 1
+	if turn_index >= players.size():
+		turn_index = 0
+		round_number += 1

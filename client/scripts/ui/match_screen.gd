@@ -12,6 +12,7 @@ const DANGER := Color("f0a0a0")
 
 var _match: OfflineMatch
 var _selected := ""
+var _hover := ""
 var _concealed := false
 var _wide := true
 
@@ -470,6 +471,7 @@ func _show_setup() -> void:
 	_error.text = ""
 	_computer_note = ""
 	_status.text = "No table open. The deal stays on this device."
+	_status.visible = true
 	_sync_dock()
 	if _merger_layer != null:
 		_merger_layer.visible = false
@@ -762,7 +764,8 @@ func _refresh() -> void:
 	else:
 		_hand_note.text = "%d tile%s" % [hand.size(), "" if hand.size() == 1 else "s"]
 	_fill_dock(player, market_open)
-	_status.add_theme_color_override("font_color", AMBER if market_open else MUTED)
+	_status.visible = false
+	_sync_landing_preview()
 	_sync_dock()
 	if _play.visible:
 		_fit_board()
@@ -973,22 +976,120 @@ func _fill_chrome(player: Dictionary) -> void:
 	var resolve_mark := "Now" if _match.phase == "choose_founder" or _match.phase == "choose_survivor" else "After place"
 	var market_mark := "Now %d left" % _match.market_actions_left if _match.phase == "market" else "Up to 2"
 	_checklist.text = "1 %s place   ·   2 %s resolve   ·   3 %s market" % [place_mark, resolve_mark, market_mark]
-	if _seats != null:
-		var rows: Array = []
-		for other in _match.players:
-			if str(other["id"]) == str(player["id"]):
-				continue
-			var other_role := "seat"
-			if bool(other.get("bot", false)):
-				other_role = "computer · %s" % BotPolicy.difficulty_label()
+	if _seats == null:
+		return
+	var tone := _turn_tone()
+	_apply_turn_banner(player, tone)
+	var active_id := str(player["id"])
+	var rows: Array = []
+	var acting_row: Dictionary = {}
+	for other in _match.players:
+		var acting := str(other["id"]) == active_id and _match.phase != "completed"
+		var row := {
+			"name": str(other["display_name"]),
+			"meta": _seat_meta(other, acting),
+			"cash": "$%d" % int(other["cash"]),
+			"book": _book_line(other),
+			"acting": acting,
+			"tone": tone,
+		}
+		if acting:
+			acting_row = row
+		else:
+			rows.append(row)
+	if not acting_row.is_empty():
+		rows.push_front(acting_row)
+	_seats.show_opponents(rows)
+
+
+func _turn_tone() -> String:
+	if _match.phase == "completed":
+		return "over"
+	if _concealed or _viewing_bot():
+		return "wait"
+	if _match.phase == "market":
+		return "market"
+	if _match.phase == "choose_founder" or _match.phase == "choose_survivor":
+		return "resolve"
+	return "place"
+
+
+func _apply_turn_banner(player: Dictionary, tone: String) -> void:
+	var step := "PLACE"
+	var who := ""
+	var detail := ""
+	var seat_name := str(player["display_name"])
+	match tone:
+		"over":
+			step = "OVER"
+			who = "Match over"
+			detail = _winner_line()
+		"wait":
+			step = "WAITING"
+			if _viewing_bot():
+				who = "%s is playing" % seat_name
+				detail = "Computer, %s. This seat does not use the device." % BotPolicy.difficulty_label()
+			else:
+				who = "Pass the device to %s" % seat_name
+				detail = "Tiles stay covered until they continue."
+		"resolve":
+			step = "RESOLVE"
+			if _match.phase == "choose_founder":
+				who = "%s names the company" % seat_name
+				detail = "Pick a brand in the dialog."
+			else:
+				who = "%s chooses the survivor" % seat_name
+				detail = "Two companies tied. Choose in the dialog."
+		"market":
+			step = "MARKET"
+			if _solo() and not bool(player.get("bot", false)):
+				who = "Your market · %s" % seat_name
+			else:
+				who = "%s trades" % seat_name
+			if _solo():
+				detail = "%d left. Pass before computers play." % _match.market_actions_left
+			else:
+				detail = "%d left. Then pass the device." % _match.market_actions_left
+		_:
+			step = "PLACE"
+			if bool(player.get("bot", false)):
+				who = "%s places" % seat_name
+				detail = "Computer, %s." % BotPolicy.difficulty_label()
 			elif _solo():
-				other_role = "you"
-			rows.append({
-				"name": str(other["display_name"]),
-				"role": other_role,
-				"tiles": (other["hand"] as Array).size(),
-			})
-		_seats.show_opponents(rows)
+				who = "Your turn · %s" % seat_name
+				detail = "Computers play after you pass."
+			else:
+				who = "%s places" % seat_name
+				detail = "The market opens after the tile."
+	if _match.final_round and tone != "over":
+		detail = "Final round. " + detail
+	_seats.show_turn(step, who, detail, tone)
+
+
+func _seat_meta(seat: Dictionary, acting: bool) -> String:
+	var kind := "seat"
+	if bool(seat.get("bot", false)):
+		kind = "computer · %s" % BotPolicy.difficulty_label()
+	elif _solo():
+		kind = "you"
+	else:
+		kind = "player"
+	var tiles := (seat["hand"] as Array).size()
+	var tile_word := "1 tile" if tiles == 1 else "%d tiles" % tiles
+	if acting and _concealed:
+		return "%s · hand covered" % kind
+	if acting:
+		return "%s · acting · %s" % [kind, tile_word]
+	return "%s · %s" % [kind, tile_word]
+
+
+func _book_line(seat: Dictionary) -> String:
+	var shares: Dictionary = seat["shares"]
+	var parts: PackedStringArray = []
+	for corp in _match.corporations:
+		parts.append("%s %d" % [str(BoardGrid.MARKS.get(corp["id"], "")), int(shares.get(corp["id"], 0))])
+	parts.append("BYTE %d" % int(seat["byte_count"]))
+	return " · ".join(parts)
 
 
 func _fill_watch(player: Dictionary) -> void:
@@ -1020,9 +1121,43 @@ func _fill_watch(player: Dictionary) -> void:
 
 
 func _on_cell_hovered(coordinate: String) -> void:
-	if _board == null:
+	_hover = coordinate
+	if _board != null:
+		_board.set_hover(coordinate)
+	_sync_landing_preview()
+
+
+func _sync_landing_preview() -> void:
+	if _preview == null:
 		return
-	_preview.text = _board._tip(coordinate, bool(_match.occupied.get(coordinate, false)) if _match != null else false, _board._legal.has(coordinate), str(_match.company_of.get(coordinate, "")) if _match != null else "")
+	var coordinate := _hover if _hover != "" else _selected
+	if coordinate == "" or _match == null or _board == null or not _play.visible:
+		_preview.text = "Hover a district. A tile in your hand shows where it will land."
+		_preview.add_theme_color_override("font_color", MUTED)
+		return
+	var occupied := bool(_match.occupied.get(coordinate, false))
+	var corp_id := str(_match.company_of.get(coordinate, ""))
+	var legal := _board._legal.has(coordinate)
+	var from_hand := _hover == "" and _selected == coordinate
+	if legal and not occupied:
+		var lead := "Selected %s." % coordinate if from_hand else "Lands on %s." % coordinate
+		_preview.text = "%s Empty district — your tile will sit here." % lead
+		_preview.add_theme_color_override("font_color", AMBER)
+	elif corp_id != "":
+		_preview.text = "%s is %s %s (%s)." % [
+			coordinate,
+			str(BoardGrid.SYMBOLS.get(corp_id, "")),
+			str(BoardGrid.NAMES.get(corp_id, corp_id)),
+			str(BoardGrid.MARKS.get(corp_id, "")),
+		]
+		_preview.add_theme_color_override("font_color", TEXT)
+	elif occupied:
+		_preview.text = "%s is taken. The district is unincorporated." % coordinate
+		_preview.add_theme_color_override("font_color", TEXT)
+	else:
+		_preview.text = "%s is empty. It is not in the active hand." % coordinate
+		_preview.add_theme_color_override("font_color", MUTED)
+	_preview.tooltip_text = _preview.text
 
 
 func _cycle_text() -> void:
@@ -1752,7 +1887,7 @@ func _run_shot(path: String, phase: String) -> void:
 		_seat_checks[2].button_pressed = true
 		_sync_seat_mode()
 		_show_setup()
-	elif phase == "bots":
+	elif phase == "bots" or phase == "preview":
 		BotPolicy.set_difficulty("normal")
 		var created = OfflineMatch.create(7710, ["Rowan", "Ada", "Bo"], ["Ada", "Bo"])
 		if created == null:
@@ -1769,7 +1904,11 @@ func _run_shot(path: String, phase: String) -> void:
 			return
 		_begin_match(created)
 		_reveal()
-	if phase == "placed":
+	if phase == "preview":
+		var preview_hand: Array = _match.active_player()["hand"]
+		if not preview_hand.is_empty():
+			_on_cell_hovered(str(preview_hand[0]))
+	elif phase == "placed":
 		var hand: Array = _match.active_player()["hand"]
 		_selected = str(hand[0])
 		_place_selected()

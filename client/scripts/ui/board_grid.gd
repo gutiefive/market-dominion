@@ -37,6 +37,10 @@ const NAMES := {
 var _buttons: Dictionary = {}
 var _legal: Dictionary = {}
 var _cell_size: int = 52
+var _hover := ""
+var _selected_cell := ""
+var _occupied_state: Dictionary = {}
+var _company_state: Dictionary = {}
 
 
 func _init() -> void:
@@ -61,7 +65,9 @@ func _build() -> void:
 			button.focus_mode = Control.FOCUS_ALL
 			button.pressed.connect(_on_cell.bind(coordinate))
 			button.mouse_entered.connect(_on_hover.bind(coordinate))
+			button.mouse_exited.connect(_on_leave.bind(coordinate))
 			button.focus_entered.connect(_on_hover.bind(coordinate))
+			button.focus_exited.connect(_on_leave.bind(coordinate))
 			_buttons[coordinate] = button
 			add_child(button)
 	set_cell_size(_cell_size)
@@ -72,9 +78,13 @@ func _add_label(text: String) -> void:
 	label.text = text
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", 13)
-	label.add_theme_color_override("font_color", Color("93a0b8"))
+	label.add_theme_font_size_override("font_size", 15)
+	label.add_theme_color_override("font_color", Color("e8eef9"))
 	label.custom_minimum_size = Vector2(_cell_size, 22)
+	if text.is_valid_int():
+		label.tooltip_text = "Row %s" % text
+	elif text != "":
+		label.tooltip_text = "Column %s" % text
 	add_child(label)
 
 
@@ -89,34 +99,54 @@ func flash(coordinate: String) -> void:
 
 func set_cell_size(px: int) -> void:
 	_cell_size = clampi(px, 24, 58)
-	var font := 13 if _cell_size >= 46 else 11
+	var font := 12 if _cell_size >= 32 else 11 if _cell_size >= 26 else 9
+	var axis := 15 if _cell_size >= 30 else 13
 	for child in get_children():
 		if child is Label:
 			child.custom_minimum_size = Vector2(_cell_size, 22)
+			child.add_theme_font_size_override("font_size", Palette.px(axis))
+			child.add_theme_color_override("font_color", Color("e8eef9"))
 	for button in _buttons.values():
 		button.custom_minimum_size = Vector2(_cell_size, _cell_size)
-		button.add_theme_font_size_override("font_size", Palette.px(9 if _cell_size < 44 else font))
+		button.add_theme_font_size_override("font_size", Palette.px(font))
 
 
 func set_state(occupied: Dictionary, companies: Dictionary, legal: Array, selected: String) -> void:
+	_occupied_state = occupied
+	_company_state = companies
+	_selected_cell = selected
 	_legal.clear()
 	for coordinate in legal:
 		_legal[str(coordinate)] = true
 	for coordinate in Coordinates.catalog():
-		var button: Button = _buttons[coordinate]
-		var is_occupied := bool(occupied.get(coordinate, false))
-		var corp_id := str(companies.get(coordinate, ""))
-		var is_legal := _legal.has(coordinate)
-		var is_selected := coordinate == selected and is_legal
-		button.disabled = false
-		button.focus_mode = Control.FOCUS_ALL if is_legal else Control.FOCUS_NONE
-		button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if is_legal else Control.CURSOR_ARROW
-		var symbol := str(SYMBOLS.get(corp_id, ""))
-		var mark := str(MARKS.get(corp_id, ""))
-		button.text = coordinate if corp_id == "" else "%s\n%s %s" % [coordinate, symbol, mark]
-		button.tooltip_text = _tip(coordinate, is_occupied, is_legal, corp_id)
-		button.accessibility_name = button.tooltip_text
-		_paint(button, is_occupied, is_legal, is_selected, corp_id)
+		_paint_cell(coordinate)
+
+
+func set_hover(coordinate: String) -> void:
+	var previous := _hover
+	_hover = coordinate
+	if previous != "" and previous != coordinate and _buttons.has(previous):
+		_paint_cell(previous)
+	if coordinate != "" and _buttons.has(coordinate):
+		_paint_cell(coordinate)
+
+
+func _paint_cell(coordinate: String) -> void:
+	var button: Button = _buttons[coordinate]
+	var is_occupied := bool(_occupied_state.get(coordinate, false))
+	var corp_id := str(_company_state.get(coordinate, ""))
+	var is_legal := _legal.has(coordinate)
+	var is_selected := coordinate == _selected_cell and is_legal
+	var landing := coordinate == _hover and is_legal and not is_occupied and not is_selected
+	button.disabled = false
+	button.focus_mode = Control.FOCUS_ALL if is_legal else Control.FOCUS_NONE
+	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if is_legal else Control.CURSOR_ARROW
+	var symbol := str(SYMBOLS.get(corp_id, ""))
+	var mark := str(MARKS.get(corp_id, ""))
+	button.text = coordinate if corp_id == "" else "%s\n%s %s" % [coordinate, symbol, mark]
+	button.tooltip_text = _tip(coordinate, is_occupied, is_legal, corp_id)
+	button.accessibility_name = button.tooltip_text
+	_paint(button, is_occupied, is_legal, is_selected, landing, corp_id)
 
 
 func _tip(coordinate: String, is_occupied: bool, is_legal: bool, corp_id: String) -> String:
@@ -135,10 +165,10 @@ func _tip(coordinate: String, is_occupied: bool, is_legal: bool, corp_id: String
 	return "%s is empty. The active player does not hold this tile." % coordinate
 
 
-func _paint(button: Button, is_occupied: bool, is_legal: bool, is_selected: bool, corp_id: String) -> void:
+func _paint(button: Button, is_occupied: bool, is_legal: bool, is_selected: bool, landing: bool, corp_id: String) -> void:
 	var fill := Color("121a2e")
 	var border := Color("2a3a52")
-	var text := Color("7d8da6")
+	var text := Color("c5d0e4")
 	var width := 1
 	if corp_id != "":
 		var style: Dictionary = _company_style(corp_id)
@@ -155,7 +185,12 @@ func _paint(button: Button, is_occupied: bool, is_legal: bool, is_selected: bool
 		fill = Color("3a3014")
 		border = Color("fbbf24")
 		text = Color("fbbf24")
-		width = 2
+		width = 3
+	elif landing:
+		fill = Color("3a3014")
+		border = Color("fbbf24")
+		text = Color("fff4d6")
+		width = 3
 	elif is_legal:
 		fill = Color("14343f")
 		border = Color("2dd4bf")
@@ -209,3 +244,8 @@ func _on_cell(coordinate: String) -> void:
 
 func _on_hover(coordinate: String) -> void:
 	cell_hovered.emit(coordinate)
+
+
+func _on_leave(coordinate: String) -> void:
+	if _hover == coordinate:
+		cell_hovered.emit("")

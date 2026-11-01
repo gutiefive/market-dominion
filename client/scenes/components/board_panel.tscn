@@ -26,8 +26,10 @@ theme_override_constants/separation = 8
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-theme_type_variation = &"MutedLabel"
-text = "Hover or focus a district for its coordinate."
+theme_override_font_sizes/font_size = 15
+text = "Hover a district. A tile in your hand shows where it will land."
+clip_text = true
+text_overrun_behavior = 3
 
 [node name="ZoomOut" type="Button" parent="Margin/Column/Tools"]
 unique_name_in_owner = true

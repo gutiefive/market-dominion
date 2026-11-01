@@ -6,7 +6,57 @@
 theme_override_constants/separation = 6
 script = ExtResource("1_bar")
 
+[node name="Strip" type="HBoxContainer" parent="."]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Banner" type="PanelContainer" parent="Strip"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(300, 68)
+layout_mode = 2
+
+[node name="Margin" type="MarginContainer" parent="Strip/Banner"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 6
+
+[node name="Copy" type="VBoxContainer" parent="Strip/Banner/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="Step" type="Label" parent="Strip/Banner/Margin/Copy"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "PLACE"
+
+[node name="Who" type="Label" parent="Strip/Banner/Margin/Copy"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "Waiting for a seat"
+clip_text = true
+text_overrun_behavior = 3
+
+[node name="Detail" type="Label" parent="Strip/Banner/Margin/Copy"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"MutedLabel"
+theme_override_font_sizes/font_size = 12
+text = ""
+clip_text = true
+text_overrun_behavior = 3
+
+[node name="Opponents" type="HBoxContainer" parent="Strip"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
 [node name="Identity" type="HBoxContainer" parent="."]
+visible = false
 layout_mode = 2
 theme_override_constants/separation = 16
 
@@ -14,24 +64,14 @@ theme_override_constants/separation = 16
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_colors/font_color = Color(0.984314, 0.74902, 0.141176, 1)
-theme_override_font_sizes/font_size = 16
 text = "No seat"
 
 [node name="Cash" type="Label" parent="Identity"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 16
 text = "Cash"
 
 [node name="Net" type="Label" parent="Identity"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.176471, 0.831373, 0.74902, 1)
-theme_override_font_sizes/font_size = 16
 text = "Net"
-
-[node name="Opponents" type="HBoxContainer" parent="."]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_constants/separation = 8

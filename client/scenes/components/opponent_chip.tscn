@@ -3,11 +3,57 @@
 [ext_resource type="Script" path="res://scripts/ui/opponent_chip.gd" id="1_chip"]
 
 [node name="OpponentChip" type="PanelContainer"]
+custom_minimum_size = Vector2(210, 68)
+size_flags_horizontal = 3
 theme_type_variation = &"TableCard"
 script = ExtResource("1_chip")
 
-[node name="Caption" type="Label" parent="."]
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 6
+
+[node name="Body" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 1
+
+[node name="Top" type="HBoxContainer" parent="Margin/Body"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Name" type="Label" parent="Margin/Body/Top"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 16
+text = "Seat"
+clip_text = true
+text_overrun_behavior = 3
+
+[node name="Cash" type="Label" parent="Margin/Body/Top"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.176471, 0.831373, 0.74902, 1)
+theme_override_font_sizes/font_size = 16
+text = "$0"
+horizontal_alignment = 2
+
+[node name="Meta" type="Label" parent="Margin/Body"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_type_variation = &"MutedLabel"
-text = "Seat"
+theme_override_font_sizes/font_size = 12
+text = "seat"
+clip_text = true
+text_overrun_behavior = 3
+
+[node name="Book" type="Label" parent="Margin/Body"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.91, 0.93, 0.98, 1)
+theme_override_font_sizes/font_size = 12
+text = "No shares"
+clip_text = true
+text_overrun_behavior = 3

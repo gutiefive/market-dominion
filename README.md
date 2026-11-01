@@ -49,7 +49,7 @@ In a second terminal:
 .tools/godot/Godot_v4.7.2-stable_linux.x86_64 --path client
 ```
 
-The Godot window is the local table, plus an Online room panel. Check "One human versus computers" to keep one seat and add Ada, Bo, or Cy. Those seats play themselves, including share and BYTE trades, and look three tiles ahead when placing. Pass-and-play is the unchecked setup. Keys: 1–5 select a tile, Enter places it, arrow keys move along the hand, R opens the rules, Esc closes a panel, `[` and `]` change text size, M toggles reduced motion. Online, two windows share one invite code. Each window shows only its own tiles. The host Start control stays off until every joined player is ready. Verified desktop captures include `docs/m6-table.png`, `docs/m6-rules.png`, `docs/m6-lobby.png`, and `docs/m6-online.png`. `docs/m6-narrow.png` is a 420×800 window, not a device.
+The Godot window is the local table, plus an Online room panel. Check "One human versus computers" to keep one seat and add Ada, Bo, or Cy. Those seats play themselves, including share and BYTE trades, and look five tiles ahead when placing. Pass-and-play is the unchecked setup. Keys: 1–5 select a tile, Enter places it, arrow keys move along the hand, R opens the rules, Esc closes a panel, `[` and `]` change text size, M toggles reduced motion. Online, two windows share one invite code. Each window shows only its own tiles. The host Start control stays off until every joined player is ready. Verified desktop captures include `docs/m6-table.png`, `docs/m6-rules.png`, `docs/m6-lobby.png`, and `docs/m6-online.png`. `docs/m6-narrow.png` is a 420×800 window, not a device.
 
 ## Web export
 

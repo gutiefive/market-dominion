@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.12.0 — 2026-11-01
+
+Longer local placement search. Protocol version stays `0.1.0`. Client `config/version` is `0.12.0`. Market, founding, and merger choices from 0.10.0 are unchanged. The one-ply opponent reply from 0.11.0 is unchanged. Pass-and-play and online rooms are unchanged.
+
+### Changed
+
+- Placement searches five tiles in the computer's own hand: the tile under consideration and up to four later tiles. That is the whole starting hand. Each later tile is worth half the one before it. A tile that would end a company for an opponent while the computer holds none of it is not expanded. A tile worth $0 that touches neither the occupied board nor another tile still in hand is not expanded. A later tile is skipped when its immediate value plus $20,000 still cannot beat the best continuation already scored. That ceiling does not cut ordinary lines. The search stops after 500 tile evaluations. A full five-tile hand with nothing cut is 325 evaluations, under the cap. Ties still use the lowest coordinate.
+- After the first tile, the computer still scores one ply for each other seat on at most 24 empty neighbors of occupied cells, in catalog order, and subtracts a quarter of the best reply. The district for that neighbor is measured once and reused for every other seat. Hands of other players are not read.
+- Share prices used by the search stay cached for the process. The match generator is still not advanced.
+
+### Evidence
+
+- `./scripts/check_client.sh` printed `M0_CLIENT_OK` through `M8_CLIENT_OK`. Seed 7710 with Rowan, Ada, and Bo still completed twice with the same trace, ranking, events, and log. Seed 4 with three computers still completed. The mixed game, Rowan on the safe autopass and Ada and Bo on the computer policy, still finished.
+- M8 keeps the earlier chain. NOVA occupies C1–C4 and Ada holds two shares. The hand is B1, D3, E3, and E4. Five tiles still place E3. A second call on the same position returns E3.
+- M8 also shows five tiles beating three. All five brands are already active, so a loose block cannot be founded. NOVA is A8–A9 and Ada holds two shares. ORBIT PAY is A1–A2 and Ada holds four. The other three brands sit off the path. The hand is B1, B8, C8, D8, and E8. Columns F–I, rows 5–9, are occupied and unincorporated, and they touch that path only at E8. Three tiles place B1, because growing ORBIT now outscores the NOVA path before the block is visible. Five tiles place B8: B8, C8, and D8 reach E8, and E8 takes the block into NOVA. A second call returns B8.
+- The suite printed `M8_PLACEMENT_50_US 201672 nodes 64` during `./scripts/check_client.sh` (about 4 ms each over 50 repeats), under the 1.5 second guard. It also printed `M8_FIVE_PLIES shallow B1 nodes 85 deep B8 nodes 325 us 474085` (about 24 ms each over 20 repeats), under the 80 ms average guard.
+- A separate four-seat timing pass, not part of the suite, measured 60 placement decisions in a seed-4 game at 28.6 ms on average and 95.6 ms at the worst (212 tile evaluations on average, 325 at the worst). Two repeats of that pass stayed in the same band.
+- `docs/bots-table.png` is still seed 7710 after Bo's opening turn. Rowan sees B5, G4, I8, C1, and I9. The log still says Bo placed B6 and passed both market actions. That opening has no chain to extend.
+
+### Not in this version
+
+Computer seats in an online room, a search past five tiles or into hidden hands, and a neural model.
+
 ## 0.11.0 — 2026-11-01
 
 Deeper local placement search. Protocol version stays `0.1.0`. Client `config/version` is `0.11.0`. Market, founding, and merger choices from 0.10.0 are unchanged. Pass-and-play and online rooms are unchanged.

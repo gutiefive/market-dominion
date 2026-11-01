@@ -11,6 +11,7 @@ func _initialize() -> void:
 	_check_isolated_tiles_use_autopass_order()
 	_check_lookahead_sets_up_a_founding()
 	_check_three_plies_prefer_a_longer_setup()
+	_check_five_plies_beat_three_ahead()
 	_check_growth_does_not_feed_a_large_opponent()
 	_check_merger_uses_holdings()
 	_check_founder_and_survivor_choices()
@@ -133,7 +134,7 @@ func _check_three_plies_prefer_a_longer_setup() -> void:
 		_fail("deep setup drifted %s" % str(again))
 	if elapsed > 1500000:
 		_fail("placement search %d us" % elapsed)
-	print("M8_PLACEMENT_50_US %d" % elapsed)
+	print("M8_PLACEMENT_50_US %d nodes %d" % [elapsed, BotPolicy.last_placement_nodes])
 
 
 func _chain_table():
@@ -150,6 +151,74 @@ func _chain_table():
 	nova["size"] = 4
 	nova["share_price"] = 300
 	return table
+
+
+func _check_five_plies_beat_three_ahead() -> void:
+	# All five brands are already on the board, so the loose block cannot be founded.
+	# B1 grows ORBIT at once (four shares). Three plies can grow NOVA along B8 and
+	# two more tiles, but they never reach the block, so B1 wins that search.
+	# Five plies follow B8, C8, and D8, then E8 takes the block into NOVA.
+	var table = _blob_table()
+	BotPolicy.placement_plies = 3
+	var shallow := BotPolicy.decide(table)
+	var shallow_nodes := BotPolicy.last_placement_nodes
+	BotPolicy.placement_plies = 5
+	var started := Time.get_ticks_usec()
+	var deep := BotPolicy.decide(table)
+	var deep_nodes := BotPolicy.last_placement_nodes
+	for _repeat in range(19):
+		BotPolicy.decide(table)
+	var elapsed := Time.get_ticks_usec() - started
+	var again := BotPolicy.decide(table)
+	BotPolicy.placement_plies = 5
+	print("M8_FIVE_PLIES shallow %s nodes %d deep %s nodes %d us %d" % [
+		str(shallow.get("coordinate", "")),
+		shallow_nodes,
+		str(deep.get("coordinate", "")),
+		deep_nodes,
+		elapsed,
+	])
+	if str(shallow.get("coordinate", "")) != "B1":
+		_fail("three-ahead greed %s" % str(shallow))
+	if str(deep.get("coordinate", "")) != "B8":
+		_fail("five-ahead setup %s" % str(deep))
+	if str(again.get("coordinate", "")) != str(deep.get("coordinate", "")):
+		_fail("five-ahead drifted %s" % str(again))
+	if deep_nodes > BotPolicy.MAX_PLACEMENT_NODES or deep_nodes < 1:
+		_fail("five-ahead nodes %d" % deep_nodes)
+	if elapsed > 1600000:
+		_fail("five-ply search %d us" % elapsed)
+
+
+func _blob_table():
+	var table = OfflineMatch.create(7710, ["Rowan", "Ada"], ["Ada"])
+	var ada := _seat(table, "Ada")
+	table.turn_index = int(ada["turn_order_index"])
+	ada["hand"] = ["B1", "B8", "C8", "D8", "E8"]
+	ada["shares"]["nova_ai"] = 2
+	ada["shares"]["orbit_pay"] = 4
+	_plant(table, "nova_ai", ["A8", "A9"])
+	_plant(table, "orbit_pay", ["A1", "A2"])
+	_plant(table, "volt_grid", ["C4", "C5"])
+	_plant(table, "pulse_media", ["I1", "I2"])
+	_plant(table, "evermart", ["A4", "A5"])
+	for column in ["F", "G", "H", "I"]:
+		for row in range(5, 10):
+			table.occupied["%s%s" % [column, str(row)]] = true
+	return table
+
+
+func _plant(table, corp_id: String, cells: Array) -> void:
+	for cell in cells:
+		var text := str(cell)
+		table.occupied[text] = true
+		table.company_of[text] = corp_id
+	for corp in table.corporations:
+		if str(corp["id"]) != corp_id:
+			continue
+		corp["active"] = true
+		corp["size"] = cells.size()
+		corp["share_price"] = 100 + 50 * cells.size()
 
 
 func _check_merger_uses_holdings() -> void:

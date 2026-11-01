@@ -2,16 +2,19 @@ extends RefCounted
 class_name BotPolicy
 
 ## Deterministic local computer. Placement scores fictional dollars for a
-## founding, a growth, or a merger across PLACEMENT_PLIES tiles of this hand.
-## Each later tile counts half as much as the one before it. A tile that ends
-## the company for an opponent while we hold nothing is not expanded. The
-## search stops at MAX_PLACEMENT_NODES. After the first tile, one ply over at
-## most FRONTIER_CAP empty neighbors estimates an opponent's best reply, and
-## a quarter of that gain is subtracted. Hidden hands are not read.
-## Market buys and sells shares and BYTE when that score is positive, at most
-## two actions, and never spends the cash floor. Ties break by lowest
-## coordinate, fixture order, or the earlier survivor. The match generator
-## is not advanced here.
+## founding, a growth, or a merger across `placement_plies` tiles of this hand
+## (five: the whole starting hand). Each later tile counts half as much as the
+## one before it. A tile that ends the company for an opponent while we hold
+## nothing is not expanded. A tile that touches neither the board nor another
+## tile still in hand scores only its immediate value. A branch is cut when its
+## immediate value plus OPTIMISTIC_TILE still cannot beat the best continuation
+## already scored. The search stops at MAX_PLACEMENT_NODES. After the first
+## tile, one ply over at most FRONTIER_CAP empty neighbors estimates an
+## opponent's best reply, and a quarter of that gain is subtracted. Hidden
+## hands are not read. Market buys and sells shares and BYTE when that score
+## is positive, at most two actions, and never spends the cash floor. Ties
+## break by lowest coordinate, fixture order, or the earlier survivor. The
+## match generator is not advanced here.
 
 
 const CASH_FLOOR := 500
@@ -24,13 +27,16 @@ const SELL_MIN_OWNED := 2
 const BYTE_BUY_MAX := 400
 const BYTE_SELL_MIN := 800
 const END_FEED_PENALTY := -100000
-const PLACEMENT_PLIES := 3
-const MAX_PLACEMENT_NODES := 120
+## Shipped depth. Tests may lower it and must restore five.
+static var placement_plies := 5
+const MAX_PLACEMENT_NODES := 500
 const FRONTIER_CAP := 24
 const THREAT_DIV := 4
-## Safe ceiling for one later tile. A sibling is skipped when even this
-## ceiling cannot beat the best continuation already scored.
-const OPTIMISTIC_CONT := 100000
+## Upper bound on one later tile's contribution after the half-step discount.
+## A sibling is skipped when even this cannot beat the best continuation.
+const OPTIMISTIC_TILE := 20000
+
+static var last_placement_nodes := 0
 
 static var _catalog_cache: PackedStringArray = PackedStringArray()
 static var _neighbor_cache: Dictionary = {}
@@ -168,7 +174,7 @@ static func _tile(match: OfflineMatch, hand: Array) -> String:
 	for coordinate in ordered:
 		var text := str(coordinate)
 		var rest := _without(ordered, text)
-		var score := _line(match, text, rest, filled, company, {}, PLACEMENT_PLIES, budget)
+		var score := _line(match, text, rest, filled, company, {}, placement_plies, budget)
 		var projected := _project(match, text, filled, company, {})
 		var threat := _opponent_threat(match, projected["filled"], projected["company"])
 		if threat > 0:
@@ -177,6 +183,7 @@ static func _tile(match: OfflineMatch, hand: Array) -> String:
 			chosen = true
 			best = text
 			best_score = score
+	last_placement_nodes = int(budget["n"])
 	return best
 
 
@@ -195,7 +202,7 @@ static func _extend_after(match: OfflineMatch, immediate: int, coordinate: Strin
 	var next_filled: Dictionary = projected["filled"]
 	var next_company: Dictionary = projected["company"]
 	var next_extra: Dictionary = projected["extra"]
-	var best_cont := 0
+	var ranked: Array = []
 	for follow in others:
 		if int(budget["n"]) >= MAX_PLACEMENT_NODES:
 			break
@@ -204,9 +211,23 @@ static func _extend_after(match: OfflineMatch, immediate: int, coordinate: Strin
 			continue
 		budget["n"] = int(budget["n"]) + 1
 		var child_imm := _immediate(match, next, next_filled, next_company, next_extra)
+		if child_imm <= END_FEED_PENALTY:
+			continue
+		if child_imm == 0 and not _touches(next, next_filled, others):
+			continue
+		ranked.append({"c": next, "imm": child_imm})
+	ranked.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		if int(a["imm"]) != int(b["imm"]):
+			return int(a["imm"]) > int(b["imm"])
+		return str(a["c"]) < str(b["c"])
+	)
+	var best_cont := 0
+	for entry in ranked:
+		var next := str(entry["c"])
+		var child_imm := int(entry["imm"])
 		var ceiling := child_imm
-		if plies > 2 and child_imm > END_FEED_PENALTY:
-			ceiling += Pricing.div_nonneg(OPTIMISTIC_CONT, 2)
+		if plies > 2:
+			ceiling += OPTIMISTIC_TILE
 		if best_cont > 0 and ceiling <= best_cont:
 			continue
 		var child := _extend_after(match, child_imm, next, _without(others, next), next_filled, next_company, next_extra, plies - 1, budget)
@@ -215,6 +236,16 @@ static func _extend_after(match: OfflineMatch, immediate: int, coordinate: Strin
 	if best_cont > 0:
 		immediate += Pricing.div_nonneg(best_cont, 2)
 	return immediate
+
+
+static func _touches(coordinate: String, filled: Dictionary, others: Array) -> bool:
+	for neighbor in _neighbors(coordinate):
+		var next := str(neighbor)
+		if bool(filled.get(next, false)):
+			return true
+		if others.has(next):
+			return true
+	return false
 
 
 static func _opponent_threat(match: OfflineMatch, filled: Dictionary, company: Dictionary) -> int:
@@ -226,11 +257,15 @@ static func _opponent_threat(match: OfflineMatch, filled: Dictionary, company: D
 		if seen >= FRONTIER_CAP:
 			break
 		seen += 1
+		var cell := str(coordinate)
+		if bool(filled.get(cell, false)):
+			continue
+		var touched := _component(cell, filled, cell)
 		for player in match.players:
 			var player_id := str(player["id"])
 			if player_id == actor:
 				continue
-			var value := _immediate(match, str(coordinate), filled, company, {}, player_id)
+			var value := _score_component(match, touched, company, {}, player_id)
 			if value > best:
 				best = value
 	return best
@@ -272,9 +307,11 @@ static func _without(hand: Array, skip: String) -> Array:
 static func _immediate(match: OfflineMatch, coordinate: String, filled: Dictionary, company: Dictionary, extra: Dictionary, actor: String = "") -> int:
 	if bool(filled.get(coordinate, false)):
 		return END_FEED_PENALTY
-	var board := filled.duplicate()
-	board[coordinate] = true
-	var touched := _component(coordinate, board)
+	var touched := _component(coordinate, filled, coordinate)
+	return _score_component(match, touched, company, extra, actor)
+
+
+static func _score_component(match: OfflineMatch, touched: PackedStringArray, company: Dictionary, extra: Dictionary, actor: String = "") -> int:
 	var company_ids := _ids_in(touched, company)
 	if company_ids.size() >= 2:
 		return _merger_tile(match, company_ids, touched.size(), company, extra, actor)
@@ -599,15 +636,17 @@ static func _neighbors(coordinate: String) -> PackedStringArray:
 	return found
 
 
-static func _component(origin: String, filled: Dictionary) -> PackedStringArray:
+static func _component(origin: String, filled: Dictionary, extra: String = "") -> PackedStringArray:
 	var ordered := PackedStringArray()
-	if not bool(filled.get(origin, false)):
+	if origin != extra and not bool(filled.get(origin, false)):
 		return ordered
 	var seen := {}
 	var stack: Array[String] = [origin]
 	while not stack.is_empty():
 		var current: String = stack.pop_back()
-		if seen.has(current) or not bool(filled.get(current, false)):
+		if seen.has(current):
+			continue
+		if current != extra and not bool(filled.get(current, false)):
 			continue
 		seen[current] = true
 		ordered.append(current)

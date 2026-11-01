@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.18.0 — 2026-11-01
+
+The table says who acts, and a hovered district shows where the tile will land. Protocol version stays `0.1.0`. Client `config/version` is `0.18.0`. Rules, bot difficulty, and the market pass are unchanged.
+
+### Changed
+
+- Every seat is a card. Cash sits on the right. The line under the name lists NA, OP, VG, PM, EM, and BYTE, including zeros. The acting seat is first and outlined in the step color. Easy, Normal, and Hard stay on the computer cards.
+- A banner on the left names the step: Place, Market, Resolve, Waiting, or Over. It names the player and the one thing they are doing. Computers still play only after Pass the market. The dock still quotes the last computer placement.
+- Column letters and row numbers are brighter. Hovering a tile in the active hand turns that district amber and the line above the board says the tile will sit there. A selected tile uses the same sentence before Place selected.
+
+### Evidence
+
+- `./scripts/check_client.sh` printed `M0_CLIENT_OK` through `M8_CLIENT_OK`. The suite printed `M8_PLACEMENT_50_US 213713 nodes 64`, `M8_FIVE_PLIES shallow B1 nodes 85 deep B8 nodes 325 us 490639`, `M8_DISCOUNT half B1 threeq B8`, `M8_REPLY absolute B1 marginal I9`, `M8_EASY chain B1 blob B1 contest pass byte pass us 59929`, `M8_HARD chain E3 blob B8 size16 buy size19 pass`, and `M8_DIFFICULTY easy 207 normal 227 hard 227 hard_vs_normal same first 6 easy pass_market: normal buy_share:nova_ai`.
+- Seed 7710 after Bo’s opening shows Place, “Your turn · Rowan”, and “Computers play after you pass.” Rowan, Bo, and Ada each show `$6000` and `NA 0 · OP 0 · VG 0 · PM 0 · EM 0 · BYTE 0`. Hovering B5 reads “Lands on B5. Empty district — your tile will sit here.”
+- `docs/bots-table.png` is that place screen. `docs/hud-hover.png` is the B5 landing preview. Rows 1–9 stay above the dock.
+
+### Not in this version
+
+Computer seats in an online room, a search past five tiles, a neural model, and a public invite URL.
+
 ## 0.17.0 — 2026-11-01
 
 The table is built as Godot scenes. Protocol version stays `0.1.0`. Client `config/version` is `0.17.0`. Placement, market rules, and Easy / Normal / Hard are unchanged. Computers still wait until the market is passed.

@@ -42,8 +42,8 @@ func _check_bonus_math() -> void:
 
 func _check_sole_holder() -> void:
 	var table = OfflineMatch.create(7710, ["Rowan", "Quinn"])
-	_chain(table, ["C1", "C2", "C3", "C4", "C5"], "nova_ai")
-	_chain(table, ["A1", "A2", "A3"], "orbit_pay")
+	_paint(table, ["C1", "C2", "C3", "C4", "C5"], "nova_ai")
+	_paint(table, ["A1", "A2", "A3"], "orbit_pay")
 	_assign(table, "orbit_pay", {"p2": 4})
 	_pull(table, "B1")
 	var resolved: Dictionary = table.place("B1")
@@ -63,8 +63,8 @@ func _check_sole_holder() -> void:
 
 func _check_tie_majority() -> void:
 	var table = OfflineMatch.create(7710, ["Rowan", "Quinn", "Avery"])
-	_chain(table, ["C1", "C2", "C3", "C4", "C5"], "nova_ai")
-	_chain(table, ["A1", "A2", "A3", "A4"], "orbit_pay")
+	_paint(table, ["C1", "C2", "C3", "C4", "C5"], "nova_ai")
+	_paint(table, ["A1", "A2", "A3", "A4"], "orbit_pay")
 	_assign(table, "orbit_pay", {"p1": 2, "p2": 2, "p3": 1})
 	_pull(table, "B1")
 	table.place("B1")
@@ -78,8 +78,8 @@ func _check_tie_majority() -> void:
 
 func _check_remainder() -> void:
 	var table = OfflineMatch.create(7710, ["Rowan", "Quinn", "Avery", "Blake"])
-	_chain(table, ["C1", "C2", "C3", "C4"], "nova_ai")
-	_chain(table, ["A1", "A2", "A3"], "orbit_pay")
+	_paint(table, ["C1", "C2", "C3", "C4"], "nova_ai")
+	_paint(table, ["A1", "A2", "A3"], "orbit_pay")
 	_assign(table, "orbit_pay", {"p1": 4, "p2": 1, "p3": 1, "p4": 1})
 	_pull(table, "B1")
 	table.place("B1")
@@ -91,12 +91,10 @@ func _check_remainder() -> void:
 
 func _check_three_companies() -> void:
 	var table = OfflineMatch.create(7710, ["Rowan", "Quinn", "Avery", "Blake"])
-	_chain(table, ["A1", "A2", "A3", "A4", "A5", "B5"], "nova_ai")
-	_chain(table, ["D5", "E5", "E6"], "orbit_pay")
-	_chain(table, ["C3", "C4"], "volt_grid")
-	_pull(table, "C6")
-	table.place("C6")
-	_finish(table)
+	_paint(table, ["A1", "A2", "A3", "A4", "A5", "B5"], "nova_ai")
+	_paint(table, ["D5", "E5", "E6"], "orbit_pay")
+	_paint(table, ["C3", "C4"], "volt_grid")
+	_paint(table, ["C6"], "")
 	_assign(table, "orbit_pay", {"p1": 2, "p2": 2})
 	_assign(table, "volt_grid", {"p3": 1})
 	var before: int = table.log.size()
@@ -118,11 +116,9 @@ func _check_three_companies() -> void:
 
 func _check_tie_choice() -> void:
 	var table = OfflineMatch.create(7710, ["Rowan", "Quinn"])
-	_chain(table, ["A2", "A3"], "nova_ai")
-	_chain(table, ["C2", "C3"], "orbit_pay")
-	_pull(table, "B1")
-	table.place("B1")
-	_finish(table)
+	_paint(table, ["A2", "A3"], "nova_ai")
+	_paint(table, ["C2", "C3"], "orbit_pay")
+	_paint(table, ["B1"], "")
 	_pull(table, "B2")
 	var opened: Dictionary = table.place("B2")
 	if str(opened["resolution"]) != "choose_survivor" or table.economy_errors().size() != 0:
@@ -131,7 +127,7 @@ func _check_tie_choice() -> void:
 	if bool(rejected["ok"]) or str(rejected["error"]) != "company is not a tied survivor":
 		_fail("volt was selectable")
 	var kept: Dictionary = table.choose_survivor("orbit_pay")
-	if str(kept["log"]) != "Quinn kept ORBIT PAY. ORBIT PAY is size 6. Share price is $400.":
+	if str(kept["log"]) != "Rowan kept ORBIT PAY. ORBIT PAY is size 6. Share price is $400.":
 		_fail("kept orbit")
 	if bool(_corp(table, "nova_ai")["active"]) or table.economy_errors().size() != 0:
 		_fail("tie resolved economy")
@@ -160,6 +156,26 @@ func _check_refound() -> void:
 		_fail("refound")
 	if table.economy_errors().size() != 0:
 		_fail("refound economy")
+
+
+func _paint(table: OfflineMatch, cells: Array, corp_id: String) -> void:
+	for cell in cells:
+		var coordinate := str(cell)
+		var found := false
+		for player in table.players:
+			var hand: Array = player["hand"]
+			var index := hand.find(coordinate)
+			if index != -1:
+				hand.remove_at(index)
+				found = true
+				break
+		if not found:
+			table.bag.remove_at(table.bag.find(coordinate))
+		table.occupied[coordinate] = true
+		if corp_id != "":
+			table.company_of[coordinate] = corp_id
+	if corp_id != "":
+		table._reprice(_corp(table, corp_id))
 
 
 func _chain(table: OfflineMatch, cells: Array, brand: String) -> void:

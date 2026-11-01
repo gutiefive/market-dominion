@@ -1,5 +1,5 @@
 {
-  "deck_note": "Unshuffled v1 order. A match seed will shuffle this deck in a later milestone.",
+  "deck_note": "Unshuffled v1 order. A match shuffles this deck after the opening deal.",
   "events": [
     {
       "id": "ai_adoption",

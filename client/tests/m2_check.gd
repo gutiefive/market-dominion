@@ -114,13 +114,14 @@ func _check_growth() -> void:
 	var grew: Dictionary = table.place("B1")
 	var nova: Dictionary = table.corporations[0]
 	var cells: Array = nova["cells"]
-	if str(grew["resolution"]) != "growth" or cells.size() != 4 or int(nova["share_price"]) != 300:
+	var posted := int(nova["share_price"])
+	if str(grew["resolution"]) != "growth" or cells.size() != 4 or posted != Pricing.share_price(4, int(table.sentiment["ai"])):
 		_fail("growth price %s" % str(nova["share_price"]))
 		return
 	if str(cells[0]) != "A1" or str(cells[1]) != "B1" or str(cells[2]) != "C1" or str(cells[3]) != "A2":
 		_fail("growth cells")
 	var bought: Dictionary = table.buy_share("nova_ai")
-	if not str(bought["log"]).ends_with("for $300.") or int(table.active_player()["cash"]) != 5700:
+	if not str(bought["log"]).ends_with("for $%d." % posted) or int(table.active_player()["cash"]) != 6000 - posted:
 		_fail("growth trade")
 	if table.economy_errors().size() != 0:
 		_fail("growth economy")

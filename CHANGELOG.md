@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.5.0 — 2026-11-01
+
+M4 events and ending on the local table. Protocol version stays `0.1.0`. The HTTP validator still does not apply moves.
+
+### Added
+
+- The 10 event cards are shuffled with the match generator after the opening deal. A completed round draws one card, clamps each touched sector to −2…+2, and reprices BYTE and every active company. An empty deck is shuffled again with the same generator.
+- Seed 7710's first event is Grid Incentives: Energy +1 and BYTE $500 to $450. The 11th draw is Risk-On Rally. Both engines match `golden_events.json`.
+- Final round starts when an active company reaches 22 squares, 65 squares are occupied, or the bag and every hand are empty. Seats that have not acted still take one turn. That close applies one event, scores, and does not open another round.
+- Net worth is cash plus active shares at the final prices plus BYTE at the final BYTE price. Ties break by cash, then active-share count, then the earlier opening seat. The table shows the ledger.
+- Captures `docs/m4-event.png` (Grid Incentives, Energy +1, BYTE $450, round 2) and `docs/m4-score.png` (Rowan $9,000, Quinn $6,000).
+
+### Evidence
+
+- `.venv/bin/python -m pytest -q` passed (64 tests).
+- `./scripts/check_client.sh` prints `M0_CLIENT_OK`, `M1_CLIENT_OK`, `M2_CLIENT_OK`, `M3_CLIENT_OK`, and `M4_CLIENT_OK`.
+
+### Not in this version
+
+WebSocket rooms, web export, and deployment.
+
 ## 0.4.0 — 2026-11-01
 
 M3 mergers on the local table. Protocol version stays `0.1.0`. The HTTP validator still does not apply moves.

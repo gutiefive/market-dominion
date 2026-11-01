@@ -31,6 +31,9 @@ var _market_corp := "nova_ai"
 var _banner: PanelContainer
 var _banner_label: Label
 var _status: Label
+var _event_label: Label
+var _score_card: PanelContainer
+var _score_box: VBoxContainer
 var _error: Label
 var _side: PanelContainer
 var _side_text: RichTextLabel
@@ -200,6 +203,16 @@ func _build_play() -> VBoxContainer:
 	_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_column.size_flags_vertical = Control.SIZE_EXPAND_FILL
 
+	_score_card = _card()
+	_score_card.visible = false
+	_column.add_child(_score_card)
+	_score_box = _box_of(_score_card)
+
+	_event_label = _label("", 15, AMBER)
+	_event_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_event_label.visible = false
+	_column.add_child(_event_label)
+
 	_board_card = _card()
 	_column.add_child(_board_card)
 	var board_box := _box_of(_board_card)
@@ -365,12 +378,14 @@ func _refresh() -> void:
 	_rebuild_hand(hand)
 	_rebuild_actions()
 	var finished := _match.bag.is_empty() and _hands_empty() and _match.phase == "place"
-	_place_button.visible = placing
+	_place_button.visible = placing and _match.phase != "completed"
 	if hand.is_empty():
 		_place_button.text = "Skip placement"
 	else:
 		_place_button.text = "Place selected"
-	if _concealed:
+	if _match.phase == "completed":
+		_status.text = _winner_line()
+	elif _concealed:
 		_status.text = "Hand covered. Prices stay visible. The next player continues when they have the device."
 	elif _match.phase == "choose_founder":
 		_status.text = "%s chooses a company for the new cluster. The founder receives one share if the bank has one." % str(player["display_name"])
@@ -384,9 +399,13 @@ func _refresh() -> void:
 		_status.text = "%s has no tile to place. Skip placement, then take up to two market actions." % str(player["display_name"])
 	else:
 		_status.text = "%s places one tile. A chain of two or more can found a company. Connecting two companies merges them." % str(player["display_name"])
-	if finished:
+	if finished and _match.phase != "completed":
 		_status.text = "No tiles remain. Market actions are still available on an empty hand."
+	if _match.final_round and _match.phase != "completed":
+		_status.text = "Final round. " + _status.text
 	_side_text.text = _side_bbcode()
+	_refresh_event()
+	_refresh_score()
 	_sync_merger_modal()
 	if _concealed:
 		_hand_note.text = "Covered"
@@ -406,6 +425,9 @@ func _hands_empty() -> bool:
 func _rebuild_hand(hand: Array) -> void:
 	for child in _hand_row.get_children():
 		child.queue_free()
+	if _match.phase == "completed":
+		_hand_row.add_child(_label("The match is over. The ledger above is the final score.", 14, MUTED))
+		return
 	if _concealed:
 		_hand_row.add_child(_label("Tiles stay face down until this player continues.", 14, MUTED))
 		return
@@ -436,7 +458,7 @@ func _rebuild_actions() -> void:
 		return
 	for child in _action_row.get_children():
 		child.queue_free()
-	if _concealed or _match == null:
+	if _concealed or _match == null or _match.phase == "completed":
 		return
 	if _match.phase == "choose_founder":
 		for corp in _match.corporations:
@@ -517,9 +539,11 @@ func _side_bbcode() -> String:
 	var lines: PackedStringArray = []
 	var active: Dictionary = _match.active_player()
 	var shares: Dictionary = active["shares"]
-	lines.append("[color=#93a0b8]Seed[/color]  %d    [color=#93a0b8]Round[/color]  %d    [color=#93a0b8]Bag[/color]  %d" % [
-		_match.seed, _match.round_number, _match.bag.size()
+	var round_note := "final" if _match.final_round else str(_match.round_number)
+	lines.append("[color=#93a0b8]Seed[/color]  %d    [color=#93a0b8]Round[/color]  %s    [color=#93a0b8]Bag[/color]  %d" % [
+		_match.seed, round_note, _match.bag.size()
 	])
+	lines.append(_sentiment_line())
 	lines.append("[color=#93a0b8]BYTE[/color]  $%d    exchange %d    you %d" % [
 		_match.byte_price, _match.byte_exchange, int(active["byte_count"])
 	])
@@ -542,10 +566,10 @@ func _side_bbcode() -> String:
 	lines.append("")
 	for index in range(_match.players.size()):
 		var info: Dictionary = _match.players[index]
-		var playing := str(info["id"]) == str(active["id"])
+		var playing := _match.phase != "completed" and str(info["id"]) == str(active["id"])
 		var mark := "  [color=#fbbf24]playing[/color]" if playing else ""
-		lines.append("%d. %s  [color=#93a0b8]%s · $%d fictional[/color]%s" % [
-			index + 1, str(info["display_name"]), str(info["id"]), int(info["cash"]), mark
+		lines.append("%d. %s  [color=#93a0b8]%s · cash $%d · net $%d[/color]%s" % [
+			index + 1, str(info["display_name"]), str(info["id"]), int(info["cash"]), _player_net(info), mark
 		])
 	if not _match.log.is_empty():
 		lines.append("")
@@ -553,8 +577,89 @@ func _side_bbcode() -> String:
 		for index in range(start, _match.log.size()):
 			lines.append(_match.log[index])
 	lines.append("")
-	lines.append("[color=#93a0b8]Local only. A merger pays bonuses, then sells the losing shares back to the bank. Round events are not drawn.[/color]")
+	lines.append("[color=#93a0b8]Local only. One event is drawn after every player has taken a turn. The final ledger uses cash, active shares, and BYTE.[/color]")
 	return "\n".join(lines)
+
+
+func _sentiment_line() -> String:
+	var labels := {"ai": "AI", "fintech": "Fintech", "energy": "Energy", "media": "Media", "retail": "Retail"}
+	var parts: PackedStringArray = []
+	for sector in ["ai", "fintech", "energy", "media", "retail"]:
+		var value := int(_match.sentiment[sector])
+		var shown := "+%d" % value if value > 0 else str(value)
+		parts.append("%s %s" % [str(labels[sector]), shown])
+	return "[color=#93a0b8]Sentiment[/color]  %s" % " · ".join(parts)
+
+
+func _player_net(player: Dictionary) -> int:
+	var net := int(player["cash"]) + int(player["byte_count"]) * _match.byte_price
+	var shares: Dictionary = player["shares"]
+	for corp in _match.corporations:
+		if bool(corp["active"]):
+			net += int(shares[str(corp["id"])]) * int(corp["share_price"])
+	return net
+
+
+func _winner_line() -> String:
+	if _match.ranking.is_empty():
+		return "The match is over."
+	for row in _match.ledger:
+		if str(row["id"]) == str(_match.ranking[0]):
+			return "%s wins with $%d fictional." % [str(row["display_name"]), int(row["net_worth"])]
+	return "The match is over."
+
+
+func _refresh_event() -> void:
+	var latest := ""
+	for line in _match.log:
+		if str(line).begins_with("Round event:"):
+			latest = str(line)
+	_event_label.visible = latest != ""
+	_event_label.text = latest
+
+
+func _refresh_score() -> void:
+	for child in _score_box.get_children():
+		child.queue_free()
+	_score_card.visible = _match.phase == "completed" and not _match.ranking.is_empty()
+	if not _score_card.visible:
+		return
+	_score_box.add_child(_label("Final ledger", 20, TEXT))
+	var place_number := 1
+	for player_id in _match.ranking:
+		var row := _ledger_row(str(player_id))
+		if row.is_empty():
+			continue
+		var color := TEAL if place_number == 1 else TEXT
+		_score_box.add_child(_label(
+			"%d. %s    $%d net" % [place_number, str(row["display_name"]), int(row["net_worth"])],
+			16, color
+		))
+		_score_box.add_child(_label(
+			"Cash $%d · active shares %d worth $%d · BYTE %d × $%d = $%d" % [
+				int(row["cash"]), int(row["active_shares"]), int(row["share_value"]),
+				int(row["byte_count"]), _match.byte_price, int(row["byte_value"])
+			],
+			14, MUTED
+		))
+		var holdings: Array = row["holdings"]
+		if holdings.is_empty():
+			_score_box.add_child(_label("No active shares.", 14, MUTED))
+		for holding in holdings:
+			_score_box.add_child(_label(
+				"%s  %d × $%d = $%d" % [
+					str(holding["name"]), int(holding["count"]), int(holding["price"]), int(holding["value"])
+				],
+				14, MUTED
+			))
+		place_number += 1
+
+
+func _ledger_row(player_id: String) -> Dictionary:
+	for row in _match.ledger:
+		if str(row["id"]) == player_id:
+			return row
+	return {}
 
 
 func _fit_board() -> void:
@@ -743,6 +848,44 @@ func _shot_merger() -> void:
 	_refresh()
 
 
+func _shot_event() -> void:
+	var rowan: Array = _match.active_player()["hand"]
+	_selected = str(rowan[0])
+	_place_selected()
+	_pass_market()
+	_pass_market()
+	_reveal()
+	var quinn: Array = _match.active_player()["hand"]
+	_selected = str(quinn[0])
+	_place_selected()
+	_pass_market()
+	_pass_market()
+	_concealed = false
+	_refresh()
+
+
+func _shot_score() -> void:
+	_match.players[0]["cash"] = 9000
+	for player in _match.players:
+		var hand: Array = player["hand"]
+		while not hand.is_empty():
+			var cell := str(hand[0])
+			hand.remove_at(0)
+			_match.occupied[cell] = true
+	while not _match.bag.is_empty():
+		var cell := str(_match.bag[0])
+		_match.bag.remove_at(0)
+		_match.occupied[cell] = true
+	_match.pass_turn()
+	_pass_market()
+	_pass_market()
+	_match.pass_turn()
+	_pass_market()
+	_pass_market()
+	_concealed = false
+	_refresh()
+
+
 func _shot_tie() -> void:
 	_shot_chain(["A1", "A2"], "nova_ai")
 	_shot_chain(["C1", "C2"], "orbit_pay")
@@ -771,6 +914,10 @@ func _run_shot(path: String, phase: String) -> void:
 		_shot_merger()
 	elif phase == "tie":
 		_shot_tie()
+	elif phase == "event":
+		_shot_event()
+	elif phase == "score":
+		_shot_score()
 	await get_tree().process_frame
 	await get_tree().process_frame
 	_fit_board()

@@ -5,6 +5,9 @@ class_name OfflineMatch
 ## Assumption A19: the largest pre-placement company survives. A tie waits
 ## for the placer. Losers are bought out in fixture order, then the survivor
 ## is repriced once.
+## Assumption A20: the event deck is shuffled after the deal. One event is
+## applied when a round completes. A final round scores instead of starting
+## another round.
 
 var seed: int
 var hand_size: int
@@ -23,10 +26,18 @@ var company_of: Dictionary = {}
 var turn_index: int
 var round_number: int
 var phase: String = "place"
+var final_round := false
 var market_actions_left: int
 var pending: Array = []
 var pending_options: Array[String] = []
 var pending_tile := ""
+var events: Array = []
+var event_ids: Array[String] = []
+var rng: MatchRng
+var ranking: Array[String] = []
+var ledger: Array = []
+var end_size: int
+var end_occupied: int
 var log: Array[String] = []
 
 
@@ -54,6 +65,8 @@ static func create(seed_value: int, names: Array) -> OfflineMatch:
 	table.byte_supply = int(rules["byte_supply"])
 	table.byte_price = int(rules["byte_initial_price"])
 	table.byte_exchange = table.byte_supply
+	table.end_size = int(rules["end_company_size"])
+	table.end_occupied = int(rules["end_occupied_tiles"])
 	var share_template := {}
 	for sector in rules["sectors"]:
 		table.sentiment[str(sector)] = 0
@@ -95,9 +108,16 @@ static func create(seed_value: int, names: Array) -> OfflineMatch:
 				break
 			player["hand"].append(table.bag[0])
 			table.bag.remove_at(0)
+	var deck: Array = []
+	var event_file = SharedFiles.read_json("fixtures/round_events.json")
+	for event in event_file["events"]:
+		deck.append((event as Dictionary).duplicate(true))
+	table.rng = rng
+	table.events = MatchRng.shuffle(deck, rng)
 	table.turn_index = 0
 	table.round_number = 1
 	table.phase = "place"
+	table.final_round = false
 	table.market_actions_left = 0
 	return table
 
@@ -128,6 +148,8 @@ func active_player() -> Dictionary:
 
 
 func place(coordinate: String) -> Dictionary:
+	if phase == "completed":
+		return {"ok": false, "error": "the match is over"}
 	if phase != "place":
 		return {"ok": false, "error": "not the placement step"}
 	var player := active_player()
@@ -189,6 +211,8 @@ func place(coordinate: String) -> Dictionary:
 
 
 func choose_founder(corp_id: String) -> Dictionary:
+	if phase == "completed":
+		return {"ok": false, "error": "the match is over"}
 	if phase != "choose_founder":
 		return {"ok": false, "error": "no company choice is pending"}
 	var corp := _corp(corp_id)
@@ -224,6 +248,8 @@ func choose_founder(corp_id: String) -> Dictionary:
 
 
 func choose_survivor(corp_id: String) -> Dictionary:
+	if phase == "completed":
+		return {"ok": false, "error": "the match is over"}
 	if phase != "choose_survivor":
 		return {"ok": false, "error": "no survivor choice is pending"}
 	var corp := _corp(corp_id)
@@ -235,6 +261,8 @@ func choose_survivor(corp_id: String) -> Dictionary:
 
 
 func pass_turn() -> Dictionary:
+	if phase == "completed":
+		return {"ok": false, "error": "the match is over"}
 	if phase != "place":
 		return {"ok": false, "error": "not the placement step"}
 	var player := active_player()
@@ -577,6 +605,8 @@ func _enter_market() -> void:
 
 
 func _market_error() -> String:
+	if phase == "completed":
+		return "the match is over"
 	if phase != "market":
 		return "not the market step"
 	return "no market action left"
@@ -623,7 +653,130 @@ func _finish_turn() -> void:
 	pending = []
 	pending_options = []
 	pending_tile = ""
+	var closing := turn_index + 1 >= players.size()
+	if not final_round and _end_triggered():
+		final_round = true
+		if closing:
+			log.append("Final round. The round is complete.")
+		else:
+			log.append("Final round. Everyone who has not acted this round still takes one turn.")
 	turn_index += 1
 	if turn_index >= players.size():
 		turn_index = 0
+		_apply_round_event()
+		if final_round:
+			_score_game()
+			return
 		round_number += 1
+
+
+func _end_triggered() -> bool:
+	for corp in corporations:
+		if bool(corp["active"]) and int(corp["size"]) >= end_size:
+			return true
+	var occupied_count := 0
+	for filled in occupied.values():
+		if bool(filled):
+			occupied_count += 1
+	if occupied_count >= end_occupied:
+		return true
+	if not bag.is_empty():
+		return false
+	for player in players:
+		if not (player["hand"] as Array).is_empty():
+			return false
+	return true
+
+
+func _apply_round_event() -> void:
+	if events.is_empty():
+		var deck: Array = []
+		var event_file = SharedFiles.read_json("fixtures/round_events.json")
+		for event in event_file["events"]:
+			deck.append((event as Dictionary).duplicate(true))
+		events = MatchRng.shuffle(deck, rng)
+	var drawn: Dictionary = events[0]
+	events.remove_at(0)
+	event_ids.append(str(drawn["id"]))
+	var updated := SectorEvents.apply_sector_deltas(sentiment, drawn["sector_deltas"])
+	sentiment = updated
+	for corp in corporations:
+		_reprice(corp)
+	byte_price = Pricing.byte_price_after_delta(byte_price, int(drawn["byte_delta_percent"]))
+	var rules = SharedFiles.read_json("fixtures/rules_constants.json")
+	var parts: PackedStringArray = []
+	var deltas: Dictionary = drawn["sector_deltas"]
+	for sector in rules["sectors"]:
+		var key := str(sector)
+		if not deltas.has(key):
+			continue
+		var value := int(sentiment[key])
+		var shown := "+%d" % value if value > 0 else str(value)
+		parts.append("%s %s" % [_sector_label(key), shown])
+	log.append("Round event: %s. %s. BYTE is $%d." % [str(drawn["name"]), ", ".join(parts), byte_price])
+
+
+func _score_game() -> void:
+	var rows: Array = []
+	for player in players:
+		var holdings: Array = []
+		var share_value := 0
+		var active_shares := 0
+		var shares: Dictionary = player["shares"]
+		for corp in corporations:
+			var count := int(shares[str(corp["id"])])
+			if not bool(corp["active"]) or count <= 0:
+				continue
+			var value := count * int(corp["share_price"])
+			active_shares += count
+			share_value += value
+			holdings.append({
+				"id": str(corp["id"]),
+				"name": str(corp["name"]),
+				"count": count,
+				"price": int(corp["share_price"]),
+				"value": value,
+			})
+		var byte_count := int(player["byte_count"])
+		var byte_value := byte_count * byte_price
+		var net_worth := int(player["cash"]) + share_value + byte_value
+		rows.append({
+			"id": str(player["id"]),
+			"display_name": str(player["display_name"]),
+			"cash": int(player["cash"]),
+			"share_value": share_value,
+			"active_shares": active_shares,
+			"byte_count": byte_count,
+			"byte_value": byte_value,
+			"net_worth": net_worth,
+			"turn_order_index": int(player["turn_order_index"]),
+			"holdings": holdings,
+		})
+	ranking.clear()
+	for player_id in Ranking.rank_players(rows):
+		ranking.append(str(player_id))
+	ledger = rows
+	phase = "completed"
+	market_actions_left = 0
+	var winner_name := ""
+	var winner_net := 0
+	for row in rows:
+		if str(row["id"]) == str(ranking[0]):
+			winner_name = str(row["display_name"])
+			winner_net = int(row["net_worth"])
+	log.append("%s wins with $%d fictional." % [winner_name, winner_net])
+
+
+func _sector_label(sector: String) -> String:
+	match sector:
+		"ai":
+			return "AI"
+		"fintech":
+			return "Fintech"
+		"energy":
+			return "Energy"
+		"media":
+			return "Media"
+		"retail":
+			return "Retail"
+	return sector

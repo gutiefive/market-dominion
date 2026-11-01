@@ -1,8 +1,8 @@
 """Sector-sentiment updates and the unshuffled event deck.
 
 Assumption A14: the fixture order is the unshuffled deck. Each listed sector
-is clamped on its own after the delta is added. Drawing, reshuffling, and
-end-of-round timing are not implemented.
+is clamped on its own after the delta is added. A match shuffles that deck
+with its own generator after the opening deal (assumption A20).
 """
 
 from __future__ import annotations

@@ -1,7 +1,7 @@
 extends RefCounted
 class_name SectorEvents
 
-## Apply sector deltas and clamp each sector on its own. No deck draw.
+## Apply sector deltas and clamp each sector on its own. The match shuffles the deck.
 
 
 static func apply_sector_deltas(sentiment: Dictionary, deltas: Dictionary) -> Dictionary:

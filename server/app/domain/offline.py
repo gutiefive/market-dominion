@@ -10,6 +10,12 @@ Assumption A19: the survivor is the largest pre-placement company. A tie
 among those largest companies waits for the placer. Every other company in
 the component is bought out, in fixture order, before the survivor is
 repriced once.
+
+Assumption A20: after the opening deal, the same generator shuffles the
+10-card event deck. A completed round draws one card, reclamps sentiment,
+and reprices BYTE and active shares. An empty deck is shuffled again.
+A final round lets the remaining seats finish one turn, applies that one
+event, and scores. It does not start another round.
 """
 
 from __future__ import annotations
@@ -20,8 +26,10 @@ from typing import Any
 from app.domain.board import component
 from app.domain.coordinates import all_coordinates
 from app.domain.corporations import load_corporations
+from app.domain.events import apply_sector_deltas, load_round_events, sectors
 from app.domain.mergers import bonus_payouts
-from app.domain.pricing import share_price
+from app.domain.pricing import byte_price_after_delta, share_price
+from app.domain.scoring import rank_players
 from app.domain.rng import MatchRng, shuffle
 from app.domain.tiles import conservation_errors
 from app.files import load_rules
@@ -53,6 +61,8 @@ class OfflineMatch:
         self.byte_supply = int(rules["byte_supply"])
         self.byte_price = int(rules["byte_initial_price"])
         self.byte_exchange = self.byte_supply
+        self.end_size = int(rules["end_company_size"])
+        self.end_occupied = int(rules["end_occupied_tiles"])
         self.sentiment = {str(sector): 0 for sector in rules["sectors"]}
         self.corporations: list[dict[str, Any]] = []
         share_template: dict[str, int] = {}
@@ -72,6 +82,7 @@ class OfflineMatch:
             )
             share_template[corp_id] = 0
         rng = MatchRng(seed)
+        self.rng = rng
         roster = [
             {
                 "id": f"p{index + 1}",
@@ -94,19 +105,26 @@ class OfflineMatch:
                 if not self.bag:
                     break
                 player["hand"].append(self.bag.pop(0))
+        self.events: list[dict[str, Any]] = shuffle(load_round_events(), rng)
+        self.event_ids: list[str] = []
         self.turn_index = 0
         self.round_number = 1
         self.phase = "place"
+        self.final_round = False
         self.market_actions_left = 0
         self.pending: list[str] = []
         self.pending_options: list[str] = []
         self.pending_tile = ""
+        self.ranking: list[str] = []
+        self.ledger: list[dict[str, Any]] = []
         self.log: list[str] = []
 
     def active_player(self) -> dict[str, Any]:
         return self.players[self.turn_index]
 
     def place(self, coordinate: str) -> dict[str, Any]:
+        if self.phase == "completed":
+            raise ValueError("the match is over")
         if self.phase != "place":
             raise ValueError("not the placement step")
         player = self.active_player()
@@ -160,6 +178,8 @@ class OfflineMatch:
         return {"placed": coordinate, "resolution": "unincorporated", "log": message}
 
     def choose_founder(self, corp_id: str) -> dict[str, Any]:
+        if self.phase == "completed":
+            raise ValueError("the match is over")
         if self.phase != "choose_founder":
             raise ValueError("no company choice is pending")
         corp = self._corp(corp_id)
@@ -194,6 +214,8 @@ class OfflineMatch:
         return {"founded": corp["id"], "granted": granted, "log": message}
 
     def choose_survivor(self, corp_id: str) -> dict[str, Any]:
+        if self.phase == "completed":
+            raise ValueError("the match is over")
         if self.phase != "choose_survivor":
             raise ValueError("no survivor choice is pending")
         if self._corp(corp_id) is None:
@@ -203,6 +225,8 @@ class OfflineMatch:
         return self._resolve_merger(corp_id, self.pending_tile, self.active_player(), True)
 
     def pass_turn(self) -> dict[str, Any]:
+        if self.phase == "completed":
+            raise ValueError("the match is over")
         if self.phase != "place":
             raise ValueError("not the placement step")
         player = self.active_player()
@@ -356,6 +380,9 @@ class OfflineMatch:
             "byte": {player["display_name"]: int(player["byte_count"]) for player in self.players},
             "byte_price": self.byte_price,
             "byte_exchange": self.byte_exchange,
+            "final_round": self.final_round,
+            "event_ids": list(self.event_ids),
+            "ranking": list(self.ranking),
             "corporations": [
                 {
                     "id": corp["id"],
@@ -493,6 +520,8 @@ class OfflineMatch:
         self.market_actions_left = self.market_limit
 
     def _open_market(self) -> dict[str, Any]:
+        if self.phase == "completed":
+            raise ValueError("the match is over")
         if self.phase != "market":
             raise ValueError("not the market step")
         if self.market_actions_left <= 0:
@@ -529,10 +558,107 @@ class OfflineMatch:
         self.pending = []
         self.pending_options = []
         self.pending_tile = ""
+        closing = self.turn_index + 1 >= len(self.players)
+        if not self.final_round and self._end_triggered():
+            self.final_round = True
+            if closing:
+                self.log.append("Final round. The round is complete.")
+            else:
+                self.log.append(
+                    "Final round. Everyone who has not acted this round still takes one turn."
+                )
         self.turn_index += 1
         if self.turn_index >= len(self.players):
             self.turn_index = 0
+            self._apply_round_event()
+            if self.final_round:
+                self._score_game()
+                return
             self.round_number += 1
+
+    def _end_triggered(self) -> bool:
+        if any(bool(corp["active"]) and int(corp["size"]) >= self.end_size for corp in self.corporations):
+            return True
+        occupied = sum(1 for filled in self.occupied.values() if filled)
+        if occupied >= self.end_occupied:
+            return True
+        return not self.bag and all(not player["hand"] for player in self.players)
+
+    def _apply_round_event(self) -> None:
+        if not self.events:
+            self.events = shuffle(load_round_events(), self.rng)
+        event = self.events.pop(0)
+        self.event_ids.append(str(event["id"]))
+        self.sentiment = apply_sector_deltas(self.sentiment, event["sector_deltas"])
+        for corp in self.corporations:
+            self._reprice(corp)
+        self.byte_price = byte_price_after_delta(self.byte_price, int(event["byte_delta_percent"]))
+        parts: list[str] = []
+        deltas = event["sector_deltas"]
+        for sector in sectors():
+            if sector not in deltas:
+                continue
+            value = int(self.sentiment[sector])
+            shown = f"+{value}" if value > 0 else str(value)
+            parts.append(f"{_SECTOR_LABELS[sector]} {shown}")
+        self.log.append(
+            f"Round event: {event['name']}. {', '.join(parts)}. BYTE is ${self.byte_price}."
+        )
+
+    def _score_game(self) -> None:
+        rows: list[dict[str, Any]] = []
+        for player in self.players:
+            holdings: list[dict[str, Any]] = []
+            share_value = 0
+            active_shares = 0
+            for corp in self.corporations:
+                count = int(player["shares"][corp["id"]])
+                if not corp["active"] or count <= 0:
+                    continue
+                value = count * int(corp["share_price"])
+                active_shares += count
+                share_value += value
+                holdings.append(
+                    {
+                        "id": corp["id"],
+                        "name": corp["name"],
+                        "count": count,
+                        "price": int(corp["share_price"]),
+                        "value": value,
+                    }
+                )
+            byte_count = int(player["byte_count"])
+            byte_value = byte_count * self.byte_price
+            net_worth = int(player["cash"]) + share_value + byte_value
+            rows.append(
+                {
+                    "id": player["id"],
+                    "display_name": player["display_name"],
+                    "cash": int(player["cash"]),
+                    "share_value": share_value,
+                    "active_shares": active_shares,
+                    "byte_count": byte_count,
+                    "byte_value": byte_value,
+                    "net_worth": net_worth,
+                    "turn_order_index": int(player["turn_order_index"]),
+                    "holdings": holdings,
+                }
+            )
+        self.ranking = rank_players(rows)
+        self.ledger = rows
+        self.phase = "completed"
+        self.market_actions_left = 0
+        winner = next(row for row in rows if row["id"] == self.ranking[0])
+        self.log.append(f"{winner['display_name']} wins with ${winner['net_worth']} fictional.")
+
+
+_SECTOR_LABELS = {
+    "ai": "AI",
+    "fintech": "Fintech",
+    "energy": "Energy",
+    "media": "Media",
+    "retail": "Retail",
+}
 
 
 def _join_names(names: list[str]) -> str:

@@ -111,12 +111,12 @@ def test_growth_absorbs_a_connected_unincorporated_square_and_reprices():
     assert grew["resolution"] == "growth"
     assert nova["cells"] == ["A1", "B1", "C1", "A2"]
     assert nova["size"] == 4
-    assert nova["share_price"] == share_price(4, 0) == 300
+    assert nova["share_price"] == share_price(4, match.sentiment["ai"])
     assert "E9" not in nova["cells"]
     assert match.company_of.get("E9") is None
     bought = match.buy_share("nova_ai")
-    assert "for $300." in bought["log"]
-    assert match.active_player()["cash"] == 5700
+    assert f"for ${nova['share_price']}." in bought["log"]
+    assert match.active_player()["cash"] == 6000 - nova["share_price"]
     assert match.active_player()["shares"]["nova_ai"] == 2
     assert nova["bank_shares"] == 18
     assert match.economy_errors() == []
@@ -228,9 +228,11 @@ def test_market_rejects_a_third_action_inactive_names_and_negative_cash():
     finish_market(match)
     pull(match, "E7")
     match.place("E7")
+    posted = match.byte_price
+    before = rowan["cash"]
     match.sell_byte()
     assert rowan["byte_count"] == 0
-    assert rowan["cash"] == 6200
+    assert rowan["cash"] == before + posted
     assert match.byte_exchange == 30
     assert match.economy_errors() == []
 

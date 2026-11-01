@@ -1,6 +1,6 @@
 # Milestones
 
-M3 is the stage this tree claims as playable. A box is checked only where a command was run and the result is recorded in [CHANGELOG.md](CHANGELOG.md).
+M4 is the stage this tree claims as playable. A box is checked only where a command was run and the result is recorded in [CHANGELOG.md](CHANGELOG.md).
 
 ## M0 Foundation
 
@@ -49,13 +49,13 @@ Local pass-and-play only. The HTTP API does not apply these moves.
 
 ## M4 Events and ending
 
-Sentiment clamp and BYTE rounding exist. The deck does not move and nothing scores a match.
+Local pass-and-play only. The HTTP API does not apply these moves.
 
-- [ ] Seeded event deck, one event per completed round, reshuffle
-- [ ] End triggers at size 22, 65 occupied, or no tiles left
-- [ ] Final-round turns for players who have not acted
-- [ ] Ledger and deterministic tie break on a finished match
-- [ ] Replay: same seed and commands, same result
+- [x] Seeded event deck, one event per completed round, reshuffle (`golden_events.json`, `M4_CLIENT_OK`)
+- [x] End triggers at size 22, 65 occupied, or no tiles left
+- [x] Final-round turns for players who have not acted
+- [x] Ledger and deterministic tie break on a finished match (`docs/m4-score.png`)
+- [x] Replay: same seed and commands, same result (`docs/m4-event.png`)
 
 ## M5 Online rooms
 
@@ -80,6 +80,6 @@ The HTTP validator is not multiplayer.
 ## Known limits
 
 - Validate never mutates a match. The offline table lives in the client and in `OfflineMatch`; it is not a server room.
-- Sector sentiment stays 0 during play. Round events and end-game scoring are M4.
+- A finished local match is scored on the device. It is not a server room.
 - GDScript rejection for prices is −1 or an empty list; the offline table returns `{ok: false, error}`. Python raises (assumption A13).
 - Docker and web export were not executed (assumption A15).

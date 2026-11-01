@@ -61,7 +61,7 @@ A12. Sample seed `7710` identifies `sample_lobby_state.json` and the M1 sample t
 
 A13. GDScript rejection uses −1 or an empty collection. Python raises. Golden files cover the legal cases on both sides. Python tests cover the rejections.
 
-A14. `round_events.json` order is the unshuffled deck. Deltas clamp per sector. Drawing and reshuffling are not implemented.
+A14. `round_events.json` order is the unshuffled deck. Deltas clamp per sector. A match shuffles and draws that deck under assumption A20.
 
 A15. Docker Compose and the Godot web export were not run. The Compatibility renderer is selected so that export remains possible. See [infra/deploy/README.md](infra/deploy/README.md).
 
@@ -69,10 +69,12 @@ A16. The match generator is a 32-bit xorshift, not a language runtime RNG. `stat
 
 A17. M1 drew immediately after a placement. M2 does not. The current local turn is assumption A18.
 
-A18. A local turn places one held tile, or skips when the hand is empty, then resolves founding, growth, or a merger, then allows two market actions, then draws. `round_number` starts at 1 and increments after every seat has finished that sequence. Sector sentiment stays 0 unless a test sets it, so a new company's price is `100 + 50 × size`, already a multiple of $10. The founder receives one share when `bank_shares > 0`. A cluster of size at least 2 stays unincorporated when every brand is already active. Hands stay covered between seats on one device. This is not an online match.
+A18. A local turn places one held tile, or skips when the hand is empty, then resolves founding, growth, or a merger, then allows two market actions, then draws. `round_number` starts at 1 and increments after every seat has finished that sequence, except the close that scores the match (assumption A20). Sector sentiment stays 0 until a round event. Before that, a new company's price is `100 + 50 × size`, already a multiple of $10. The founder receives one share when `bank_shares > 0`. A cluster of size at least 2 stays unincorporated when every brand is already active. Hands stay covered between seats on one device. This is not an online match.
 
 A19. Merger survivor is the company with the largest pre-placement size. Size is the company's own cell count. The new tile and any unincorporated squares in the component do not count toward that comparison. A unique largest company resolves immediately. A tie among the largest opens phase `choose_survivor`; the tile is already on the board and unassigned until the placer picks one of those tied companies. A smaller company in the same component is absorbed and cannot be chosen. Losers resolve in corporation-fixture order. For each loser, bonuses are paid from the snapshotted share price, then every outstanding share of that loser is sold back to the bank at the same price. The loser then goes inactive with 20 bank shares, no cells, and no outstanding shares. The survivor is repriced once after every loser is done. Remainder dollars follow assumption A10. While `choose_survivor` is open, the pending component may contain more than one company; after the choice it must not.
 
+A20. After the opening deal, the same generator shuffles the 10 events. That shuffle does not change seats or the bag. A completed round draws the front card. An empty deck is shuffled again before the next draw. Each listed sector is clamped to −2…+2, then every active company and BYTE are repriced. The log line is `Round event: {name}. {Sector} {signed value}, …. BYTE is ${price}.` Seed 7710 opens with Grid Incentives, energy +1 and BYTE $500 to $450 (`golden_events.json`). The 11th draw of that seed is Risk-On Rally. The end check runs after the draw. Triggers are an active company of size at least 22, at least 65 occupied squares, or an empty bag and empty hands. The first trigger sets `final_round`. Seats that have not finished the current round still take one turn. That close applies one event, sets phase `completed`, and does not increment `round_number`. Later commands fail with `the match is over`. Net worth is cash plus active shares at the post-event prices plus BYTE at the post-event BYTE price. Inactive shares add nothing. `rank_players` orders the ledger (assumption A10). The winner line is `{name} wins with ${net} fictional.`
+
 ## What is intentionally absent
 
-Rooms, WebSockets, reconnect, idempotent command application, the round-event draw, end-game scoring from a board, accounts, and deployment. The HTTP validator still returns `applied: false`.
+Rooms, WebSockets, reconnect, idempotent command application, accounts, and deployment. The HTTP validator still returns `applied: false`.

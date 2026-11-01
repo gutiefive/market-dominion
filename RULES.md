@@ -2,7 +2,7 @@
 
 This is the project rulebook for implementation. It restates the game specification in project language. It is not a copy of any published board-game rulebook. All money is fictional integer dollars.
 
-The local table deals tiles, founds and grows companies, merges them, and trades shares and BYTE. Round events are not drawn, and a finished match is not scored. Those gaps are listed in [TASKS.md](TASKS.md). Assumptions that close spec gaps are numbered in [ARCHITECTURE.md](ARCHITECTURE.md).
+The local table deals tiles, founds and grows companies, merges them, trades shares and BYTE, draws one round event after every seat has acted, and scores the final round. Online rooms are not implemented. Those gaps are listed in [TASKS.md](TASKS.md). Assumptions that close spec gaps are numbered in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Players and opening
 
@@ -39,7 +39,7 @@ Sector sentiment starts at 0 for each sector and stays inside −2…+2.
 2. Resolve growth, founding, or a merger before market actions. A tie for the largest pre-placement company waits for the placer (assumption A19).
 3. Up to two market actions, either of which may be passed: buy one share, sell one share, buy one BYTE, or sell one BYTE, at the price currently posted. No loans, shorts, fractions, or negative cash.
 4. Draw one tile if the bag has one. The hand returns to five when the bag allows it. A hand never exceeds five (assumption A5). The draw happens after the market actions.
-5. After every remaining player has taken one turn, apply exactly one round event, reprice, and check the end of the game. M3 does not do this. Sentiment stays 0 and BYTE stays at its posted price.
+5. After every remaining player has taken one turn, apply exactly one round event, reprice, and check the end of the game. Sentiment and BYTE stay put until that close.
 
 M3 runs steps 1 through 4. Founding requires a connected unincorporated cluster of size at least 2 and an inactive brand. The founder receives one share when the bank has one. Growth absorbs every connected unincorporated square and reprices from the new size. A merger pays each loser, liquidates that stock, then reprices the survivor once.
 
@@ -95,7 +95,7 @@ The spec example: $500 and a +20% event posts $600.
 
 ## Round events
 
-One event per completed round, drawn from a seeded shuffle of this deck. When the deck is empty it is reshuffled with the same match generator. Repeat events after a reshuffle are allowed. M0 stores the unshuffled order and can clamp a delta; it does not draw (assumption A14).
+One event per completed round, drawn from a seeded shuffle of this deck. The fixture order is the unshuffled deck (assumption A14). The match shuffles it after the opening deal and reshuffles with the same generator when it is empty (assumption A20). Repeat events after a reshuffle are allowed.
 
 | Event | Sectors | BYTE |
 | --- | --- | --- |

@@ -29,8 +29,8 @@ def test_bonus_examples_from_the_spec():
 
 def test_larger_chain_survives_and_sole_holder_receives_both_pools():
     match = OfflineMatch(7710, ["Rowan", "Quinn"])
-    _chain(match, ["C1", "C2", "C3", "C4", "C5"], "nova_ai")
-    _chain(match, ["A1", "A2", "A3"], "orbit_pay")
+    _paint(match, ["C1", "C2", "C3", "C4", "C5"], "nova_ai")
+    _paint(match, ["A1", "A2", "A3"], "orbit_pay")
     _assign(match, "orbit_pay", {"p2": 4})
     nova_shares = _shares(match, "nova_ai")
     pull(match, "B1")
@@ -62,8 +62,8 @@ def test_larger_chain_survives_and_sole_holder_receives_both_pools():
 
 def test_size_six_loser_at_400_pays_the_spec_majority_example():
     match = OfflineMatch(7710, ["Rowan", "Quinn"])
-    _chain(match, [f"C{row}" for row in range(1, 8)], "nova_ai")
-    _chain(match, [f"A{row}" for row in range(1, 7)], "orbit_pay")
+    _paint(match, [f"C{row}" for row in range(1, 8)], "nova_ai")
+    _paint(match, [f"A{row}" for row in range(1, 7)], "orbit_pay")
     _assign(match, "orbit_pay", {"p1": 4})
     pull(match, "B1")
     match.place("B1")
@@ -79,8 +79,8 @@ def test_size_six_loser_at_400_pays_the_spec_majority_example():
 
 def test_tied_majority_splits_900_and_a_lower_holder_gets_no_bonus():
     match = OfflineMatch(7710, ["Rowan", "Quinn", "Avery"])
-    _chain(match, [f"C{row}" for row in range(1, 6)], "nova_ai")
-    _chain(match, [f"A{row}" for row in range(1, 5)], "orbit_pay")
+    _paint(match, [f"C{row}" for row in range(1, 6)], "nova_ai")
+    _paint(match, [f"A{row}" for row in range(1, 5)], "orbit_pay")
     _assign(match, "orbit_pay", {"p1": 2, "p2": 2, "p3": 1})
     pull(match, "B1")
     match.place("B1")
@@ -102,8 +102,8 @@ def test_tied_majority_splits_900_and_a_lower_holder_gets_no_bonus():
 
 def test_second_place_tie_pays_remainder_by_player_id():
     match = OfflineMatch(7710, ["Rowan", "Quinn", "Avery", "Blake"])
-    _chain(match, [f"C{row}" for row in range(1, 5)], "nova_ai")
-    _chain(match, ["A1", "A2", "A3"], "orbit_pay")
+    _paint(match, [f"C{row}" for row in range(1, 5)], "nova_ai")
+    _paint(match, ["A1", "A2", "A3"], "orbit_pay")
     _assign(match, "orbit_pay", {"p1": 4, "p2": 1, "p3": 1, "p4": 1})
     pull(match, "B1")
     match.place("B1")
@@ -119,8 +119,8 @@ def test_second_place_tie_pays_remainder_by_player_id():
 
 def test_four_way_tie_splits_the_combined_pool_with_a_remainder():
     match = OfflineMatch(7710, ["Rowan", "Quinn", "Avery", "Blake"])
-    _chain(match, [f"C{row}" for row in range(1, 5)], "nova_ai")
-    _chain(match, ["A1", "A2", "A3"], "orbit_pay")
+    _paint(match, [f"C{row}" for row in range(1, 5)], "nova_ai")
+    _paint(match, ["A1", "A2", "A3"], "orbit_pay")
     _assign(match, "orbit_pay", {"p1": 1, "p2": 1, "p3": 1, "p4": 1})
     pull(match, "B1")
     match.place("B1")
@@ -134,12 +134,10 @@ def test_four_way_tie_splits_the_combined_pool_with_a_remainder():
 def test_three_companies_pay_once_and_reprice_the_survivor_once():
     match = OfflineMatch(7710, ["Rowan", "Quinn", "Avery", "Blake"])
     # C5 is the only bridge. Chains stay apart until that tile, and C6 is unincorporated.
-    _chain(match, ["A1", "A2", "A3", "A4", "A5", "B5"], "nova_ai")
-    _chain(match, ["D5", "E5", "E6"], "orbit_pay")
-    _chain(match, ["C3", "C4"], "volt_grid")
-    pull(match, "C6")
-    assert match.place("C6")["resolution"] == "unincorporated"
-    finish_market(match)
+    _paint(match, ["A1", "A2", "A3", "A4", "A5", "B5"], "nova_ai")
+    _paint(match, ["D5", "E5", "E6"], "orbit_pay")
+    _paint(match, ["C3", "C4"], "volt_grid")
+    _paint(match, ["C6"], None)
     _assign(match, "orbit_pay", {"p1": 2, "p2": 2})
     _assign(match, "volt_grid", {"p3": 1})
     nova_shares = _shares(match, "nova_ai")
@@ -168,16 +166,14 @@ def test_three_companies_pay_once_and_reprice_the_survivor_once():
 
 def test_tie_uses_company_size_before_the_tile_and_ignores_loose_squares():
     match = OfflineMatch(7710, ["Rowan", "Quinn"])
-    _chain(match, ["A2", "A3"], "nova_ai")
-    _chain(match, ["C2", "C3"], "orbit_pay")
-    pull(match, "B1")
-    assert match.place("B1")["resolution"] == "unincorporated"
-    finish_market(match)
+    _paint(match, ["A2", "A3"], "nova_ai")
+    _paint(match, ["C2", "C3"], "orbit_pay")
+    _paint(match, ["B1"], None)
     pull(match, "B2")
     opened = match.place("B2")
     assert opened["resolution"] == "choose_survivor"
     assert opened["log"] == (
-        "Quinn placed B2. Choose the survivor. NOVA AI and ORBIT PAY are tied at size 2."
+        "Rowan placed B2. Choose the survivor. NOVA AI and ORBIT PAY are tied at size 2."
     )
     assert match.pending_options == ["nova_ai", "orbit_pay"]
     assert _corp(match, "nova_ai")["size"] == 2
@@ -191,7 +187,7 @@ def test_tie_uses_company_size_before_the_tile_and_ignores_loose_squares():
         match.choose_survivor("not_a_brand")
     assert match.snapshot() == before
     kept = match.choose_survivor("orbit_pay")
-    assert kept["log"] == "Quinn kept ORBIT PAY. ORBIT PAY is size 6. Share price is $400."
+    assert kept["log"] == "Rowan kept ORBIT PAY. ORBIT PAY is size 6. Share price is $400."
     assert _inactive(match, "nova_ai")
     assert _corp(match, "orbit_pay")["cells"] == ["B1", "A2", "B2", "C2", "A3", "C3"]
     assert match.phase == "market"
@@ -200,9 +196,9 @@ def test_tie_uses_company_size_before_the_tile_and_ignores_loose_squares():
 
 def test_a_smaller_company_in_the_same_merger_cannot_be_chosen():
     match = OfflineMatch(7710, ["Rowan", "Quinn", "Avery"])
-    _chain(match, ["A3", "A4", "A5", "B5"], "nova_ai")
-    _chain(match, ["D5", "E5", "E4", "E3"], "orbit_pay")
-    _chain(match, ["C6", "C7"], "volt_grid")
+    _paint(match, ["A3", "A4", "A5", "B5"], "nova_ai")
+    _paint(match, ["D5", "E5", "E4", "E3"], "orbit_pay")
+    _paint(match, ["C6", "C7"], "volt_grid")
     pull(match, "C5")
     match.place("C5")
     assert match.pending_options == ["nova_ai", "orbit_pay"]
@@ -248,8 +244,8 @@ def test_empty_loser_pays_nothing_and_can_be_founded_again():
 
 def test_loser_price_is_snapshotted_with_its_own_sentiment():
     match = OfflineMatch(7710, ["Rowan", "Quinn"])
-    _chain(match, ["C1", "C2", "C3", "C4", "C5"], "nova_ai")
-    _chain(match, ["A1", "A2", "A3", "A4"], "orbit_pay")
+    _paint(match, ["C1", "C2", "C3", "C4", "C5"], "nova_ai")
+    _paint(match, ["A1", "A2", "A3", "A4"], "orbit_pay")
     match.sentiment["fintech"] = 2
     match._reprice(_corp(match, "orbit_pay"))
     assert _corp(match, "orbit_pay")["share_price"] == 360
@@ -260,6 +256,22 @@ def test_loser_price_is_snapshotted_with_its_own_sentiment():
     assert "Rowan liquidated 1 ORBIT PAY shares for $360." in match.log
     assert _corp(match, "nova_ai")["share_price"] == 600
     assert match.economy_errors() == []
+
+
+def _paint(match: OfflineMatch, cells: list[str], corp_id: str | None) -> None:
+    """Put tiles on the board before the first turn, so sentiment is still 0."""
+    for cell in cells:
+        for player in match.players:
+            if cell in player["hand"]:
+                player["hand"].remove(cell)
+                break
+        else:
+            match.bag.remove(cell)
+        match.occupied[cell] = True
+        if corp_id:
+            match.company_of[cell] = corp_id
+    if corp_id:
+        match._reprice(_corp(match, corp_id))
 
 
 def _chain(match: OfflineMatch, cells: list[str], brand: str) -> None:

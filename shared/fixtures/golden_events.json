@@ -1,0 +1,29 @@
+{
+  "seed": 7710,
+  "names": ["Rowan", "Quinn"],
+  "deck": [
+    "grid_incentives",
+    "risk_on_rally",
+    "energy_crunch",
+    "consumer_recovery",
+    "media_boom",
+    "ai_adoption",
+    "liquidity_freeze",
+    "risk_off_shock",
+    "retail_slowdown",
+    "fintech_regulation"
+  ],
+  "eleven": [
+    "grid_incentives",
+    "risk_on_rally",
+    "energy_crunch",
+    "consumer_recovery",
+    "media_boom",
+    "ai_adoption",
+    "liquidity_freeze",
+    "risk_off_shock",
+    "retail_slowdown",
+    "fintech_regulation",
+    "risk_on_rally"
+  ]
+}

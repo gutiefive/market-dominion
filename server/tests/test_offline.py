@@ -108,10 +108,10 @@ def _finish_market(match: OfflineMatch) -> None:
         match.pass_market()
 
 
-def test_full_bag_plays_through_mergers_and_keeps_invariants():
+def test_full_bag_plays_until_the_game_ends_and_keeps_invariants():
     match = OfflineMatch(7710, ["Rowan", "Quinn"])
     placed = 0
-    while placed < 81:
+    while match.phase != "completed" and placed < 81:
         assert match.economy_errors() == []
         if match.phase == "choose_founder":
             inactive = [corp["id"] for corp in match.corporations if not corp["active"]]
@@ -129,8 +129,9 @@ def test_full_bag_plays_through_mergers_and_keeps_invariants():
             continue
         match.place(hand[0])
         placed += 1
-    assert placed == 81
-    assert match.bag == []
+    assert match.phase == "completed"
+    assert match.ranking
+    assert len(match.event_ids) == match.round_number
     assert match.economy_errors() == []
     assert match.conservation() == []
 

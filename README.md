@@ -2,7 +2,7 @@
 
 A fictional tile-and-market strategy game for 2–4 players. Cash, shares, and BYTE coins are game currency. This repository does not take bets, hold wallets, or trade real assets.
 
-**M3 is a local pass-and-play table.** The board deals tiles, founds and grows companies, merges them, and trades shares and BYTE on one device. Round events and online rooms are not implemented. See [TASKS.md](TASKS.md).
+**M4 is a local pass-and-play table.** The board deals tiles, founds and grows companies, merges them, trades shares and BYTE, draws one round event after every seat has acted, and scores the final round. Online rooms are not implemented. See [TASKS.md](TASKS.md).
 
 ## Tested Godot build
 

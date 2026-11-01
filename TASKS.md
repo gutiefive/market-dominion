@@ -1,6 +1,6 @@
 # Milestones
 
-M2 is the stage this tree claims as playable. A box is checked only where a command was run and the result is recorded in [CHANGELOG.md](CHANGELOG.md).
+M3 is the stage this tree claims as playable. A box is checked only where a command was run and the result is recorded in [CHANGELOG.md](CHANGELOG.md).
 
 ## M0 Foundation
 
@@ -24,12 +24,12 @@ Local pass-and-play only. The HTTP API does not apply these moves.
 - [x] Seeded bag shuffle and a deal of five unique tiles per seat (`golden_deals.json`, `M1_CLIENT_OK`)
 - [x] Local pass-and-play turn ownership, with the hand covered between seats
 - [x] Legal-cell highlight for the active hand
-- [x] Conservation test that walks a scripted deal; a longer play keeps cash and inventory until the first rejected merger
+- [x] Conservation test that walks a scripted deal. A full-bag play, including mergers, is the M3 invariant test.
 - [x] Screenshot of a real placement (`docs/m1-placed.png`, seed 7710, Rowan places C1)
 
 ## M2 Economy
 
-Local pass-and-play only. Mergers are rejected instead of resolved. The HTTP API does not apply these moves.
+Local pass-and-play only. The HTTP API does not apply these moves.
 
 - [x] Founding when two orthogonal unincorporated squares connect (`docs/m2-economy.png`, `M2_CLIENT_OK`)
 - [x] Free founder share and the 20-share identity after the grant
@@ -39,11 +39,13 @@ Local pass-and-play only. Mergers are rejected instead of resolved. The HTTP API
 
 ## M3 Mergers
 
-- [ ] Survivor from pre-placement sizes, with a tie modal
-- [ ] Majority and minority pools, including sole holder and ties
-- [ ] Remainder dollars by ascending player id
-- [ ] Automatic liquidation of every losing share
-- [ ] Multi-company merger with one reprice
+Local pass-and-play only. The HTTP API does not apply these moves.
+
+- [x] Survivor from pre-placement sizes, with a tie modal (`docs/m3-tie.png`, `M3_CLIENT_OK`)
+- [x] Majority and minority pools, including sole holder and ties
+- [x] Remainder dollars by ascending player id
+- [x] Automatic liquidation of every losing share
+- [x] Multi-company merger with one reprice (`docs/m3-merger.png`)
 
 ## M4 Events and ending
 
@@ -78,7 +80,6 @@ The HTTP validator is not multiplayer.
 ## Known limits
 
 - Validate never mutates a match. The offline table lives in the client and in `OfflineMatch`; it is not a server room.
-- A placement that would merge two companies is rejected. Payouts and liquidation are M3.
-- Sector sentiment stays 0. Round events and end-game scoring are M4.
+- Sector sentiment stays 0 during play. Round events and end-game scoring are M4.
 - GDScript rejection for prices is −1 or an empty list; the offline table returns `{ok: false, error}`. Python raises (assumption A13).
 - Docker and web export were not executed (assumption A15).

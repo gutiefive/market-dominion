@@ -44,6 +44,13 @@ func _finish(table: OfflineMatch) -> void:
 		table.pass_market()
 
 
+func _corp(table: OfflineMatch, corp_id: String) -> Dictionary:
+	for corp in table.corporations:
+		if str(corp["id"]) == corp_id:
+			return corp
+	return {}
+
+
 func _check_founding_and_trade() -> void:
 	var table = OfflineMatch.create(7710, ["Rowan", "Quinn"])
 	_pull(table, "A1")
@@ -147,13 +154,19 @@ func _check_merger_and_diagonal() -> void:
 	table.choose_founder("orbit_pay")
 	_finish(table)
 	_pull(table, "B1")
-	var blocked: Dictionary = table.place("B1")
-	if bool(blocked["ok"]) or str(blocked["error"]) != "merger is not in this build":
-		_fail("merger stub")
-	if table.active_player()["hand"].find("B1") == -1:
-		_fail("merger consumed the tile")
-	if table.economy_errors().size() != 0:
-		_fail("merger economy")
+	var opened: Dictionary = table.place("B1")
+	if not bool(opened["ok"]) or str(opened["resolution"]) != "choose_survivor":
+		_fail("tie should wait for a survivor")
+	if table.phase != "choose_survivor" or table.economy_errors().size() != 0:
+		_fail("tie economy")
+	var rejected: Dictionary = table.choose_survivor("volt_grid")
+	if bool(rejected["ok"]) or str(rejected["error"]) != "company is not a tied survivor":
+		_fail("smaller brand was accepted")
+	var kept: Dictionary = table.choose_survivor("nova_ai")
+	if not bool(kept["ok"]) or int(_corp(table, "nova_ai")["size"]) != 5:
+		_fail("chosen survivor")
+	if bool(_corp(table, "orbit_pay")["active"]) or table.economy_errors().size() != 0:
+		_fail("loser still active")
 
 
 func _check_rejections() -> void:

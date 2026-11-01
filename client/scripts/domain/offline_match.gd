@@ -1,8 +1,10 @@
 extends RefCounted
 class_name OfflineMatch
 
-## Local deal, founding, growth, and two market actions.
-## A merger is rejected so the board stays legal. Assumption A18.
+## Local deal, founding, growth, mergers, and two market actions.
+## Assumption A19: the largest pre-placement company survives. A tie waits
+## for the placer. Losers are bought out in fixture order, then the survivor
+## is repriced once.
 
 var seed: int
 var hand_size: int
@@ -23,6 +25,8 @@ var round_number: int
 var phase: String = "place"
 var market_actions_left: int
 var pending: Array = []
+var pending_options: Array[String] = []
+var pending_tile := ""
 var log: Array[String] = []
 
 
@@ -143,10 +147,14 @@ func place(coordinate: String) -> Dictionary:
 		var corp_id := str(company_of.get(str(cell), ""))
 		if corp_id != "" and not company_ids.has(corp_id):
 			company_ids.append(corp_id)
-	if company_ids.size() >= 2:
-		return {"ok": false, "error": "merger is not in this build"}
 	hand.remove_at(hand.find(coordinate))
 	occupied[coordinate] = true
+	if company_ids.size() >= 2:
+		var involved: Array = []
+		for corp in corporations:
+			if company_ids.has(str(corp["id"])):
+				involved.append(corp)
+		return _begin_merger(coordinate, player, touched, involved)
 	if company_ids.size() == 1:
 		var grown = _corp(company_ids[0])
 		for cell in touched:
@@ -192,6 +200,8 @@ func choose_founder(corp_id: String) -> Dictionary:
 	for cell in pending:
 		company_of[str(cell)] = corp["id"]
 	pending = []
+	pending_options = []
+	pending_tile = ""
 	_reprice(corp)
 	var granted := false
 	if int(corp["bank_shares"]) > 0:
@@ -211,6 +221,17 @@ func choose_founder(corp_id: String) -> Dictionary:
 		]
 	log.append(message)
 	return {"ok": true, "founded": corp["id"], "granted": granted, "log": message}
+
+
+func choose_survivor(corp_id: String) -> Dictionary:
+	if phase != "choose_survivor":
+		return {"ok": false, "error": "no survivor choice is pending"}
+	var corp := _corp(corp_id)
+	if corp.is_empty():
+		return {"ok": false, "error": "unknown company"}
+	if not pending_options.has(corp_id):
+		return {"ok": false, "error": "company is not a tied survivor"}
+	return _resolve_merger(corp_id, pending_tile, active_player(), true)
 
 
 func pass_turn() -> Dictionary:
@@ -361,7 +382,7 @@ func economy_errors() -> PackedStringArray:
 			var owner := str(company_of.get(str(cell), ""))
 			if owner != "" and not present.has(owner):
 				present.append(owner)
-		if present.size() > 1:
+		if present.size() > 1 and not (phase == "choose_survivor" and _same_cells(touched, pending)):
 			errors.append("mixed:%s" % ",".join(present))
 	for cell in company_of.keys():
 		if not bool(occupied.get(str(cell), false)):
@@ -407,6 +428,147 @@ func _reprice(corp: Dictionary) -> void:
 		corp["share_price"] = Pricing.share_price(cells.size(), int(sentiment[str(corp["sector"])]))
 	else:
 		corp["share_price"] = 0
+
+
+func _same_cells(touched: PackedStringArray, pending_cells: Array) -> bool:
+	if touched.size() != pending_cells.size():
+		return false
+	for cell in touched:
+		if pending_cells.find(str(cell)) == -1:
+			return false
+	return true
+
+
+func _begin_merger(coordinate: String, player: Dictionary, touched: PackedStringArray, involved: Array) -> Dictionary:
+	var top := 0
+	for corp in involved:
+		top = maxi(top, int(corp["size"]))
+	var tied: Array = []
+	for corp in involved:
+		if int(corp["size"]) == top:
+			tied.append(corp)
+	pending = []
+	for cell in touched:
+		pending.append(str(cell))
+	pending_tile = coordinate
+	if tied.size() > 1:
+		pending_options = []
+		for corp in tied:
+			pending_options.append(str(corp["id"]))
+		phase = "choose_survivor"
+		var names: PackedStringArray = []
+		for corp in tied:
+			names.append(str(corp["name"]))
+		var message := "%s placed %s. Choose the survivor. %s are tied at size %d." % [
+			player["display_name"], coordinate, _join_names(names), top
+		]
+		log.append(message)
+		return {"ok": true, "placed": coordinate, "resolution": "choose_survivor", "log": message}
+	pending_options = []
+	pending_options.append(str(tied[0]["id"]))
+	return _resolve_merger(str(tied[0]["id"]), coordinate, player, false)
+
+
+func _resolve_merger(survivor_id: String, coordinate: String, player: Dictionary, chosen: bool) -> Dictionary:
+	var involved_ids: Array[String] = []
+	for cell in pending:
+		var owner := str(company_of.get(str(cell), ""))
+		if owner != "" and not involved_ids.has(owner):
+			involved_ids.append(owner)
+	var losers: Array = []
+	for corp in corporations:
+		var corp_id := str(corp["id"])
+		if involved_ids.has(corp_id) and corp_id != survivor_id:
+			losers.append(corp)
+	var snapshots := {}
+	for corp in losers:
+		var holdings := {}
+		for holder in players:
+			holdings[str(holder["id"])] = int(holder["shares"][str(corp["id"])])
+		snapshots[str(corp["id"])] = {"price": int(corp["share_price"]), "holdings": holdings}
+	var loser_ids := {}
+	for corp in losers:
+		loser_ids[str(corp["id"])] = true
+	for cell in pending:
+		company_of[str(cell)] = survivor_id
+	var leftovers: Array[String] = []
+	for cell in company_of.keys():
+		if loser_ids.has(str(company_of[cell])):
+			leftovers.append(str(cell))
+	for cell in leftovers:
+		company_of.erase(cell)
+	var messages: Array[String] = []
+	var ordered: Array = []
+	for holder in players:
+		var placed := false
+		for index in ordered.size():
+			if str(holder["id"]) < str(ordered[index]["id"]):
+				ordered.insert(index, holder)
+				placed = true
+				break
+		if not placed:
+			ordered.append(holder)
+	for corp in losers:
+		var corp_id := str(corp["id"])
+		var price := int(snapshots[corp_id]["price"])
+		var holdings: Dictionary = snapshots[corp_id]["holdings"]
+		var payouts := Mergers.bonus_payouts(price, holdings)
+		var any_holder := false
+		for count in holdings.values():
+			if int(count) > 0:
+				any_holder = true
+		if not any_holder:
+			messages.append("%s paid no merger bonus." % str(corp["name"]))
+		else:
+			for holder in ordered:
+				var amount := int(payouts.get(str(holder["id"]), 0))
+				if amount <= 0:
+					continue
+				holder["cash"] = int(holder["cash"]) + amount
+				messages.append("%s received a $%d bonus on %s." % [holder["display_name"], amount, str(corp["name"])])
+		for holder in ordered:
+			var count := int(holdings[str(holder["id"])])
+			if count <= 0:
+				continue
+			var proceeds := count * price
+			var shares: Dictionary = holder["shares"]
+			shares[corp_id] = 0
+			holder["cash"] = int(holder["cash"]) + proceeds
+			messages.append("%s liquidated %d %s shares for $%d." % [
+				holder["display_name"], count, str(corp["name"]), proceeds
+			])
+		corp["bank_shares"] = share_supply
+		_reprice(corp)
+	var survivor := _corp(survivor_id)
+	_reprice(survivor)
+	pending = []
+	pending_options = []
+	pending_tile = ""
+	_enter_market()
+	var summary := ""
+	if chosen:
+		summary = "%s kept %s. %s is size %d. Share price is $%d." % [
+			player["display_name"], survivor["name"], survivor["name"], int(survivor["size"]), int(survivor["share_price"])
+		]
+	else:
+		summary = "%s placed %s. %s survives the merger at size %d. Share price is $%d." % [
+			player["display_name"], coordinate, survivor["name"], int(survivor["size"]), int(survivor["share_price"])
+		]
+	log.append(summary)
+	for line in messages:
+		log.append(line)
+	return {"ok": true, "placed": coordinate, "resolution": "merger", "survivor": survivor_id, "log": summary}
+
+
+func _join_names(names: PackedStringArray) -> String:
+	if names.size() == 2:
+		return "%s and %s" % [names[0], names[1]]
+	var head := ""
+	for index in range(names.size() - 1):
+		if index > 0:
+			head += ", "
+		head += names[index]
+	return "%s, and %s" % [head, names[names.size() - 1]]
 
 
 func _enter_market() -> void:
@@ -459,6 +621,8 @@ func _finish_turn() -> void:
 	phase = "place"
 	market_actions_left = 0
 	pending = []
+	pending_options = []
+	pending_tile = ""
 	turn_index += 1
 	if turn_index >= players.size():
 		turn_index = 0

@@ -1,4 +1,4 @@
-"""Founding, growth, and two market actions. Mergers are rejected, not resolved."""
+"""Founding, growth, and two market actions. Merger payouts live in test_mergers.py."""
 
 from __future__ import annotations
 
@@ -158,7 +158,7 @@ def test_a_cluster_stays_unincorporated_when_every_brand_is_active():
     assert match.economy_errors() == []
 
 
-def test_merger_placement_is_rejected_without_changing_state():
+def test_equal_chains_wait_for_a_survivor_without_entering_the_market():
     match = OfflineMatch(7710, ["Rowan", "Quinn"])
     pull(match, "A1")
     match.place("A1")
@@ -178,11 +178,12 @@ def test_merger_placement_is_rejected_without_changing_state():
     match.choose_founder("orbit_pay")
     finish_market(match)
     pull(match, "B1")
-    before = match.snapshot()
-    with pytest.raises(ValueError, match="merger is not in this build"):
-        match.place("B1")
-    assert match.snapshot() == before
-    assert "B1" in match.active_player()["hand"]
+    opened = match.place("B1")
+    assert opened["resolution"] == "choose_survivor"
+    assert match.phase == "choose_survivor"
+    assert "B1" not in match.active_player()["hand"]
+    assert match.occupied["B1"]
+    assert "B1" not in match.company_of
     assert match.economy_errors() == []
 
 

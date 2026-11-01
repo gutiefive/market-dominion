@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.4.0 — 2026-11-01
+
+M3 mergers on the local table. Protocol version stays `0.1.0`. The HTTP validator still does not apply moves.
+
+### Added
+
+- Largest pre-placement chain survives. A tie among those largest companies opens a modal and waits for the placer. Smaller companies in the same chain are absorbed.
+- Each losing company pays a majority pool of 2 × its snapshotted price and a minority pool of 1 × that price. A sole holder receives both. A tie for the most shares splits the combined pool. Otherwise the minority pool goes to the tied second place. Leftover $1 bills follow ascending player id.
+- After the bonus, every losing share is sold back to the bank at the snapshotted price. The loser is inactive, with 20 bank shares and no cells. The survivor is repriced once.
+- Captures `docs/m3-merger.png` (NOVA AI size 9 at $550, Quinn paid $750 plus $1,000) and `docs/m3-tie.png` (NOVA AI and ORBIT PAY tied at size 2).
+
+### Evidence
+
+- `.venv/bin/python -m pytest -q` passed (57 tests).
+- `./scripts/check_client.sh` prints `M0_CLIENT_OK`, `M1_CLIENT_OK`, `M2_CLIENT_OK`, and `M3_CLIENT_OK`.
+
+### Not in this version
+
+Round events, match scoring, WebSockets, web export, and deployment.
+
 ## 0.3.0 — 2026-11-01
 
 M2 economy on the local table. Protocol version stays `0.1.0`. The HTTP validator still does not apply moves.

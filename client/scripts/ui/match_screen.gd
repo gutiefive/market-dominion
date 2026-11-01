@@ -35,6 +35,9 @@ var _error: Label
 var _side: PanelContainer
 var _side_text: RichTextLabel
 var _scroll: ScrollContainer
+var _merger_layer: Control
+var _merger_copy: Label
+var _merger_buttons: VBoxContainer
 var _seed_input: LineEdit
 var _name_inputs: Array[LineEdit] = []
 var _seat_checks: Array[CheckBox] = []
@@ -70,6 +73,8 @@ func _build() -> void:
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	add_child(scroll)
+	_merger_layer = _build_merger_modal()
+	add_child(_merger_layer)
 
 	var root := VBoxContainer.new()
 	root.add_theme_constant_override("separation", 6)
@@ -252,6 +257,8 @@ func _show_setup() -> void:
 	_play.visible = false
 	_error.text = ""
 	_status.text = "No table open. The deal stays on this device."
+	if _merger_layer != null:
+		_merger_layer.visible = false
 
 
 func _on_deal_pressed() -> void:
@@ -367,6 +374,8 @@ func _refresh() -> void:
 		_status.text = "Hand covered. Prices stay visible. The next player continues when they have the device."
 	elif _match.phase == "choose_founder":
 		_status.text = "%s chooses a company for the new cluster. The founder receives one share if the bank has one." % str(player["display_name"])
+	elif _match.phase == "choose_survivor":
+		_status.text = "%s chooses which tied company survives. The others are bought out at the prices shown." % str(player["display_name"])
 	elif _match.phase == "market":
 		_status.text = "%s has %d market action%s left. Prices shown are the prices used for the next trade." % [
 			str(player["display_name"]), _match.market_actions_left, "" if _match.market_actions_left == 1 else "s"
@@ -374,10 +383,11 @@ func _refresh() -> void:
 	elif hand.is_empty():
 		_status.text = "%s has no tile to place. Skip placement, then take up to two market actions." % str(player["display_name"])
 	else:
-		_status.text = "%s places one tile. A chain of two or more can found a company. Mergers are not in this build." % str(player["display_name"])
+		_status.text = "%s places one tile. A chain of two or more can found a company. Connecting two companies merges them." % str(player["display_name"])
 	if finished:
 		_status.text = "No tiles remain. Market actions are still available on an empty hand."
 	_side_text.text = _side_bbcode()
+	_sync_merger_modal()
 	if _concealed:
 		_hand_note.text = "Covered"
 	else:
@@ -539,11 +549,11 @@ func _side_bbcode() -> String:
 		])
 	if not _match.log.is_empty():
 		lines.append("")
-		var start := maxi(0, _match.log.size() - 3)
+		var start := maxi(0, _match.log.size() - 6)
 		for index in range(start, _match.log.size()):
 			lines.append(_match.log[index])
 	lines.append("")
-	lines.append("[color=#93a0b8]Local only. A placement that would merge two companies is rejected. Round events are not drawn.[/color]")
+	lines.append("[color=#93a0b8]Local only. A merger pays bonuses, then sells the losing shares back to the bank. Round events are not drawn.[/color]")
 	return "\n".join(lines)
 
 
@@ -594,6 +604,66 @@ func _ensure_table(wide: bool) -> void:
 	_column.size_flags_stretch_ratio = 1.7
 
 
+func _build_merger_modal() -> Control:
+	var layer := Control.new()
+	layer.set_anchors_preset(PRESET_FULL_RECT)
+	layer.visible = false
+	layer.mouse_filter = Control.MOUSE_FILTER_STOP
+	var dim := ColorRect.new()
+	dim.color = Color(0.04, 0.06, 0.12, 0.62)
+	dim.set_anchors_preset(PRESET_FULL_RECT)
+	dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	layer.add_child(dim)
+	var center := CenterContainer.new()
+	center.set_anchors_preset(PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(center)
+	var card := _card()
+	card.custom_minimum_size = Vector2(460, 0)
+	center.add_child(card)
+	var box := _box_of(card)
+	box.add_child(_label("Choose the surviving company", 20, TEXT))
+	_merger_copy = _label("", 14, MUTED)
+	_merger_copy.custom_minimum_size = Vector2(420, 0)
+	box.add_child(_merger_copy)
+	_merger_buttons = VBoxContainer.new()
+	_merger_buttons.add_theme_constant_override("separation", 8)
+	box.add_child(_merger_buttons)
+	return layer
+
+
+func _sync_merger_modal() -> void:
+	if _merger_layer == null:
+		return
+	var open := _match != null and _match.phase == "choose_survivor" and not _concealed
+	_merger_layer.visible = open
+	if not open:
+		return
+	for child in _merger_buttons.get_children():
+		child.queue_free()
+	var names: PackedStringArray = []
+	for corp_id in _match.pending_options:
+		for corp in _match.corporations:
+			if str(corp["id"]) == str(corp_id):
+				names.append(str(corp["name"]))
+	_merger_copy.text = "%s. The company you keep absorbs every connected district. Each company you leave pays its shareholders from the price on the button, then every losing share is sold back to the bank." % " and ".join(names)
+	for corp_id in _match.pending_options:
+		for corp in _match.corporations:
+			if str(corp["id"]) != str(corp_id):
+				continue
+			var mark := str(BoardGrid.MARKS.get(corp_id, ""))
+			var choice := _button("%s   %s     size %d     $%d" % [
+				str(corp["name"]), mark, int(corp["size"]), int(corp["share_price"])
+			], true)
+			choice.pressed.connect(_choose_survivor.bind(str(corp_id)))
+			_merger_buttons.add_child(choice)
+
+
+func _choose_survivor(corp_id: String) -> void:
+	if _match != null:
+		_apply(_match.choose_survivor(corp_id))
+
+
 func _shot_pull(coordinate: String) -> void:
 	for player in _match.players:
 		var hand: Array = player["hand"]
@@ -634,6 +704,55 @@ func _shot_economy() -> void:
 	_refresh()
 
 
+func _shot_chain(cells: Array, brand: String) -> void:
+	for index in cells.size():
+		var coordinate := str(cells[index])
+		_shot_pull(coordinate)
+		_match.place(coordinate)
+		if index == 1:
+			_match.choose_founder(brand)
+		_shot_pass_market()
+
+
+func _shot_assign(corp_id: String, counts: Dictionary) -> void:
+	var outstanding := 0
+	for player in _match.players:
+		var count := int(counts.get(str(player["id"]), 0))
+		player["shares"][corp_id] = count
+		outstanding += count
+	for corp in _match.corporations:
+		if str(corp["id"]) == corp_id:
+			corp["bank_shares"] = 20 - outstanding
+
+
+func _shot_trim_hand() -> void:
+	var hand: Array = _match.active_player()["hand"]
+	while hand.size() > 5:
+		_match.bag.append(str(hand[hand.size() - 1]))
+		hand.remove_at(hand.size() - 1)
+
+
+func _shot_merger() -> void:
+	_shot_chain(["C1", "C2", "C3", "C4", "C5"], "nova_ai")
+	_shot_chain(["A1", "A2", "A3"], "orbit_pay")
+	_shot_assign("orbit_pay", {"p1": 0, "p2": 4})
+	_shot_pull("B1")
+	_match.place("B1")
+	_shot_trim_hand()
+	_concealed = false
+	_refresh()
+
+
+func _shot_tie() -> void:
+	_shot_chain(["A1", "A2"], "nova_ai")
+	_shot_chain(["C1", "C2"], "orbit_pay")
+	_shot_pull("B1")
+	_match.place("B1")
+	_shot_trim_hand()
+	_concealed = false
+	_refresh()
+
+
 func _run_shot(path: String, phase: String) -> void:
 	var created = OfflineMatch.create(7710, ["Rowan", "Quinn"])
 	if created == null:
@@ -648,6 +767,10 @@ func _run_shot(path: String, phase: String) -> void:
 		_place_selected()
 	elif phase == "economy":
 		_shot_economy()
+	elif phase == "merger":
+		_shot_merger()
+	elif phase == "tie":
+		_shot_tie()
 	await get_tree().process_frame
 	await get_tree().process_frame
 	_fit_board()

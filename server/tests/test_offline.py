@@ -108,15 +108,17 @@ def _finish_market(match: OfflineMatch) -> None:
         match.pass_market()
 
 
-def test_safe_play_stops_at_a_merger_and_keeps_invariants():
+def test_full_bag_plays_through_mergers_and_keeps_invariants():
     match = OfflineMatch(7710, ["Rowan", "Quinn"])
     placed = 0
-    stopped = False
     while placed < 81:
         assert match.economy_errors() == []
         if match.phase == "choose_founder":
             inactive = [corp["id"] for corp in match.corporations if not corp["active"]]
             match.choose_founder(inactive[0])
+            continue
+        if match.phase == "choose_survivor":
+            match.choose_survivor(match.pending_options[0])
             continue
         if match.phase == "market":
             _finish_market(match)
@@ -125,16 +127,12 @@ def test_safe_play_stops_at_a_merger_and_keeps_invariants():
         if not hand:
             match.pass_turn()
             continue
-        try:
-            match.place(hand[0])
-        except ValueError as exc:
-            assert str(exc) == "merger is not in this build"
-            stopped = True
-            break
+        match.place(hand[0])
         placed += 1
-    assert stopped
+    assert placed == 81
+    assert match.bag == []
     assert match.economy_errors() == []
-    assert placed < 81
+    assert match.conservation() == []
 
 
 def test_empty_hand_skips_and_table_size_is_checked():

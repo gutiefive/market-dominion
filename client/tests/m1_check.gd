@@ -194,6 +194,10 @@ func _finish_open_step(table: OfflineMatch) -> bool:
 		var chosen: Dictionary = table.choose_founder(brand)
 		if not bool(chosen["ok"]):
 			return false
+	if table.phase == "choose_survivor":
+		var kept: Dictionary = table.choose_survivor(str(table.pending_options[0]))
+		if not bool(kept["ok"]):
+			return false
 	while table.phase == "market":
 		var passed: Dictionary = table.pass_market()
 		if not bool(passed["ok"]):

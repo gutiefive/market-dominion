@@ -1,12 +1,15 @@
-"""Local pass-and-play deal, founding, growth, and two market actions.
+"""Local pass-and-play deal, founding, growth, mergers, and two market actions.
 
 Assumption A16: shuffle seats, then the bag, then deal five tiles round-robin.
 
 Assumption A18: a turn places one tile (or skips an empty hand), resolves
-founding or growth, then allows two market actions, then draws. A placement
-that would join two active companies is rejected and does not change the
-board. That rejection is a legality stub, not a merger. Sector sentiment
-stays 0 and no round event is drawn.
+founding, growth, or a merger, then allows two market actions, then draws.
+Sector sentiment stays 0 unless a test sets it. No round event is drawn.
+
+Assumption A19: the survivor is the largest pre-placement company. A tie
+among those largest companies waits for the placer. Every other company in
+the component is bought out, in fixture order, before the survivor is
+repriced once.
 """
 
 from __future__ import annotations
@@ -17,6 +20,7 @@ from typing import Any
 from app.domain.board import component
 from app.domain.coordinates import all_coordinates
 from app.domain.corporations import load_corporations
+from app.domain.mergers import bonus_payouts
 from app.domain.pricing import share_price
 from app.domain.rng import MatchRng, shuffle
 from app.domain.tiles import conservation_errors
@@ -95,6 +99,8 @@ class OfflineMatch:
         self.phase = "place"
         self.market_actions_left = 0
         self.pending: list[str] = []
+        self.pending_options: list[str] = []
+        self.pending_tile = ""
         self.log: list[str] = []
 
     def active_player(self) -> dict[str, Any]:
@@ -116,10 +122,11 @@ class OfflineMatch:
             corp_id = self.company_of.get(cell)
             if corp_id and corp_id not in company_ids:
                 company_ids.append(corp_id)
-        if len(company_ids) >= 2:
-            raise ValueError("merger is not in this build")
         player["hand"].remove(coordinate)
         self.occupied[coordinate] = True
+        if len(company_ids) >= 2:
+            involved = [corp for corp in self.corporations if corp["id"] in company_ids]
+            return self._begin_merger(coordinate, player, touched, involved)
         if len(company_ids) == 1:
             corp = self._corp(company_ids[0])
             for cell in touched:
@@ -164,6 +171,8 @@ class OfflineMatch:
         for cell in self.pending:
             self.company_of[cell] = corp["id"]
         self.pending = []
+        self.pending_options = []
+        self.pending_tile = ""
         self._reprice(corp)
         granted = False
         if int(corp["bank_shares"]) > 0:
@@ -183,6 +192,15 @@ class OfflineMatch:
             )
         self.log.append(message)
         return {"founded": corp["id"], "granted": granted, "log": message}
+
+    def choose_survivor(self, corp_id: str) -> dict[str, Any]:
+        if self.phase != "choose_survivor":
+            raise ValueError("no survivor choice is pending")
+        if self._corp(corp_id) is None:
+            raise ValueError("unknown company")
+        if corp_id not in self.pending_options:
+            raise ValueError("company is not a tied survivor")
+        return self._resolve_merger(corp_id, self.pending_tile, self.active_player(), True)
 
     def pass_turn(self) -> dict[str, Any]:
         if self.phase != "place":
@@ -296,7 +314,9 @@ class OfflineMatch:
                 corp_id = self.company_of.get(cell)
                 if corp_id and corp_id not in present:
                     present.append(corp_id)
-            if len(present) > 1:
+            if len(present) > 1 and not (
+                self.phase == "choose_survivor" and set(touched) == set(self.pending)
+            ):
                 errors.append("mixed:" + ",".join(present))
         for cell, corp_id in self.company_of.items():
             if not self.occupied.get(cell, False):
@@ -348,6 +368,7 @@ class OfflineMatch:
                 for corp in self.corporations
             ],
             "pending": list(self.pending),
+            "pending_options": list(self.pending_options),
             "log": list(self.log),
         }
 
@@ -370,6 +391,102 @@ class OfflineMatch:
             corp["share_price"] = share_price(len(cells), self.sentiment[corp["sector"]])
         else:
             corp["share_price"] = 0
+
+    def _begin_merger(
+        self,
+        coordinate: str,
+        player: dict[str, Any],
+        touched: list[str],
+        involved: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        top = max(int(corp["size"]) for corp in involved)
+        tied = [corp for corp in involved if int(corp["size"]) == top]
+        self.pending = list(touched)
+        self.pending_tile = coordinate
+        if len(tied) > 1:
+            self.pending_options = [corp["id"] for corp in tied]
+            self.phase = "choose_survivor"
+            message = (
+                f"{player['display_name']} placed {coordinate}. Choose the survivor. "
+                f"{_join_names([corp['name'] for corp in tied])} are tied at size {top}."
+            )
+            self.log.append(message)
+            return {"placed": coordinate, "resolution": "choose_survivor", "log": message}
+        self.pending_options = [tied[0]["id"]]
+        return self._resolve_merger(tied[0]["id"], coordinate, player, False)
+
+    def _resolve_merger(
+        self,
+        survivor_id: str,
+        coordinate: str,
+        player: dict[str, Any],
+        chosen: bool,
+    ) -> dict[str, Any]:
+        involved_ids: list[str] = []
+        for cell in self.pending:
+            corp_id = self.company_of.get(cell)
+            if corp_id and corp_id not in involved_ids:
+                involved_ids.append(corp_id)
+        losers = [corp for corp in self.corporations if corp["id"] in involved_ids and corp["id"] != survivor_id]
+        snapshots = {
+            corp["id"]: {
+                "price": int(corp["share_price"]),
+                "holdings": {holder["id"]: int(holder["shares"][corp["id"]]) for holder in self.players},
+            }
+            for corp in losers
+        }
+        loser_ids = {corp["id"] for corp in losers}
+        for cell in self.pending:
+            self.company_of[cell] = survivor_id
+        for cell, corp_id in list(self.company_of.items()):
+            if corp_id in loser_ids:
+                del self.company_of[cell]
+        messages: list[str] = []
+        for corp in losers:
+            price = int(snapshots[corp["id"]]["price"])
+            holdings = snapshots[corp["id"]]["holdings"]
+            payouts = bonus_payouts(price, holdings)
+            if not any(int(count) > 0 for count in holdings.values()):
+                messages.append(f"{corp['name']} paid no merger bonus.")
+            else:
+                for holder in sorted(self.players, key=lambda item: str(item["id"])):
+                    amount = int(payouts.get(holder["id"], 0))
+                    if amount <= 0:
+                        continue
+                    holder["cash"] = int(holder["cash"]) + amount
+                    messages.append(f"{holder['display_name']} received a ${amount} bonus on {corp['name']}.")
+            for holder in sorted(self.players, key=lambda item: str(item["id"])):
+                count = int(holdings[holder["id"]])
+                if count <= 0:
+                    continue
+                proceeds = count * price
+                holder["shares"][corp["id"]] = 0
+                holder["cash"] = int(holder["cash"]) + proceeds
+                messages.append(
+                    f"{holder['display_name']} liquidated {count} {corp['name']} shares for ${proceeds}."
+                )
+            corp["bank_shares"] = self.share_supply
+            self._reprice(corp)
+        survivor = self._corp(survivor_id)
+        assert survivor is not None
+        self._reprice(survivor)
+        self.pending = []
+        self.pending_options = []
+        self.pending_tile = ""
+        self._enter_market()
+        if chosen:
+            summary = (
+                f"{player['display_name']} kept {survivor['name']}. "
+                f"{survivor['name']} is size {survivor['size']}. Share price is ${survivor['share_price']}."
+            )
+        else:
+            summary = (
+                f"{player['display_name']} placed {coordinate}. {survivor['name']} survives the merger "
+                f"at size {survivor['size']}. Share price is ${survivor['share_price']}."
+            )
+        self.log.append(summary)
+        self.log.extend(messages)
+        return {"placed": coordinate, "resolution": "merger", "survivor": survivor_id, "log": summary}
 
     def _enter_market(self) -> None:
         self.phase = "market"
@@ -410,7 +527,15 @@ class OfflineMatch:
         self.phase = "place"
         self.market_actions_left = 0
         self.pending = []
+        self.pending_options = []
+        self.pending_tile = ""
         self.turn_index += 1
         if self.turn_index >= len(self.players):
             self.turn_index = 0
             self.round_number += 1
+
+
+def _join_names(names: list[str]) -> str:
+    if len(names) == 2:
+        return f"{names[0]} and {names[1]}"
+    return ", ".join(names[:-1]) + f", and {names[-1]}"

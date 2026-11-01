@@ -2,7 +2,7 @@
 
 A fictional tile-and-market strategy game for 2–4 players. Cash, shares, and BYTE coins are game currency. This repository does not take bets, hold wallets, or trade real assets.
 
-**M2 is a local pass-and-play table.** The board deals tiles, founds and grows companies, and trades shares and BYTE on one device. Mergers, round events, and online rooms are not implemented. See [TASKS.md](TASKS.md).
+**M3 is a local pass-and-play table.** The board deals tiles, founds and grows companies, merges them, and trades shares and BYTE on one device. Round events and online rooms are not implemented. See [TASKS.md](TASKS.md).
 
 ## Tested Godot build
 
@@ -41,7 +41,7 @@ In a second terminal:
 .tools/godot/Godot_v4.7.2-stable_linux.x86_64 --path client
 ```
 
-The Godot window is the local table. Deal with a seed, pass the device, place a tile, choose a brand when a chain reaches size 2, then take up to two market actions. Hands stay covered between seats. Verified captures: `docs/m2-economy.png` (founding, growth, and a share purchase), `docs/m1-opening.png`, `docs/m1-placed.png` (1280×720), and `docs/m1-narrow.png` (420×800).
+The Godot window is the local table. Deal with a seed, pass the device, place a tile, choose a brand when a chain reaches size 2, choose a survivor when the largest chains tie, then take up to two market actions. Hands stay covered between seats. Verified captures: `docs/m3-merger.png` (size 5 absorbs size 3), `docs/m3-tie.png` (survivor modal), `docs/m2-economy.png`, `docs/m1-opening.png`, `docs/m1-placed.png` (1280×720), and `docs/m1-narrow.png` (420×800).
 
 ## Tests
 

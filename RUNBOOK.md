@@ -37,7 +37,7 @@ Expect `"applied": false`.
 .tools/godot/Godot_v4.7.2-stable_linux.x86_64 --path client
 ```
 
-The check imports the project headless and must print `M0_CLIENT_OK`, `M1_CLIENT_OK`, and `M2_CLIENT_OK`. The window is the local table. Deal with a seed, pass the device, place one tile, found or grow a company, then take up to two market actions. Under about 980 px the grid stacks above the market notes, and the page scrolls if the window is shorter than the column. Verified captures: `docs/m2-economy.png`, `docs/m1-opening.png`, `docs/m1-placed.png` (1280×720), and `docs/m1-narrow.png` (420×800).
+The check imports the project headless and must print `M0_CLIENT_OK`, `M1_CLIENT_OK`, `M2_CLIENT_OK`, and `M3_CLIENT_OK`. The window is the local table. Deal with a seed, pass the device, place one tile, found or grow a company, resolve a merger, then take up to two market actions. Under about 980 px the grid stacks above the market notes, and the page scrolls if the window is shorter than the column. Verified captures: `docs/m3-merger.png`, `docs/m3-tie.png`, `docs/m2-economy.png`, `docs/m1-opening.png`, `docs/m1-placed.png` (1280×720), and `docs/m1-narrow.png` (420×800).
 
 Set `GODOT_BIN` to skip the download. The script still refuses a binary whose `--version` output is not `4.7.2.stable.official.ed1daf0bf`, because `client/tests/m0_check.gd` asserts that string.
 

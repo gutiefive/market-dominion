@@ -13,7 +13,7 @@ Local solo play. Protocol version stays `0.1.0`. Client `config/version` is `0.9
 
 ### Evidence
 
-- `./scripts/check_client.sh` printed `M0_CLIENT_OK` through `M8_CLIENT_OK`. Seed 7710 with Rowan, Ada, and Bo completed twice with the same decision trace, ranking, events, and log. Seed 4 with four seats, three of them computers, also completed with empty economy and tile errors.
+- `./scripts/check_client.sh` printed `M0_CLIENT_OK` through `M8_CLIENT_OK`. Seed 7710 with Rowan, Ada, and Bo completed twice with the same decision trace, ranking, events, and log. Seed 4 with four seats, three of them computers, also completed. A third game keeps Rowan on the safe autopass and lets only Ada and Bo use the computer policy. That game finished too.
 - `docs/bots-setup.png` is the setup with You, Ada, and Bo. `docs/bots-table.png` is seed 7710 after Bo's opening turn: Rowan sees B5, G4, I8, C1, and I9. Bo's tiles are not listed. The log says Bo placed B6 and passed both market actions.
 
 ### Not in this version

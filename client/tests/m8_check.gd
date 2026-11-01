@@ -150,6 +150,12 @@ func _check_full_matches() -> void:
 		return
 	if int(first["steps"]) < 20 or int(wider["steps"]) < 20:
 		_fail("short match")
+	var mixed := _play_mixed(7710, ["Rowan", "Ada", "Bo"], ["Ada", "Bo"])
+	if not bool(mixed.get("ok", false)):
+		_fail("mixed %s" % str(mixed.get("error", mixed)))
+		return
+	if int(mixed.get("computer_actions", 0)) < 10:
+		_fail("mixed computers did not play")
 
 
 func _play(seed_value: int, names: Array, bots: Array) -> Dictionary:
@@ -184,6 +190,54 @@ func _play(seed_value: int, names: Array, bots: Array) -> Dictionary:
 		"events": ",".join(table.event_ids),
 		"log": "\n".join(table.log),
 	}
+
+
+func _play_mixed(seed_value: int, names: Array, bots: Array) -> Dictionary:
+	var table = OfflineMatch.create(seed_value, names, bots)
+	if table == null:
+		return {"ok": false, "error": "deal"}
+	var steps := 0
+	var computer_actions := 0
+	while table.phase != "completed" and steps < 900:
+		steps += 1
+		var result: Dictionary
+		if bool(table.active_player().get("bot", false)):
+			computer_actions += 1
+			result = BotPolicy.act(table)
+		else:
+			result = _human_autopass(table)
+		if not bool(result.get("ok", false)):
+			return {"ok": false, "error": str(result.get("error", result)), "at": steps}
+	if table.phase != "completed":
+		return {"ok": false, "error": "step cap %d" % steps}
+	var economy := table.economy_errors()
+	if not economy.is_empty():
+		return {"ok": false, "error": "economy %s" % str(economy)}
+	if table.ranking.is_empty():
+		return {"ok": false, "error": "ranking"}
+	return {"ok": true, "computer_actions": computer_actions, "steps": steps}
+
+
+func _human_autopass(table: OfflineMatch) -> Dictionary:
+	if table.phase == "choose_founder":
+		for corp in table.corporations:
+			if not bool(corp["active"]):
+				return table.choose_founder(str(corp["id"]))
+		return {"ok": false, "error": "no founder"}
+	if table.phase == "choose_survivor":
+		return table.choose_survivor(str(table.pending_options[0]))
+	if table.phase == "place":
+		var hand: Array = table.active_player()["hand"]
+		if hand.is_empty():
+			return table.pass_turn()
+		var lowest := str(hand[0])
+		for tile in hand:
+			if str(tile) < lowest:
+				lowest = str(tile)
+		return table.place(lowest)
+	if table.phase == "market":
+		return table.pass_market()
+	return {"ok": false, "error": table.phase}
 
 
 func _seat(table: OfflineMatch, display_name: String) -> Dictionary:

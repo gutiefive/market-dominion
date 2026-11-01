@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.11.0 — 2026-11-01
+
+Deeper local placement search. Protocol version stays `0.1.0`. Client `config/version` is `0.11.0`. Market, founding, and merger choices from 0.10.0 are unchanged. Pass-and-play and online rooms are unchanged.
+
+### Changed
+
+- Placement searches three tiles in the computer's own hand: the tile under consideration and two later tiles. Each later tile is worth half the one before it. A tile that would end a company for an opponent while the computer holds none of it is not expanded. A later tile is skipped when its immediate value plus $50,000 still cannot beat the best continuation already scored. The search stops after 120 tile evaluations. A full five-tile hand stays under that cap (85 evaluations). Ties still use the lowest coordinate.
+- After that first tile, the computer scores one ply for each other seat on at most 24 empty neighbors of occupied cells, in catalog order. A quarter of the best such reply is subtracted. Hands of other players are not read.
+- Share prices used by the search are cached for the process. The match generator is still not advanced.
+
+### Evidence
+
+- `./scripts/check_client.sh` printed `M0_CLIENT_OK` through `M8_CLIENT_OK`. Seed 7710 with Rowan, Ada, and Bo still completed twice with the same trace, ranking, events, and log. Seed 4 with three computers still completed. The mixed game, Rowan on the safe autopass and Ada and Bo on the computer policy, still finished.
+- M8 checks that the longer line wins. NOVA occupies C1–C4 and Ada holds two shares. The hand is B1, D3, E3, and E4. One tile ahead places B1, because it grows NOVA now and the next tile is only a size-2 founding. Three tiles place E3: E4 can found, and D3 then merges that company into NOVA. A second call on the same position returns E3.
+- Fifty repeats of that search printed `M8_PLACEMENT_50_US 104153` during `./scripts/check_client.sh` (about 2 ms each), under the 1.5 second guard. A separate four-seat timing pass, not part of the suite, measured 60 placement decisions at about 19 ms on average and 52 ms at the worst.
+- `docs/bots-table.png` is still seed 7710 after Bo's opening turn. Rowan sees B5, G4, I8, C1, and I9. The log still says Bo placed B6 and passed both market actions. That opening has no chain to extend.
+
+### Not in this version
+
+Computer seats in an online room, a search past three tiles or into hidden hands, and a neural model.
+
 ## 0.10.0 — 2026-11-01
 
 Stronger local computers. Protocol version stays `0.1.0`. Client `config/version` is `0.10.0`. Pass-and-play and online rooms are unchanged.

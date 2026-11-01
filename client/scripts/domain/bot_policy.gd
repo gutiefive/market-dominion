@@ -2,11 +2,16 @@ extends RefCounted
 class_name BotPolicy
 
 ## Deterministic local computer. Placement scores fictional dollars for a
-## founding, a growth, or a merger, then adds half of the best follow-up
-## tile still in hand. Market buys and sells shares and BYTE when that
-## score is positive, at most two actions, and never spends the cash floor.
-## Ties break by lowest coordinate, fixture order, or the earlier survivor.
-## The match generator is not advanced here.
+## founding, a growth, or a merger across PLACEMENT_PLIES tiles of this hand.
+## Each later tile counts half as much as the one before it. A tile that ends
+## the company for an opponent while we hold nothing is not expanded. The
+## search stops at MAX_PLACEMENT_NODES. After the first tile, one ply over at
+## most FRONTIER_CAP empty neighbors estimates an opponent's best reply, and
+## a quarter of that gain is subtracted. Hidden hands are not read.
+## Market buys and sells shares and BYTE when that score is positive, at most
+## two actions, and never spends the cash floor. Ties break by lowest
+## coordinate, fixture order, or the earlier survivor. The match generator
+## is not advanced here.
 
 
 const CASH_FLOOR := 500
@@ -19,6 +24,17 @@ const SELL_MIN_OWNED := 2
 const BYTE_BUY_MAX := 400
 const BYTE_SELL_MIN := 800
 const END_FEED_PENALTY := -100000
+const PLACEMENT_PLIES := 3
+const MAX_PLACEMENT_NODES := 120
+const FRONTIER_CAP := 24
+const THREAT_DIV := 4
+## Safe ceiling for one later tile. A sibling is skipped when even this
+## ceiling cannot beat the best continuation already scored.
+const OPTIMISTIC_CONT := 100000
+
+static var _catalog_cache: PackedStringArray = PackedStringArray()
+static var _neighbor_cache: Dictionary = {}
+static var _price_cache: Dictionary = {}
 
 
 static func decide(match: OfflineMatch) -> Dictionary:
@@ -144,12 +160,19 @@ static func _sell_byte_score(match: OfflineMatch, player: Dictionary, cash: int)
 static func _tile(match: OfflineMatch, hand: Array) -> String:
 	var filled := _filled(match)
 	var company := _company_map(match)
+	var ordered := _sorted_hand(hand)
+	var budget := {"n": 0}
 	var best := ""
 	var best_score := 0
 	var chosen := false
-	for coordinate in hand:
+	for coordinate in ordered:
 		var text := str(coordinate)
-		var score := _placement_score(match, text, hand, filled, company)
+		var rest := _without(ordered, text)
+		var score := _line(match, text, rest, filled, company, {}, PLACEMENT_PLIES, budget)
+		var projected := _project(match, text, filled, company, {})
+		var threat := _opponent_threat(match, projected["filled"], projected["company"])
+		if threat > 0:
+			score -= Pricing.div_nonneg(threat, THREAT_DIV)
 		if not chosen or score > best_score or (score == best_score and text < best):
 			chosen = true
 			best = text
@@ -157,36 +180,106 @@ static func _tile(match: OfflineMatch, hand: Array) -> String:
 	return best
 
 
-static func _placement_score(match: OfflineMatch, coordinate: String, hand: Array, filled: Dictionary, company: Dictionary) -> int:
-	var immediate := _immediate(match, coordinate, filled, company, {})
-	var projected := _project(match, coordinate, filled, company, {})
-	var bonus := 0
+static func _line(match: OfflineMatch, coordinate: String, others: Array, filled: Dictionary, company: Dictionary, extra: Dictionary, plies: int, budget: Dictionary) -> int:
+	if int(budget["n"]) >= MAX_PLACEMENT_NODES:
+		return 0
+	budget["n"] = int(budget["n"]) + 1
+	var immediate := _immediate(match, coordinate, filled, company, extra)
+	return _extend_after(match, immediate, coordinate, others, filled, company, extra, plies, budget)
+
+
+static func _extend_after(match: OfflineMatch, immediate: int, coordinate: String, others: Array, filled: Dictionary, company: Dictionary, extra: Dictionary, plies: int, budget: Dictionary) -> int:
+	if plies <= 1 or immediate <= END_FEED_PENALTY:
+		return immediate
+	var projected := _project(match, coordinate, filled, company, extra)
 	var next_filled: Dictionary = projected["filled"]
 	var next_company: Dictionary = projected["company"]
 	var next_extra: Dictionary = projected["extra"]
-	for other in hand:
-		var follow := str(other)
-		if follow == coordinate or bool(next_filled.get(follow, false)):
+	var best_cont := 0
+	for follow in others:
+		if int(budget["n"]) >= MAX_PLACEMENT_NODES:
+			break
+		var next := str(follow)
+		if bool(next_filled.get(next, false)):
 			continue
-		var value := _immediate(match, follow, next_filled, next_company, next_extra)
-		if value > bonus:
-			bonus = value
-	if bonus > 0:
-		immediate += Pricing.div_nonneg(bonus, 2)
+		budget["n"] = int(budget["n"]) + 1
+		var child_imm := _immediate(match, next, next_filled, next_company, next_extra)
+		var ceiling := child_imm
+		if plies > 2 and child_imm > END_FEED_PENALTY:
+			ceiling += Pricing.div_nonneg(OPTIMISTIC_CONT, 2)
+		if best_cont > 0 and ceiling <= best_cont:
+			continue
+		var child := _extend_after(match, child_imm, next, _without(others, next), next_filled, next_company, next_extra, plies - 1, budget)
+		if child > best_cont:
+			best_cont = child
+	if best_cont > 0:
+		immediate += Pricing.div_nonneg(best_cont, 2)
 	return immediate
 
 
-static func _immediate(match: OfflineMatch, coordinate: String, filled: Dictionary, company: Dictionary, extra: Dictionary) -> int:
+static func _opponent_threat(match: OfflineMatch, filled: Dictionary, company: Dictionary) -> int:
+	var actor := str(match.active_player()["id"])
+	var frontier := _frontier(filled)
+	var best := 0
+	var seen := 0
+	for coordinate in frontier:
+		if seen >= FRONTIER_CAP:
+			break
+		seen += 1
+		for player in match.players:
+			var player_id := str(player["id"])
+			if player_id == actor:
+				continue
+			var value := _immediate(match, str(coordinate), filled, company, {}, player_id)
+			if value > best:
+				best = value
+	return best
+
+
+static func _frontier(filled: Dictionary) -> Array:
+	var found: Array = []
+	var seen := {}
+	for cell in _catalog():
+		if not bool(filled.get(cell, false)):
+			continue
+		for neighbor in _neighbors(cell):
+			var next := str(neighbor)
+			if bool(filled.get(next, false)) or seen.has(next):
+				continue
+			seen[next] = true
+			found.append(next)
+	found.sort()
+	return found
+
+
+static func _sorted_hand(hand: Array) -> Array:
+	var ordered: Array = []
+	for coordinate in hand:
+		ordered.append(str(coordinate))
+	ordered.sort()
+	return ordered
+
+
+static func _without(hand: Array, skip: String) -> Array:
+	var rest: Array = []
+	for coordinate in hand:
+		var text := str(coordinate)
+		if text != skip:
+			rest.append(text)
+	return rest
+
+
+static func _immediate(match: OfflineMatch, coordinate: String, filled: Dictionary, company: Dictionary, extra: Dictionary, actor: String = "") -> int:
 	if bool(filled.get(coordinate, false)):
 		return END_FEED_PENALTY
 	var board := filled.duplicate()
 	board[coordinate] = true
-	var touched := BoardGraph.component(coordinate, board)
+	var touched := _component(coordinate, board)
 	var company_ids := _ids_in(touched, company)
 	if company_ids.size() >= 2:
-		return _merger_tile(match, company_ids, touched.size(), company, extra)
+		return _merger_tile(match, company_ids, touched.size(), company, extra, actor)
 	if company_ids.size() == 1:
-		return _growth_value(match, company_ids[0], touched.size(), company, extra)
+		return _growth_value(match, company_ids[0], touched.size(), company, extra, actor)
 	if touched.size() >= 2 and not _inactive_ids(match, company).is_empty():
 		return _found_value(match, touched.size(), company)
 	return 0
@@ -197,7 +290,7 @@ static func _project(match: OfflineMatch, coordinate: String, filled: Dictionary
 	board[coordinate] = true
 	var owners := company.duplicate()
 	var granted := extra.duplicate()
-	var touched := BoardGraph.component(coordinate, board)
+	var touched := _component(coordinate, board)
 	var company_ids := _ids_in(touched, owners)
 	if company_ids.size() >= 2:
 		var survivor := _best_merger_id(match, company_ids, touched.size(), owners, granted)
@@ -225,17 +318,17 @@ static func _found_value(match: OfflineMatch, cluster: int, company: Dictionary)
 	return best
 
 
-static func _growth_value(match: OfflineMatch, corp_id: String, new_size: int, company: Dictionary, extra: Dictionary) -> int:
+static func _growth_value(match: OfflineMatch, corp_id: String, new_size: int, company: Dictionary, extra: Dictionary, actor: String = "") -> int:
 	var old_size := int(_sizes(company).get(corp_id, 0))
 	var delta := _quoted(match, corp_id, new_size) - _quoted(match, corp_id, old_size)
-	var ours := _held(match, corp_id, extra)
-	var others := _others(match, corp_id)
+	var ours := _held(match, corp_id, extra, actor)
+	var others := _others(match, corp_id, actor)
 	if new_size >= match.end_size and ours == 0 and others > 0:
 		return END_FEED_PENALTY
 	return ours * delta - others * delta
 
 
-static func _merger_tile(match: OfflineMatch, company_ids: Array, new_size: int, company: Dictionary, extra: Dictionary) -> int:
+static func _merger_tile(match: OfflineMatch, company_ids: Array, new_size: int, company: Dictionary, extra: Dictionary, actor: String = "") -> int:
 	var sizes := _sizes(company)
 	var top := 0
 	for corp_id in company_ids:
@@ -246,7 +339,7 @@ static func _merger_tile(match: OfflineMatch, company_ids: Array, new_size: int,
 		var corp_id := str(match.corporations[index]["id"])
 		if not company_ids.has(corp_id) or int(sizes.get(corp_id, 0)) != top:
 			continue
-		var value := _merger_value(match, corp_id, company_ids, new_size, sizes, extra)
+		var value := _merger_value(match, corp_id, company_ids, new_size, sizes, extra, actor)
 		if not found or value > best:
 			found = true
 			best = value
@@ -273,17 +366,17 @@ static func _best_merger_id(match: OfflineMatch, company_ids: Array, new_size: i
 	return best_id
 
 
-static func _merger_value(match: OfflineMatch, survivor: String, company_ids: Array, new_size: int, sizes: Dictionary, extra: Dictionary) -> int:
+static func _merger_value(match: OfflineMatch, survivor: String, company_ids: Array, new_size: int, sizes: Dictionary, extra: Dictionary, actor: String = "") -> int:
 	var old_size := int(sizes.get(survivor, 0))
 	var delta := _quoted(match, survivor, new_size) - _quoted(match, survivor, old_size)
-	var ours := _held(match, survivor, extra)
-	var value := ours * delta - _others(match, survivor) * delta
-	var self_id := str(match.active_player()["id"])
+	var ours := _held(match, survivor, extra, actor)
+	var value := ours * delta - _others(match, survivor, actor) * delta
+	var self_id := _actor_id(match, actor)
 	for corp_id in company_ids:
 		var loser := str(corp_id)
 		if loser == survivor:
 			continue
-		var holdings := _holdings(match, loser, extra)
+		var holdings := _holdings(match, loser, extra, actor)
 		var payouts := Mergers.bonus_payouts(_quoted(match, loser, int(sizes.get(loser, 0))), holdings)
 		for player in match.players:
 			var amount := int(payouts.get(str(player["id"]), 0))
@@ -429,14 +522,18 @@ static func _quoted(match: OfflineMatch, corp_id: String, size: int) -> int:
 	if size <= 0:
 		return 0
 	var sentiment := int(match.sentiment.get(str(_corp(match, corp_id).get("sector", "")), 0))
+	var key := "%d:%d" % [size, sentiment]
+	if _price_cache.has(key):
+		return int(_price_cache[key])
 	var price := Pricing.share_price(size, sentiment)
 	if price < 0:
-		return 0
+		price = 0
+	_price_cache[key] = price
 	return price
 
 
-static func _holdings(match: OfflineMatch, corp_id: String, extra: Dictionary) -> Dictionary:
-	var self_id := str(match.active_player()["id"])
+static func _holdings(match: OfflineMatch, corp_id: String, extra: Dictionary, actor: String = "") -> Dictionary:
+	var self_id := _actor_id(match, actor)
 	var holdings := {}
 	for player in match.players:
 		var shares: Dictionary = player["shares"]
@@ -459,16 +556,61 @@ static func _own(match: OfflineMatch, corp_id: String) -> int:
 	return int(shares.get(corp_id, 0))
 
 
-static func _held(match: OfflineMatch, corp_id: String, extra: Dictionary) -> int:
-	return _own(match, corp_id) + int(extra.get(corp_id, 0))
+static func _actor_id(match: OfflineMatch, actor: String) -> String:
+	if actor != "":
+		return actor
+	return str(match.active_player()["id"])
 
 
-static func _others(match: OfflineMatch, corp_id: String) -> int:
-	var self_id := str(match.active_player()["id"])
+static func _held(match: OfflineMatch, corp_id: String, extra: Dictionary, actor: String = "") -> int:
+	var who := _actor_id(match, actor)
+	var count := 0
+	for player in match.players:
+		if str(player["id"]) != who:
+			continue
+		var shares: Dictionary = player["shares"]
+		count = int(shares.get(corp_id, 0))
+		break
+	return count + int(extra.get(corp_id, 0))
+
+
+static func _others(match: OfflineMatch, corp_id: String, actor: String = "") -> int:
+	var who := _actor_id(match, actor)
 	var total := 0
 	for player in match.players:
-		if str(player["id"]) == self_id:
+		if str(player["id"]) == who:
 			continue
 		var shares: Dictionary = player["shares"]
 		total += int(shares.get(corp_id, 0))
 	return total
+
+
+static func _catalog() -> PackedStringArray:
+	if _catalog_cache.is_empty():
+		_catalog_cache = Coordinates.catalog()
+	return _catalog_cache
+
+
+static func _neighbors(coordinate: String) -> PackedStringArray:
+	if _neighbor_cache.has(coordinate):
+		return _neighbor_cache[coordinate]
+	var found := BoardGraph.neighbors(coordinate)
+	_neighbor_cache[coordinate] = found
+	return found
+
+
+static func _component(origin: String, filled: Dictionary) -> PackedStringArray:
+	var ordered := PackedStringArray()
+	if not bool(filled.get(origin, false)):
+		return ordered
+	var seen := {}
+	var stack: Array[String] = [origin]
+	while not stack.is_empty():
+		var current: String = stack.pop_back()
+		if seen.has(current) or not bool(filled.get(current, false)):
+			continue
+		seen[current] = true
+		ordered.append(current)
+		for neighbor in _neighbors(current):
+			stack.append(str(neighbor))
+	return ordered

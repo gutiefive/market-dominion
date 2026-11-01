@@ -10,6 +10,7 @@ func _initialize() -> void:
 	_check_founding_beats_an_isolated_tile()
 	_check_isolated_tiles_use_autopass_order()
 	_check_lookahead_sets_up_a_founding()
+	_check_three_plies_prefer_a_longer_setup()
 	_check_growth_does_not_feed_a_large_opponent()
 	_check_merger_uses_holdings()
 	_check_founder_and_survivor_choices()
@@ -113,6 +114,42 @@ func _check_lookahead_sets_up_a_founding() -> void:
 	var again := BotPolicy.decide(table)
 	if str(again.get("coordinate", "")) != "C1":
 		_fail("lookahead drifted %s" % str(again))
+
+
+func _check_three_plies_prefer_a_longer_setup() -> void:
+	# One tile ahead scores B1 highest. It grows NOVA immediately (150).
+	# E3 scores 100 on that rule, because the next tile only founds a size-2 company.
+	# Three plies see E3, then E4 founds, then D3 merges that company into NOVA.
+	var table = _chain_table()
+	var started := Time.get_ticks_usec()
+	var decision := BotPolicy.decide(table)
+	for _repeat in range(49):
+		BotPolicy.decide(table)
+	var elapsed := Time.get_ticks_usec() - started
+	if str(decision.get("coordinate", "")) != "E3":
+		_fail("deep setup %s" % str(decision))
+	var again := BotPolicy.decide(table)
+	if str(again.get("coordinate", "")) != "E3":
+		_fail("deep setup drifted %s" % str(again))
+	if elapsed > 1500000:
+		_fail("placement search %d us" % elapsed)
+	print("M8_PLACEMENT_50_US %d" % elapsed)
+
+
+func _chain_table():
+	var table = OfflineMatch.create(7710, ["Rowan", "Ada"], ["Ada"])
+	var ada := _seat(table, "Ada")
+	table.turn_index = int(ada["turn_order_index"])
+	ada["hand"] = ["B1", "D3", "E3", "E4"]
+	ada["shares"]["nova_ai"] = 2
+	for cell in ["C1", "C2", "C3", "C4"]:
+		table.occupied[cell] = true
+		table.company_of[cell] = "nova_ai"
+	var nova: Dictionary = table.corporations[0]
+	nova["active"] = true
+	nova["size"] = 4
+	nova["share_price"] = 300
+	return table
 
 
 func _check_merger_uses_holdings() -> void:

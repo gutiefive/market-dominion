@@ -71,6 +71,13 @@ var _error_layer: Control
 var _error_title: Label
 var _error_body: Label
 var _zoom_steps := 0
+var _dock: PanelContainer
+var _dock_title: Label
+var _dock_detail: Label
+var _step_row: HBoxContainer
+var _finish_market: Button
+var _computer_note := ""
+var _subtitle: Label
 
 
 func _ready() -> void:
@@ -131,10 +138,25 @@ func _build() -> void:
 	titles.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(titles)
 	titles.add_child(_label("Market Dominion", 22, TEXT))
-	titles.add_child(_label("Local pass-and-play, computers on this device, or a private room.", 13, MUTED))
+	_subtitle = _label("Local pass-and-play, computers on this device, or a private room.", 13, MUTED)
+	titles.add_child(_subtitle)
+	var tools := HBoxContainer.new()
+	tools.add_theme_constant_override("separation", 8)
+	header.add_child(tools)
+	var smaller := _button("Text", false)
+	smaller.tooltip_text = "Cycle text size. The bracket keys do the same."
+	smaller.pressed.connect(_cycle_text)
+	tools.add_child(smaller)
+	var motion := _button("Motion", false)
+	motion.tooltip_text = "Toggle reduced motion. The M key does the same."
+	motion.pressed.connect(_toggle_motion)
+	tools.add_child(motion)
+	var rules_button := _button("Rules", false)
+	rules_button.pressed.connect(func() -> void: _rules.show_panel())
+	tools.add_child(rules_button)
 	var fresh := _button("New table", false)
 	fresh.pressed.connect(_show_setup)
-	header.add_child(fresh)
+	tools.add_child(fresh)
 
 	_status = _label("", 14, MUTED)
 	root.add_child(_status)
@@ -147,10 +169,13 @@ func _build() -> void:
 	root.add_child(_setup)
 	root.add_child(_order)
 	root.add_child(_play)
+	_build_dock()
 	_online = OnlineTable.new()
 	_online.visible = false
 	_online.closed_panel.connect(_hide_online)
 	add_child(_online)
+	for layer in [_merger_layer, _founder_layer, _confirm_layer, _event_layer, _error_layer, _rules, _online]:
+		layer.move_to_front()
 	_show_setup()
 
 
@@ -252,39 +277,19 @@ func _build_play() -> VBoxContainer:
 	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	panel.add_theme_constant_override("separation", 6)
 
-	var top := VBoxContainer.new()
-	top.add_theme_constant_override("separation", 4)
-	panel.add_child(top)
 	var identity := HBoxContainer.new()
-	identity.add_theme_constant_override("separation", 12)
-	top.add_child(identity)
-	_badge = _label("No seat", 14, AMBER)
+	identity.add_theme_constant_override("separation", 16)
+	panel.add_child(identity)
+	_badge = _label("No seat", 16, AMBER)
 	_badge.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_badge.autowrap_mode = TextServer.AUTOWRAP_OFF
 	identity.add_child(_badge)
-	_cash_label = _label("Cash", 14, TEXT)
+	_cash_label = _label("Cash", 16, TEXT)
 	_cash_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	identity.add_child(_cash_label)
-	_net_label = _label("Net", 14, TEAL)
+	_net_label = _label("Net", 16, TEAL)
 	_net_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	identity.add_child(_net_label)
-	var tools := HBoxContainer.new()
-	tools.add_theme_constant_override("separation", 8)
-	top.add_child(tools)
-	var smaller := _button("Text", false)
-	smaller.tooltip_text = "Cycle text size. The bracket keys do the same."
-	smaller.pressed.connect(_cycle_text)
-	tools.add_child(smaller)
-	var motion := _button("Motion", false)
-	motion.tooltip_text = "Toggle reduced motion. The M key does the same."
-	motion.pressed.connect(_toggle_motion)
-	tools.add_child(motion)
-	var rules_button := _button("Rules", false)
-	rules_button.pressed.connect(func() -> void: _rules.show_panel())
-	tools.add_child(rules_button)
-	var leave := _button("Leave", false)
-	leave.pressed.connect(_show_setup)
-	tools.add_child(leave)
 
 	_banner = _card()
 	_banner.visible = false
@@ -315,8 +320,8 @@ func _build_play() -> VBoxContainer:
 	_event_label.visible = false
 	_column.add_child(_event_label)
 
-	_checklist = _label("Turn", 13, TEXT)
-	_column.add_child(_checklist)
+	_checklist = _label("", 13, TEXT)
+	_checklist.visible = false
 	var preview_row := HBoxContainer.new()
 	preview_row.add_theme_constant_override("separation", 8)
 	_column.add_child(preview_row)
@@ -333,33 +338,10 @@ func _build_play() -> VBoxContainer:
 	_board_card = _card()
 	_column.add_child(_board_card)
 	var board_box := _box_of(_board_card)
-	board_box.add_child(_label("Districts A–I, rows 1–9. Teal outline plus the word legal. Amber focus ring. Company cells show a symbol and letters.", 13, MUTED))
 	_board = BoardGrid.new()
 	_board.cell_pressed.connect(_on_cell_pressed)
 	_board.cell_hovered.connect(_on_cell_hovered)
 	board_box.add_child(_board)
-
-	var hand_card := _card()
-	_column.add_child(hand_card)
-	var hand_box := _box_of(hand_card)
-	var hand_header := HBoxContainer.new()
-	hand_box.add_child(hand_header)
-	hand_header.add_child(_label("Tile hand", 14, TEXT))
-	_hand_note = _label("", 13, MUTED)
-	_hand_note.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_hand_note.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	hand_header.add_child(_hand_note)
-	_hand_row = HBoxContainer.new()
-	_hand_row.add_theme_constant_override("separation", 8)
-	_hand_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	hand_box.add_child(_hand_row)
-	_place_button = _button("Place selected", true)
-	_place_button.pressed.connect(_place_selected)
-	hand_box.add_child(_place_button)
-	_action_row = HFlowContainer.new()
-	_action_row.add_theme_constant_override("h_separation", 6)
-	_action_row.add_theme_constant_override("v_separation", 6)
-	hand_box.add_child(_action_row)
 
 	_side = _card()
 	_side.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -379,15 +361,166 @@ func _build_play() -> VBoxContainer:
 	return panel
 
 
+func _build_dock() -> void:
+	_dock = PanelContainer.new()
+	_dock.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	_dock.offset_left = 12
+	_dock.offset_right = -12
+	_dock.offset_top = -168
+	_dock.offset_bottom = -8
+	_dock.mouse_filter = Control.MOUSE_FILTER_STOP
+	_dock.add_theme_stylebox_override("panel", _dock_style(Color("1a2744"), TEAL))
+	add_child(_dock)
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 12)
+	margin.add_theme_constant_override("margin_right", 12)
+	margin.add_theme_constant_override("margin_top", 8)
+	margin.add_theme_constant_override("margin_bottom", 8)
+	_dock.add_child(margin)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 6)
+	margin.add_child(box)
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 12)
+	box.add_child(head)
+	var titles := VBoxContainer.new()
+	titles.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(titles)
+	var title_row := HBoxContainer.new()
+	title_row.add_theme_constant_override("separation", 10)
+	titles.add_child(title_row)
+	_dock_title = _label("Your turn", 18, TEXT)
+	_dock_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title_row.add_child(_dock_title)
+	_hand_note = _label("", 13, MUTED)
+	_hand_note.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_hand_note.autowrap_mode = TextServer.AUTOWRAP_OFF
+	title_row.add_child(_hand_note)
+	_dock_detail = _label("", 13, MUTED)
+	_dock_detail.autowrap_mode = TextServer.AUTOWRAP_OFF
+	_dock_detail.clip_text = true
+	_dock_detail.custom_minimum_size = Vector2(200, 22)
+	titles.add_child(_dock_detail)
+	_step_row = HBoxContainer.new()
+	_step_row.add_theme_constant_override("separation", 6)
+	head.add_child(_step_row)
+	_hand_row = HBoxContainer.new()
+	_hand_row.add_theme_constant_override("separation", 8)
+	box.add_child(_hand_row)
+	var trades := ScrollContainer.new()
+	trades.custom_minimum_size = Vector2(0, 40)
+	trades.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	trades.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	box.add_child(trades)
+	_action_row = HBoxContainer.new()
+	_action_row.add_theme_constant_override("separation", 8)
+	trades.add_child(_action_row)
+	var commands := HBoxContainer.new()
+	commands.add_theme_constant_override("separation", 8)
+	box.add_child(commands)
+	_place_button = _button("Place selected", true)
+	_place_button.pressed.connect(_place_selected)
+	_place_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	commands.add_child(_place_button)
+	_finish_market = _button("Pass the market", true)
+	_finish_market.pressed.connect(_finish_market_turn)
+	_finish_market.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_finish_market.visible = false
+	commands.add_child(_finish_market)
+
+
+func _dock_style(fill: Color, accent: Color) -> StyleBoxFlat:
+	var box := _box(fill, accent, 10)
+	box.border_width_top = 2
+	box.border_width_left = 1
+	box.border_width_right = 1
+	box.border_width_bottom = 1
+	box.content_margin_left = 0
+	box.content_margin_right = 0
+	box.content_margin_top = 0
+	box.content_margin_bottom = 0
+	box.shadow_color = Color(0, 0, 0, 0.35)
+	box.shadow_size = 10
+	box.shadow_offset = Vector2(0, -2)
+	return box
+
+
+func _sync_dock() -> void:
+	if _dock == null or _scroll == null:
+		return
+	var playing := _play != null and _play.visible
+	_dock.visible = playing and not _online.visible
+	var market_open := _dock.visible and _match != null and _match.phase == "market" and not _concealed and not _viewing_bot()
+	var dock_h := 208.0 if market_open else 158.0
+	_dock.offset_top = -dock_h if _dock.visible else 0.0
+	_scroll.offset_bottom = -(dock_h + 8.0) if _dock.visible else -8.0
+	if _action_row != null and _action_row.get_parent() is CanvasItem:
+		(_action_row.get_parent() as CanvasItem).visible = market_open
+	if _subtitle != null:
+		_subtitle.visible = not playing
+	if _dock.visible and _match != null:
+		var accent := AMBER if market_open else TEAL
+		_dock.add_theme_stylebox_override("panel", _dock_style(Color("1a2744"), accent))
+
+
+func _paint_steps() -> void:
+	if _step_row == null or _match == null:
+		return
+	for child in _step_row.get_children():
+		child.queue_free()
+	var place_on := _match.phase == "place"
+	var resolve_on := _match.phase == "choose_founder" or _match.phase == "choose_survivor"
+	var market_on := _match.phase == "market"
+	_step_row.add_child(_step_pill("Place", place_on))
+	_step_row.add_child(_step_pill("Resolve", resolve_on))
+	_step_row.add_child(_step_pill("Market", market_on))
+
+
+func _step_pill(text: String, on: bool) -> PanelContainer:
+	var pill := PanelContainer.new()
+	var fill := TEAL if on else Color("121a2e")
+	var border := TEAL if on else Color("2c3c58")
+	var font := Color("06211c") if on else MUTED
+	pill.add_theme_stylebox_override("panel", _box(fill, border, 8))
+	var label := _label(text, 12, font)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	label.custom_minimum_size = Vector2(72, 0)
+	pill.add_child(label)
+	return pill
+
+
+func _finish_market_turn() -> void:
+	if _match == null or _match.phase != "market" or _concealed or _viewing_bot():
+		return
+	var last_log := ""
+	var guard := 0
+	while _match.phase == "market" and guard < 4:
+		guard += 1
+		var result := _match.pass_market()
+		if not bool(result.get("ok", false)):
+			_error.text = str(result.get("error", "The market could not be passed."))
+			_refresh()
+			return
+		last_log = str(result.get("log", last_log))
+	_error.text = ""
+	if _match.phase == "place" or _match.phase == "completed":
+		_conceal_for_next(last_log)
+	else:
+		_refresh()
+
+
 func _show_online() -> void:
 	_scroll.visible = false
 	_online.visible = true
 	_online.move_to_front()
+	_sync_dock()
 
 
 func _hide_online() -> void:
 	_online.visible = false
 	_scroll.visible = true
+	_sync_dock()
 
 
 func _show_setup() -> void:
@@ -398,7 +531,9 @@ func _show_setup() -> void:
 	_order.visible = false
 	_play.visible = false
 	_error.text = ""
+	_computer_note = ""
 	_status.text = "No table open. The deal stays on this device."
+	_sync_dock()
 	if _merger_layer != null:
 		_merger_layer.visible = false
 	if _founder_layer != null:
@@ -504,6 +639,7 @@ func _begin_match(table: OfflineMatch) -> void:
 		_order_go.text = "Pass the device"
 		_status.text = "Seed %d. Bag holds %d tiles. Pass the device to %s before anyone looks at a hand." % [_match.seed, _match.bag.size(), str(first["display_name"])]
 	_error.text = ""
+	_sync_dock()
 
 
 func _reveal() -> void:
@@ -534,6 +670,7 @@ func _viewing_bot() -> bool:
 
 
 func _run_bots() -> void:
+	var before := 0 if _match == null else _match.log.size()
 	var guard := 0
 	while _match != null and _match.phase != "completed" and bool(_match.active_player().get("bot", false)) and guard < 48:
 		guard += 1
@@ -543,6 +680,7 @@ func _run_bots() -> void:
 			break
 	if guard >= 48 and _match != null and bool(_match.active_player().get("bot", false)) and _match.phase != "completed":
 		_error.text = "The computer turn did not finish."
+	_computer_note = _recent_log(before)
 	_concealed = false
 	_selected = ""
 	_order.visible = false
@@ -619,6 +757,7 @@ func _refresh() -> void:
 		_place_button.text = "Skip placement"
 	else:
 		_place_button.text = "Place selected"
+	var market_open := _match.phase == "market" and not _concealed and not _viewing_bot()
 	if _match.phase == "completed":
 		_status.text = _winner_line()
 	elif _viewing_bot():
@@ -629,15 +768,15 @@ func _refresh() -> void:
 		_status.text = "%s chooses a company for the new cluster. The founder receives one share if the bank has one." % str(player["display_name"])
 	elif _match.phase == "choose_survivor":
 		_status.text = "%s chooses which tied company survives. The others are bought out at the prices shown." % str(player["display_name"])
-	elif _match.phase == "market":
-		_status.text = "%s has %d market action%s left. Prices shown are the prices used for the next trade." % [
-			str(player["display_name"]), _match.market_actions_left, "" if _match.market_actions_left == 1 else "s"
+	elif market_open:
+		_status.text = "Tile placed. %d market action%s left — trade, or pass the market to end the turn." % [
+			_match.market_actions_left, "" if _match.market_actions_left == 1 else "s"
 		]
 	elif hand.is_empty():
 		_status.text = "%s has no tile to place. Skip placement, then take up to two market actions." % str(player["display_name"])
 	else:
 		if _solo():
-			_status.text = "Your turn, %s. Place one tile. Computers play themselves and keep their tiles hidden." % str(player["display_name"])
+			_status.text = "Your turn, %s. Place one tile. The market opens after the tile, and computers play after you pass." % str(player["display_name"])
 		else:
 			_status.text = "%s places one tile. A chain of two or more can found a company. Connecting two companies merges them." % str(player["display_name"])
 	if finished and _match.phase != "completed":
@@ -662,8 +801,71 @@ func _refresh() -> void:
 		_hand_note.text = "Your tiles · %d" % hand.size()
 	else:
 		_hand_note.text = "%d tile%s" % [hand.size(), "" if hand.size() == 1 else "s"]
+	_fill_dock(player, market_open)
+	_status.add_theme_color_override("font_color", AMBER if market_open else MUTED)
+	_sync_dock()
 	if _play.visible:
 		_fit_board()
+
+
+func _fill_dock(player: Dictionary, market_open: bool) -> void:
+	if _dock_title == null:
+		return
+	_paint_steps()
+	_place_button.visible = _match.phase == "place" and not _concealed and not _viewing_bot() and _match.phase != "completed"
+	_finish_market.visible = market_open
+	if _match.phase == "completed":
+		_dock_title.text = "Match over"
+		_dock_detail.text = _winner_line()
+	elif _viewing_bot():
+		_dock_title.text = "%s is playing" % str(player["display_name"])
+		_dock_detail.text = "Computer, %s. This seat does not use the device." % BotPolicy.difficulty_label()
+	elif _concealed:
+		_dock_title.text = "Pass the device"
+		_dock_detail.text = "Tiles stay covered until the next player continues."
+	elif _match.phase == "choose_founder":
+		_dock_title.text = "Name the company"
+		_dock_detail.text = "The cluster is on the board. Pick a brand in the dialog."
+	elif _match.phase == "choose_survivor":
+		_dock_title.text = "Choose the survivor"
+		_dock_detail.text = "Two companies tied. The dialog lists the buyout."
+	elif market_open:
+		_dock_title.text = "Your tile is on the board"
+		var follow := "Computers play after you pass." if _solo() else "The next player takes the device after you pass."
+		_dock_detail.text = "%d trade%s left. Buy or sell, or pass the market. %s" % [
+			_match.market_actions_left, "" if _match.market_actions_left == 1 else "s", follow
+		]
+	elif (player["hand"] as Array).is_empty():
+		_dock_title.text = "No tile to place"
+		_dock_detail.text = "Skip placement. The market still opens."
+	else:
+		_dock_title.text = "Place one tile"
+		if _computer_note != "":
+			_dock_detail.text = _computer_note
+		elif _solo():
+			_dock_detail.text = "Click a tile or its district. The market opens next, before anyone else plays."
+		else:
+			_dock_detail.text = "Click a tile or its district. A chain of two can found a company."
+	_dock_detail.tooltip_text = _dock_detail.text
+
+
+func _recent_log(start: int) -> String:
+	if _match == null:
+		return ""
+	var placed := PackedStringArray()
+	for index in range(start, _match.log.size()):
+		var line := str(_match.log[index])
+		if " placed " in line or " founded " in line or " grew " in line or " merger " in line:
+			placed.append(line)
+	if not placed.is_empty():
+		return " ".join(placed)
+	var parts: PackedStringArray = []
+	var from := start
+	if _match.log.size() - from > 2:
+		from = _match.log.size() - 2
+	for index in range(from, _match.log.size()):
+		parts.append(str(_match.log[index]))
+	return " ".join(parts)
 
 
 func _hands_empty() -> bool:
@@ -692,10 +894,7 @@ func _rebuild_hand(hand: Array) -> void:
 		return
 	for coordinate in hand:
 		var chosen := str(coordinate) == _selected
-		var tile := _button(str(coordinate), chosen)
-		if chosen:
-			tile.add_theme_color_override("font_color", Color("1a1404"))
-			tile.add_theme_color_override("font_hover_color", Color("1a1404"))
+		var tile := _tile_button(str(coordinate), chosen)
 		tile.pressed.connect(_select_tile.bind(str(coordinate)))
 		tile.accessibility_name = "Tile %s" % str(coordinate)
 		_hand_row.add_child(tile)
@@ -741,7 +940,7 @@ func _rebuild_actions() -> void:
 	buy_byte.pressed.connect(func() -> void: _open_confirm("buy_byte"))
 	var sell_byte := _button("Sell BYTE", false)
 	sell_byte.pressed.connect(func() -> void: _open_confirm("sell_byte"))
-	var pass_action := _button("Pass action", false)
+	var pass_action := _button("Pass one", false)
 	pass_action.pressed.connect(func() -> void: _open_confirm("pass"))
 	_action_row.add_child(buy_byte)
 	_action_row.add_child(sell_byte)
@@ -1032,17 +1231,18 @@ func _fit_board() -> void:
 		return
 	var wide := window.x >= 980.0
 	_ensure_table(wide)
-	var side_reserve := 268.0 if wide else 0.0
-	var board_width := window.x - 24.0 - side_reserve - (10.0 if wide else 0.0) - 28.0
+	var side_reserve := 300.0 if wide else 0.0
+	var board_width := window.x - 56.0 - side_reserve
 	var cell_w := int((board_width - 27.0) / 10.0)
-	# 1280×720 must keep the hand on screen, including the pass banner.
-	# Taller windows can use a larger cell; narrow windows are width-limited.
-	var cell_h := 46
-	if window.y < 760.0:
-		cell_h = 28 if _banner.visible else 30
-	elif window.y >= 900.0:
-		cell_h = 52
-	_board.set_cell_size(mini(cell_w, cell_h) + _zoom_steps * 6)
+	var dock_h := 0.0
+	if _dock != null and _dock.visible:
+		dock_h = -_dock.offset_top + 16.0
+	# Header, seat line, and the board card sit above the grid. The dock covers
+	# the bottom of the window, so the grid has to finish above it.
+	var chrome := 248.0 if _banner.visible else 214.0
+	var cell_h := int((window.y - dock_h - chrome) / 10.0)
+	cell_h = clampi(cell_h, 24, 46)
+	_board.set_cell_size(mini(maxi(cell_w, 24), cell_h) + _zoom_steps * 6)
 
 
 func _ensure_table(wide: bool) -> void:
@@ -1611,9 +1811,32 @@ func _run_shot(path: String, phase: String) -> void:
 	get_tree().quit(0)
 
 
+func _tile_button(text: String, chosen: bool) -> Button:
+	var button := Button.new()
+	button.text = text
+	button.focus_mode = Control.FOCUS_ALL
+	button.custom_minimum_size = Vector2(78, 44)
+	var fill := AMBER if chosen else Color("243044")
+	var border := Color("f6d98a") if chosen else Color("3d4e6b")
+	var font := Color("1a1404") if chosen else TEXT
+	button.add_theme_stylebox_override("normal", _box(fill, border, 8))
+	button.add_theme_stylebox_override("hover", _box(fill.lightened(0.08) if not chosen else fill, border, 8))
+	button.add_theme_stylebox_override("pressed", _box(fill.darkened(0.06), border, 8))
+	button.add_theme_stylebox_override("focus", _box(fill, AMBER, 8))
+	button.add_theme_color_override("font_color", font)
+	button.add_theme_color_override("font_hover_color", font)
+	button.add_theme_color_override("font_pressed_color", font)
+	Palette.remember(button, 16)
+	return button
+
+
 func _card() -> PanelContainer:
 	var panel := PanelContainer.new()
-	panel.add_theme_stylebox_override("panel", _box(CARD, Color("243044"), 8))
+	var style := _box(CARD, Color("2a3b56"), 10)
+	style.shadow_color = Color(0, 0, 0, 0.22)
+	style.shadow_size = 8
+	style.shadow_offset = Vector2(0, 3)
+	panel.add_theme_stylebox_override("panel", style)
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var margin := MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 10)
@@ -1685,7 +1908,7 @@ func _button(text: String, primary: bool) -> Button:
 	var button := Button.new()
 	button.text = text
 	button.focus_mode = Control.FOCUS_ALL
-	button.custom_minimum_size = Vector2(0, 36)
+	button.custom_minimum_size = Vector2(0, 40)
 	var fill := TEAL if primary else Color("243044")
 	var font := Color("06211c") if primary else TEXT
 	var hover_fill := fill if Palette.reduced_motion else fill.lightened(0.08)

@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.16.0 — 2026-11-01
+
+The turn no longer looks frozen after the first tile. Protocol version stays `0.1.0`. Client `config/version` is `0.16.0`.
+
+### Changed
+
+- Placing a tile opens the market, and the computers wait until that market is passed. Those controls used to sit below the board, so the table looked unchanged. The hand and the market now stay in a dock along the bottom of the window. The dock says the tile is on the board, how many trades are left, and that computers play after the pass.
+- "Pass the market" spends the remaining market actions and lets the next seat play. "Pass one" still skips a single action. After the computers move, the dock quotes what they just did.
+- The board, company list, tile chips, and table chrome are redrawn so the current step, cash, and prices read at a glance. Pass-and-play and online rooms still follow the same rules.
+
+### Not in this version
+
+Computer seats in an online room, a search past five tiles, and a public invite URL.
+
 ## 0.15.0 — 2026-11-01
 
 Local computer difficulty. Protocol version stays `0.1.0`. Client `config/version` is `0.15.0`. Normal is the 0.14.0 policy: five tiles, three-quarter continuations, BYTE around $500, and a fourth share only to tie or take the lead. Pass-and-play forces Normal. Online rooms still have no computers.

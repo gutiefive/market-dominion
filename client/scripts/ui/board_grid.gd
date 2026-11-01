@@ -127,9 +127,9 @@ func _tip(coordinate: String, is_occupied: bool, is_legal: bool, corp_id: String
 
 
 func _paint(button: Button, is_occupied: bool, is_legal: bool, is_selected: bool, corp_id: String) -> void:
-	var fill := Color("10182a")
-	var border := Color("243044")
-	var text := Color("66758c")
+	var fill := Color("121a2e")
+	var border := Color("2a3a52")
+	var text := Color("7d8da6")
 	var width := 1
 	if corp_id != "":
 		var style: Dictionary = _company_style(corp_id)
@@ -148,9 +148,9 @@ func _paint(button: Button, is_occupied: bool, is_legal: bool, is_selected: bool
 		text = Color("fbbf24")
 		width = 2
 	elif is_legal:
-		fill = Color("132a36")
+		fill = Color("14343f")
 		border = Color("2dd4bf")
-		text = Color("d7fff6")
+		text = Color("e7fff8")
 		width = 2
 	var normal := _box(fill, border, width)
 	button.add_theme_stylebox_override("normal", normal)
@@ -185,7 +185,7 @@ func _box(fill: Color, border: Color, width: int) -> StyleBoxFlat:
 	box.bg_color = fill
 	box.border_color = border
 	box.set_border_width_all(width)
-	box.set_corner_radius_all(6)
+	box.set_corner_radius_all(8)
 	box.content_margin_left = 0
 	box.content_margin_right = 0
 	box.content_margin_top = 0

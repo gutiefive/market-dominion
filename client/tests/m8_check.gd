@@ -458,6 +458,7 @@ func _check_byte_round_trip() -> void:
 
 func _check_tuned_dollar_scores() -> void:
 	_check_byte_midrange_and_share_cap()
+	_check_fair_byte_contest_and_one_share()
 	_check_long_setup_beats_immediate_gain()
 	_check_new_reply_outweighs_a_small_growth()
 	_restore_score_defaults()
@@ -550,6 +551,89 @@ func _check_byte_midrange_and_share_cap() -> void:
 	var locked := BotPolicy.decide(hot)
 	if str(locked.get("command", "")) != "sell_share" or str(locked.get("corporation_id", "")) != "volt_grid":
 		_fail("hot modest %s" % str(locked))
+
+
+func _check_fair_byte_contest_and_one_share() -> void:
+	var under = _market_table()
+	under.byte_price = 460
+	if str(BotPolicy.decide(under).get("command", "")) != "buy_byte":
+		_fail("byte 460 %s" % str(BotPolicy.decide(under)))
+	under.byte_price = 490
+	if str(BotPolicy.decide(under).get("command", "")) != "buy_byte":
+		_fail("byte 490 %s" % str(BotPolicy.decide(under)))
+	under.byte_price = 500
+	_seat(under, "Ada")["byte_count"] = 1
+	under.byte_exchange = 29
+	if str(BotPolicy.decide(under).get("command", "")) != "pass_market":
+		_fail("byte 500 hold %s" % str(BotPolicy.decide(under)))
+	for price in [510, 640, 690]:
+		var selling = _market_table()
+		selling.byte_price = price
+		_seat(selling, "Ada")["byte_count"] = 1
+		selling.byte_exchange = 29
+		var decision := BotPolicy.decide(selling)
+		if str(decision.get("command", "")) != "sell_byte":
+			_fail("byte %d sell %s" % [price, str(decision)])
+	var floor = _market_table()
+	floor.byte_price = 460
+	_seat(floor, "Ada")["cash"] = 950
+	if str(BotPolicy.decide(floor).get("command", "")) != "pass_market":
+		_fail("byte 460 floor %s" % str(BotPolicy.decide(floor)))
+	var behind = _market_table()
+	_plant_market(behind, "pulse_media", 18, 1000, 2)
+	var ada := _seat(behind, "Ada")
+	var rowan := _seat(behind, "Rowan")
+	ada["shares"]["pulse_media"] = 1
+	rowan["shares"]["pulse_media"] = 3
+	var dumped := BotPolicy.decide(behind)
+	if str(dumped.get("command", "")) != "sell_share" or str(dumped.get("corporation_id", "")) != "pulse_media":
+		_fail("one share behind %s" % str(dumped))
+	var sole = _market_table()
+	_plant_market(sole, "pulse_media", 18, 1000, 2)
+	_seat(sole, "Ada")["shares"]["pulse_media"] = 1
+	if str(BotPolicy.decide(sole).get("command", "")) != "pass_market":
+		_fail("one share sole %s" % str(BotPolicy.decide(sole)))
+	var tied = _market_table()
+	_plant_market(tied, "pulse_media", 18, 1000, 2)
+	_seat(tied, "Ada")["shares"]["pulse_media"] = 2
+	_seat(tied, "Rowan")["shares"]["pulse_media"] = 2
+	if str(BotPolicy.decide(tied).get("command", "")) != "pass_market":
+		_fail("tied large %s" % str(BotPolicy.decide(tied)))
+	var fight = _market_table()
+	_plant_market(fight, "nova_ai", 6, 400, 0)
+	_seat(fight, "Ada")["shares"]["nova_ai"] = 3
+	_seat(fight, "Rowan")["shares"]["nova_ai"] = 3
+	var taken := BotPolicy.decide(fight)
+	if str(taken.get("command", "")) != "buy_share" or str(taken.get("corporation_id", "")) != "nova_ai":
+		_fail("contest buy %s" % str(taken))
+	if not bool(BotPolicy.apply(fight, taken).get("ok", false)):
+		_fail("contest buy failed")
+	var lead := BotPolicy.decide(fight)
+	if str(lead.get("command", "")) != "pass_market":
+		_fail("contest stopped %s" % str(lead))
+	if int(_seat(fight, "Ada")["shares"]["nova_ai"]) != 4:
+		_fail("contest book %s" % str(_seat(fight, "Ada")["shares"]["nova_ai"]))
+
+
+func _market_table():
+	var table = OfflineMatch.create(4, ["Rowan", "Ada"], ["Ada"])
+	var ada := _seat(table, "Ada")
+	table.turn_index = int(ada["turn_order_index"])
+	table.phase = "market"
+	table.market_actions_left = 2
+	return table
+
+
+func _plant_market(table, corp_id: String, size: int, price: int, sentiment: int) -> void:
+	for corp in table.corporations:
+		if str(corp["id"]) != corp_id:
+			continue
+		corp["active"] = true
+		corp["size"] = size
+		corp["share_price"] = price
+		corp["bank_shares"] = 14
+		var sector := str(corp["sector"])
+		table.sentiment[sector] = sentiment
 
 
 func _check_long_setup_beats_immediate_gain() -> void:

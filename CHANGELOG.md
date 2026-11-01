@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.14.0 — 2026-11-01
+
+Finer local dollar scores. Protocol version stays `0.1.0`. Client `config/version` is `0.14.0`. The five-tile search, 500-evaluation cap, 24-cell frontier, and $20,000 branch ceiling are unchanged. Founding and survivor choices are unchanged. Pass-and-play and online rooms are unchanged.
+
+### Changed
+
+- BYTE is traded against the $500 reference instead of a $460–$690 gap. A price of $490 or below is bought when cash stays at or above $500. A price of $510 or above is sold when a coin is held. $500 is still left alone. A share buy that scores higher still wins the action.
+- A fourth share is bought when the largest other holding is tied or ahead, so the purchase can tie or take the lead. A fourth share is still refused when nobody else holds as many. The cash floor and the size-14 buy limit stay.
+- One share of a rich company is sold when someone else already holds more: size 6 or larger at sentiment +2, or size 16 or larger at sentiment +1. The same share is kept when it is the sole holding or a tie, because selling it would give the bonus away. A tie on a large company is no longer sold for the size-16 rule. Cash under $500 still sells whatever share or coin it must.
+
+### Evidence
+
+- `./scripts/check_client.sh` printed `M0_CLIENT_OK` through `M8_CLIENT_OK`. Seed 7710 still replayed. Seed 4 with three computers still finished. The mixed game still finished.
+- Before this pass, BYTE at $460 and $490 was left alone, and a held coin at $510, $640, or $690 was left alone. Those prices now buy or sell. A held coin at $500 still passes. BYTE at $460 is refused when cash is $950. The older $440 buy, $720 sell, $300 double buy, and $1,000 sell still hold.
+- Before this pass, three NOVA AI shares against three of Rowan's passed, and the lower coordinate did not matter: the cap refused the buy. The same position, size 6 at $400, now buys the fourth share and then passes, because Ada leads by one. Three NOVA AI shares with Rowan holding none still pass.
+- Before this pass, one PULSE MEDIA share at size 18, media +2, and $1,000 was kept whenever cash was at least $500. It is sold when Rowan holds three. It is kept when Ada is the only holder. Two shares against Rowan's two on that company used to sell and hand Rowan the lead. They now pass.
+- The C1–C4 chain still places E3. The five-tile block still places B1 at three tiles and B8 at five. Bo's opening on seed 7710 is still B6, then two passed market actions.
+- Placement timing is unchanged in kind. A separate seed-4 pass measured 56 placement decisions, ending when the match ended, at 26.6 ms on average and 104 ms at the worst (215 evaluations on average, 325 at the worst).
+
+### Not in this version
+
+Computer seats in an online room, a search past five tiles or into hidden hands, a neural model, a buy of a size-15 company just to take the lead, and a sale of a tied share while cash is at least $500.
+
 ## 0.13.0 — 2026-11-01
 
 Tuned local dollar scores. Protocol version stays `0.1.0`. Client `config/version` is `0.13.0`. The five-tile search, 500-evaluation cap, 24-cell frontier, and $20,000 branch ceiling from 0.12.0 stay. Founding still picks the highest free-share price. A tied survivor still picks the higher payout, then the larger own holding, then the earlier option. Pass-and-play and online rooms are unchanged.

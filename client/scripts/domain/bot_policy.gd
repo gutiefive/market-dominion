@@ -13,21 +13,23 @@ class_name BotPolicy
 ## opponent's best reply. Only the increase over the reply already available
 ## is kept, and half of that increase is subtracted. Hidden hands are not read.
 ## Market buys and sells shares and BYTE when that score is positive, at most
-## two actions, and never spends the cash floor. A third share of one company
-## is the last buy. BYTE at $450 or below is bought when cash stays at or above
-## $500; BYTE at $700 or above is sold. Ties break by lowest coordinate, fixture order, or
-## the earlier survivor. The match generator is not advanced here.
+## two actions, and never spends the cash floor. BYTE under the $500 reference
+## is bought. BYTE over that reference is sold. A share past three is bought
+## only to tie or take the lead. A one-share holding is sold when someone else
+## already leads and the price is rich, and it is kept when it is the bonus.
+## Ties break by lowest coordinate, fixture order, or the earlier survivor.
+## The match generator is not advanced here.
 
 
 const CASH_FLOOR := 500
 const BUY_MAX_SIZE := 14
 const BUY_MAX_SENTIMENT := 1
-const BUY_OWNED_LIMIT := 3
 const SELL_MIN_SIZE := 16
 const SELL_MIN_SENTIMENT := 1
 const SELL_MIN_OWNED := 2
-const BYTE_BUY_MAX := 450
-const BYTE_SELL_MIN := 700
+const BYTE_REFERENCE := 500
+const BYTE_BUY_MAX := 490
+const BYTE_SELL_MIN := 510
 const END_FEED_PENALTY := -100000
 ## Shipped depth. Tests may lower it and must restore five.
 static var placement_plies := 5
@@ -38,7 +40,7 @@ static var continuation_num := 3
 static var continuation_den := 4
 static var threat_div := 2
 static var threat_uses_marginal := true
-## Upper bound on one later tile's contribution after the half-step discount.
+## Upper bound on one later tile's contribution after the three-quarter discount.
 ## A sibling is skipped when even this cannot beat the best continuation.
 const OPTIMISTIC_TILE := 20000
 
@@ -131,14 +133,20 @@ static func _buy_share_score(match: OfflineMatch, corp: Dictionary, owned: int, 
 	var size := int(corp["size"])
 	var sentiment := int(match.sentiment.get(str(corp["sector"]), 0))
 	var price := int(corp["share_price"])
-	if size > BUY_MAX_SIZE or sentiment > BUY_MAX_SENTIMENT or owned >= BUY_OWNED_LIMIT:
+	if size > BUY_MAX_SIZE or sentiment > BUY_MAX_SENTIMENT:
 		return 0
-	var corp_id := str(corp["id"])
-	if owned >= 2 and size >= 8 and owned - _others(match, corp_id) >= 2:
+	var best_other := _best_opponent(match, str(corp["id"]))
+	if owned >= 3 and best_other < owned:
+		return 0
+	if owned >= 2 and size >= 8 and owned - best_other >= 2:
 		return 0
 	if cash - price < CASH_FLOOR:
 		return 0
-	var stake := 40 if owned == 1 else 0
+	var stake := 0
+	if owned == 1:
+		stake = 40
+	elif owned >= 3 and best_other >= owned:
+		stake = 120
 	return (15 - size) * 30 + (1 - sentiment) * 40 - Pricing.div_nonneg(price, 20) + stake
 
 
@@ -148,15 +156,19 @@ static func _sell_share_score(match: OfflineMatch, corp: Dictionary, owned: int,
 	var size := int(corp["size"])
 	var sentiment := int(match.sentiment.get(str(corp["sector"]), 0))
 	var price := int(corp["share_price"])
-	var corp_id := str(corp["id"])
-	var lead := owned - _others(match, corp_id)
+	var best_other := _best_opponent(match, str(corp["id"]))
+	var behind := best_other > owned
+	var safe_lead := owned - 1 > best_other
 	var profit := 0
-	if owned >= SELL_MIN_OWNED and size >= SELL_MIN_SIZE and sentiment >= SELL_MIN_SENTIMENT:
-		profit = (size - 14) * 50 + sentiment * 80 + Pricing.div_nonneg(price, 10)
-	elif owned >= 4 and size >= 10 and sentiment >= 0 and lead >= 2:
-		profit = (size - 8) * 40 + Pricing.div_nonneg(price, 10)
-	elif owned >= 2 and size >= 6 and sentiment >= 2:
-		profit = sentiment * 70 + Pricing.div_nonneg(price, 10)
+	if safe_lead or behind:
+		if owned >= SELL_MIN_OWNED and size >= SELL_MIN_SIZE and sentiment >= SELL_MIN_SENTIMENT:
+			profit = (size - 14) * 50 + sentiment * 80 + Pricing.div_nonneg(price, 10)
+		elif owned >= 4 and size >= 10 and sentiment >= 0 and owned - best_other >= 2:
+			profit = (size - 8) * 40 + Pricing.div_nonneg(price, 10)
+		elif owned >= SELL_MIN_OWNED and size >= 6 and sentiment >= 2:
+			profit = sentiment * 70 + Pricing.div_nonneg(price, 10)
+		elif owned == 1 and behind and ((size >= 6 and sentiment >= 2) or (size >= SELL_MIN_SIZE and sentiment >= SELL_MIN_SENTIMENT)):
+			profit = sentiment * 70 + Pricing.div_nonneg(price, 10) + 40
 	var liquidity := 500 if cash < CASH_FLOOR else 0
 	return maxi(profit, liquidity)
 
@@ -165,7 +177,7 @@ static func _buy_byte_score(match: OfflineMatch, cash: int) -> int:
 	var price := int(match.byte_price)
 	if price > BYTE_BUY_MAX or match.byte_exchange < 1 or cash - price < CASH_FLOOR:
 		return 0
-	return (BYTE_BUY_MAX - price) + 50
+	return (BYTE_REFERENCE - price) + 30
 
 
 static func _sell_byte_score(match: OfflineMatch, player: Dictionary, cash: int) -> int:
@@ -174,7 +186,7 @@ static func _sell_byte_score(match: OfflineMatch, player: Dictionary, cash: int)
 	var price := int(match.byte_price)
 	var profit := 0
 	if price >= BYTE_SELL_MIN:
-		profit = (price - 650) + 40
+		profit = (price - BYTE_REFERENCE) + 30
 	var liquidity := 500 if cash < CASH_FLOOR else 0
 	return maxi(profit, liquidity)
 
@@ -627,6 +639,19 @@ static func _held(match: OfflineMatch, corp_id: String, extra: Dictionary, actor
 		count = int(shares.get(corp_id, 0))
 		break
 	return count + int(extra.get(corp_id, 0))
+
+
+static func _best_opponent(match: OfflineMatch, corp_id: String) -> int:
+	var who := str(match.active_player()["id"])
+	var best := 0
+	for player in match.players:
+		if str(player["id"]) == who:
+			continue
+		var shares: Dictionary = player["shares"]
+		var count := int(shares.get(corp_id, 0))
+		if count > best:
+			best = count
+	return best
 
 
 static func _others(match: OfflineMatch, corp_id: String, actor: String = "") -> int:

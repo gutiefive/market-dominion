@@ -38,7 +38,13 @@ var _score_box: VBoxContainer
 var _error: Label
 var _online: OnlineTable
 var _side: PanelContainer
-var _side_text: RichTextLabel
+var _feed: ActionFeed
+var _standings: StandingsPanel
+var _seen_ready := false
+var _seen_cash: Dictionary = {}
+var _seen_book: Dictionary = {}
+var _seen_price: Dictionary = {}
+var _seen_log := 0
 var _scroll: ScrollContainer
 var _merger_layer: Control
 var _merger_copy: Label
@@ -137,6 +143,11 @@ func _build() -> void:
 	add_child(_error_layer)
 	_rules = RulesPanel.new()
 	add_child(_rules)
+	_standings = preload("res://scenes/components/standings_panel.tscn").instantiate() as StandingsPanel
+	_standings.visible = false
+	add_child(_standings)
+	_standings.play_again_pressed.connect(_on_deal_pressed)
+	_standings.lobby_pressed.connect(_show_setup)
 
 	var root := VBoxContainer.new()
 	root.add_theme_constant_override("separation", 6)
@@ -346,8 +357,7 @@ func _build_play() -> VBoxContainer:
 	prices.grab()
 	_side = prices
 	_watch = prices.watch
-	_side_text = prices.activity
-	Palette.remember(_side_text, 13)
+	_feed = prices.feed
 	return panel
 
 
@@ -472,6 +482,9 @@ func _show_setup() -> void:
 	_computer_note = ""
 	_status.text = "No table open. The deal stays on this device."
 	_status.visible = true
+	_seen_ready = false
+	if _standings != null:
+		_standings.visible = false
 	_sync_dock()
 	if _merger_layer != null:
 		_merger_layer.visible = false
@@ -565,6 +578,9 @@ func _on_deal_pressed() -> void:
 func _begin_match(table: OfflineMatch) -> void:
 	_match = table
 	_selected = ""
+	_seen_ready = false
+	if _standings != null:
+		_standings.visible = false
 	_setup.visible = false
 	_play.visible = false
 	_order.visible = true
@@ -747,7 +763,9 @@ func _refresh() -> void:
 		_status.text = "Final round. " + _status.text
 	_fill_chrome(player)
 	_fill_watch(player)
-	_side_text.text = _activity_bbcode()
+	_show_feed()
+	_sync_change_feedback()
+	_show_standings()
 	_refresh_event()
 	_refresh_score()
 	_sync_merger_modal()
@@ -842,7 +860,7 @@ func _rebuild_hand(hand: Array) -> void:
 	for child in _hand_row.get_children():
 		child.queue_free()
 	if _match.phase == "completed":
-		_hand_row.add_child(_label("The match is over. The ledger above is the final score.", 14, MUTED))
+		_hand_row.add_child(_label("The match is over. Standings show cash, portfolio, and net.", 14, MUTED))
 		return
 	if _viewing_bot():
 		_hand_row.add_child(_label("%s is a computer (%s). %d tiles stay hidden. This seat does not use the device." % [str(_match.active_player()["display_name"]), BotPolicy.difficulty_label(), hand.size()], 14, MUTED))
@@ -944,6 +962,116 @@ func _sell_byte() -> void:
 func _pass_market() -> void:
 	if _match != null:
 		_apply(_match.pass_market())
+
+
+func _show_feed() -> void:
+	if _feed == null or _match == null:
+		return
+	var events := PackedStringArray()
+	var start := maxi(0, _match.log.size() - 4)
+	for index in range(_match.log.size() - 1, start - 1, -1):
+		events.append(ActionFeed.shorten(str(_match.log[index])))
+	var round_note := "final" if _match.final_round else str(_match.round_number)
+	_feed.show_events(events, "Round %s · bag %d · seed %d" % [round_note, _match.bag.size(), _match.seed])
+
+
+func _sync_change_feedback() -> void:
+	if _match == null:
+		return
+	var prices := _price_snapshot()
+	var round_hit := false
+	if _seen_ready:
+		for index in range(_seen_log, _match.log.size()):
+			var line := str(_match.log[index])
+			if line.begins_with("Round event:"):
+				round_hit = true
+			for mark in _marks_in_line(line):
+				if _watch != null:
+					_watch.flash(mark)
+		for player in _match.players:
+			var seat_id := str(player["id"])
+			var cash := int(player["cash"])
+			var book := _book_line(player)
+			var changed := int(_seen_cash.get(seat_id, cash)) != cash or str(_seen_book.get(seat_id, book)) != book
+			if (changed or round_hit) and _seats != null:
+				_seats.pulse(str(player["display_name"]))
+		for mark in prices.keys():
+			var before := int(_seen_price[mark]) if _seen_price.has(mark) else -1
+			if before != int(prices[mark]) and _watch != null:
+				_watch.flash(mark)
+	_seen_cash.clear()
+	_seen_book.clear()
+	_seen_price = prices
+	for player in _match.players:
+		var seat_id := str(player["id"])
+		_seen_cash[seat_id] = int(player["cash"])
+		_seen_book[seat_id] = _book_line(player)
+	_seen_log = _match.log.size()
+	_seen_ready = true
+
+
+func _price_snapshot() -> Dictionary:
+	var prices := {"BYTE": _match.byte_price}
+	for corp in _match.corporations:
+		prices[str(BoardGrid.MARKS.get(corp["id"], ""))] = int(corp["share_price"])
+	return prices
+
+
+func _marks_in_line(line: String) -> PackedStringArray:
+	var marks := PackedStringArray()
+	var trade := " bought " in line or " sold " in line or " grew " in line or " founded " in line
+	if not trade:
+		return marks
+	if " BYTE " in line:
+		marks.append("BYTE")
+	for corp_id in BoardGrid.NAMES.keys():
+		if str(BoardGrid.NAMES[corp_id]) in line:
+			marks.append(str(BoardGrid.MARKS[corp_id]))
+	return marks
+
+
+func _show_standings() -> void:
+	if _standings == null or _match == null:
+		return
+	var open := _match.phase == "completed" and not _match.ranking.is_empty()
+	_standings.visible = open
+	if not open:
+		return
+	var rows: Array = []
+	var rank := 1
+	for player_id in _match.ranking:
+		var row := _ledger_row(str(player_id))
+		if row.is_empty():
+			continue
+		var book_bits: PackedStringArray = []
+		for holding in row["holdings"]:
+			book_bits.append("%s %d × $%d" % [str(holding["name"]), int(holding["count"]), int(holding["price"])])
+		if int(row["byte_count"]) > 0:
+			book_bits.append("BYTE %d × $%d" % [int(row["byte_count"]), _match.byte_price])
+		rows.append({
+			"rank": rank,
+			"name": str(row["display_name"]),
+			"role": _standing_role(str(row["id"])),
+			"cash": int(row["cash"]),
+			"portfolio": int(row["share_value"]) + int(row["byte_value"]),
+			"net": int(row["net_worth"]),
+			"book": " · ".join(book_bits),
+		})
+		rank += 1
+	_standings.present(_winner_line(), rows)
+	_standings.move_to_front()
+
+
+func _standing_role(player_id: String) -> String:
+	for player in _match.players:
+		if str(player["id"]) != player_id:
+			continue
+		if bool(player.get("bot", false)):
+			return "computer · %s" % BotPolicy.difficulty_label()
+		if _solo():
+			return "you"
+		return "player"
+	return "player"
 
 
 func _activity_bbcode() -> String:
@@ -1290,8 +1418,8 @@ func _refresh_event() -> void:
 func _refresh_score() -> void:
 	for child in _score_box.get_children():
 		child.queue_free()
-	_score_card.visible = _match.phase == "completed" and not _match.ranking.is_empty()
-	if not _score_card.visible:
+	_score_card.visible = false
+	if _match.phase != "completed" or _match.ranking.is_empty():
 		return
 	_score_box.add_child(_label("Final ledger", 20, TEXT))
 	var place_number := 1
@@ -1846,6 +1974,36 @@ func _shot_event() -> void:
 	_refresh()
 
 
+func _shot_trade() -> void:
+	_shot_pull("A1")
+	_match.place("A1")
+	_shot_pass_market()
+	_shot_pull("E9")
+	_match.place("E9")
+	_shot_pass_market()
+	_shot_pull("A2")
+	_match.place("A2")
+	_match.choose_founder("nova_ai")
+	_concealed = false
+	_refresh()
+	if _event_layer != null and _event_layer.visible:
+		_dismiss_event()
+	_apply(_match.buy_share("nova_ai"))
+
+
+func _shot_resolve() -> void:
+	_shot_pull("A1")
+	_match.place("A1")
+	_shot_pass_market()
+	_shot_pull("E9")
+	_match.place("E9")
+	_shot_pass_market()
+	_concealed = false
+	_refresh()
+	if _event_layer != null:
+		_event_layer.visible = false
+
+
 func _shot_score() -> void:
 	_match.players[0]["cash"] = 9000
 	for player in _match.players:
@@ -1858,12 +2016,9 @@ func _shot_score() -> void:
 		var cell := str(_match.bag[0])
 		_match.bag.remove_at(0)
 		_match.occupied[cell] = true
-	_match.pass_turn()
-	_pass_market()
-	_pass_market()
-	_match.pass_turn()
-	_pass_market()
-	_pass_market()
+	for _seat in _match.players.size():
+		_match.pass_turn()
+		_shot_pass_market()
 	_concealed = false
 	_refresh()
 
@@ -1887,8 +2042,8 @@ func _run_shot(path: String, phase: String) -> void:
 		_seat_checks[2].button_pressed = true
 		_sync_seat_mode()
 		_show_setup()
-	elif phase == "bots" or phase == "preview":
-		BotPolicy.set_difficulty("normal")
+	elif phase == "bots" or phase == "preview" or phase == "standings":
+		BotPolicy.set_difficulty("hard" if phase == "standings" else "normal")
 		var created = OfflineMatch.create(7710, ["Rowan", "Ada", "Bo"], ["Ada", "Bo"])
 		if created == null:
 			push_error("screenshot deal failed")
@@ -1922,8 +2077,12 @@ func _run_shot(path: String, phase: String) -> void:
 		_shot_founder()
 	elif phase == "event":
 		_shot_event()
-	elif phase == "score":
+	elif phase == "score" or phase == "standings":
 		_shot_score()
+	elif phase == "resolve":
+		_shot_resolve()
+	elif phase == "trade":
+		_shot_trade()
 	elif phase == "rules":
 		_rules.show_panel()
 	elif phase == "confirm":

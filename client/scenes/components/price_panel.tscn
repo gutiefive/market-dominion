@@ -1,7 +1,8 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/price_panel.gd" id="1_panel"]
 [ext_resource type="Script" path="res://scripts/ui/market_watch.gd" id="2_watch"]
+[ext_resource type="PackedScene" path="res://scenes/components/action_feed.tscn" id="3_feed"]
 
 [node name="PricePanel" type="PanelContainer"]
 custom_minimum_size = Vector2(280, 0)
@@ -38,17 +39,7 @@ size_flags_horizontal = 3
 theme_override_constants/separation = 6
 script = ExtResource("2_watch")
 
-[node name="ActivityHeading" type="Label" parent="Margin/Column"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 14
-text = "Activity"
-
-[node name="Activity" type="RichTextLabel" parent="Margin/Column"]
+[node name="Feed" parent="Margin/Column" instance=ExtResource("3_feed")]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
 size_flags_vertical = 0
-bbcode_enabled = true
-fit_content = false
-scroll_active = true
-theme_override_font_sizes/normal_font_size = 13

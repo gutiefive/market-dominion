@@ -1,10 +1,10 @@
 extends PanelContainer
 class_name PricePanel
 
-## Share and BYTE prices, then the short activity log.
+## Share and BYTE prices, then the last few actions.
 
 var watch: MarketWatch
-var activity: RichTextLabel
+var feed: ActionFeed
 
 
 func _ready() -> void:
@@ -16,6 +16,6 @@ func grab() -> void:
 	if watch != null:
 		return
 	watch = get_node("%Watch") as MarketWatch
-	activity = get_node("%Activity") as RichTextLabel
+	feed = get_node("%Feed") as ActionFeed
 	custom_minimum_size = Vector2(280, 0)
 	size_flags_vertical = Control.SIZE_EXPAND_FILL

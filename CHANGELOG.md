@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.19.0 — 2026-11-01
+
+The table says what just happened, and the end of the match shows who won. Protocol version stays `0.1.0`. Client `config/version` is `0.19.0`. Rules, bot difficulty, and the market pass are unchanged.
+
+### Changed
+
+- The price column keeps the last four actions, newest first, in plain language. A placement, a pass, a buy, a sale, and a round event each get one line. The footer still shows the round, the bag, and the seed. The board is not covered.
+- A buy, a sale, a founding, a growth, or a posted-price change flashes that price chip amber. The seat whose cash or book changed pulses, and its cash turns amber. A round event pulses every seat and flashes BYTE when the coin price moves. Reduced motion skips the tweens.
+- When the match is over, a standings panel lists rank, name, cash, portfolio, and net. Computer seats keep the Easy, Normal, or Hard tag. Play again deals the same seed, seats, and difficulty. Back to lobby returns to that setup without clearing them.
+
+### Evidence
+
+- `./scripts/check_client.sh` printed `M0_CLIENT_OK` through `M8_CLIENT_OK`. The suite printed `M8_PLACEMENT_50_US 213583 nodes 64`, `M8_FIVE_PLIES shallow B1 nodes 85 deep B8 nodes 325 us 500593`, `M8_DISCOUNT half B1 threeq B8`, `M8_REPLY absolute B1 marginal I9`, `M8_EASY chain B1 blob B1 contest pass byte pass us 60146`, `M8_HARD chain E3 blob B8 size16 buy size19 pass`, and `M8_DIFFICULTY easy 207 normal 227 hard 227 hard_vs_normal same first 6 easy pass_market: normal buy_share:nova_ai`.
+- Seed 7710 after Bo’s opening lists, newest first, “Bo drew a tile”, “Bo passed the market”, “Bo passed the market”, and “Bo placed B6”. Rows 1–9 stay above the dock, and the dock still quotes that placement.
+- After a round event, the BYTE chip turns amber and the feed reads “Round resolved: Energy +1 · BYTE $450”. Buying the founder’s next NOVA AI share flashes the NA chip and drops that seat’s cash from $6000 to $5800.
+- A finished Hard game shows Bo, Rowan, and Ada with cash, portfolio, and net. Ada and Bo read “computer · Hard”. Play again and Back to lobby are on the panel.
+
+### Not in this version
+
+Computer seats in an online room, a search past five tiles, a neural model, and a public invite URL.
+
 ## 0.18.0 — 2026-11-01
 
 The table says who acts, and a hovered district shows where the tile will land. Protocol version stays `0.1.0`. Client `config/version` is `0.18.0`. Rules, bot difficulty, and the market pass are unchanged.

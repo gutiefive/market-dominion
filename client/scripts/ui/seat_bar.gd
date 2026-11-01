@@ -30,6 +30,15 @@ func grab() -> void:
 	banner = get_node("%Banner") as PanelContainer
 
 
+func pulse(seat_name: String) -> void:
+	grab()
+	for child in opponents.get_children():
+		if child.is_queued_for_deletion():
+			continue
+		if child is OpponentChip and (child as OpponentChip).seat_name == seat_name:
+			(child as OpponentChip).pulse()
+
+
 func show_turn(step: String, who: String, detail: String, tone: String) -> void:
 	grab()
 	step_label.text = step

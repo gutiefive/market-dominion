@@ -7,6 +7,7 @@ var name_label: Label
 var cash_label: Label
 var meta_label: Label
 var book_label: Label
+var seat_name := ""
 
 
 func show_seat(seat_name: String, meta: String, cash: String, book: String, acting: bool, tone: String) -> void:
@@ -15,6 +16,7 @@ func show_seat(seat_name: String, meta: String, cash: String, book: String, acti
 		cash_label = get_node("%Cash") as Label
 		meta_label = get_node("%Meta") as Label
 		book_label = get_node("%Book") as Label
+	self.seat_name = seat_name
 	name_label.text = seat_name
 	cash_label.text = cash
 	meta_label.text = meta
@@ -28,6 +30,21 @@ func show_seat(seat_name: String, meta: String, cash: String, book: String, acti
 		remove_theme_stylebox_override("panel")
 		name_label.add_theme_color_override("font_color", Color("e8eef9"))
 	theme_type_variation = "TableCard"
+
+
+func pulse() -> void:
+	if Palette.reduced_motion or cash_label == null:
+		return
+	modulate = Color(1.4, 1.25, 0.75)
+	var tween := create_tween()
+	tween.tween_property(self, "modulate", Color.WHITE, 0.45)
+	cash_label.add_theme_color_override("font_color", Color("fbbf24"))
+	var cash_tween := create_tween()
+	cash_tween.tween_interval(0.45)
+	cash_tween.tween_callback(func() -> void:
+		if is_instance_valid(cash_label):
+			cash_label.add_theme_color_override("font_color", Color("2dd4bf"))
+	)
 
 
 func _accent(tone: String) -> Color:

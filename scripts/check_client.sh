@@ -73,3 +73,6 @@ run_godot --headless --path "$ROOT/client" --script res://tests/m10_check.gd
 
 run_godot --headless --path "$ROOT/client" --check-only --script res://tests/m10_history_check.gd
 run_godot --headless --path "$ROOT/client" --script res://tests/m10_history_check.gd
+
+run_godot --headless --path "$ROOT/client" --check-only --script res://tests/m10_focus_check.gd
+run_godot --headless --path "$ROOT/client" --script res://tests/m10_focus_check.gd

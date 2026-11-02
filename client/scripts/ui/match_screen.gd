@@ -1686,6 +1686,7 @@ func _build_merger_modal() -> Control:
 	_merger_buttons = VBoxContainer.new()
 	_merger_buttons.add_theme_constant_override("separation", 8)
 	box.add_child(_merger_buttons)
+	DialogFocus.install(layer)
 	return layer
 
 
@@ -1836,6 +1837,7 @@ func _dim_layer() -> Control:
 	var card := _card()
 	card.custom_minimum_size = Vector2(480, 0)
 	center.add_child(card)
+	DialogFocus.install(layer)
 	return layer
 
 
@@ -1898,6 +1900,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			var index := slot - 1
 			if index < hand.size():
 				_select_tile(str(hand[index]))
+				_place_button.grab_focus()
 				get_viewport().set_input_as_handled()
 			return
 	if event.is_action_pressed("hand_left") or event.is_action_pressed("hand_right"):
@@ -1908,6 +1911,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		var next := 0 if current < 0 else (current + step + hand.size()) % hand.size()
 		_selected = str(hand[next])
 		_refresh()
+		_place_button.grab_focus()
 		get_viewport().set_input_as_handled()
 		return
 	if event.is_action_pressed("ui_accept"):

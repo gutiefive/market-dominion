@@ -34,6 +34,8 @@ func _ready() -> void:
 	card.add_theme_stylebox_override("panel", Palette.flat(Palette.CARD, Palette.LINE, 1, 10))
 	margin.add_child(card)
 	var scroll := ScrollContainer.new()
+	scroll.focus_mode = Control.FOCUS_ALL
+	scroll.follow_focus = true
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	card.add_child(scroll)
 	var box := VBoxContainer.new()
@@ -55,10 +57,12 @@ func _ready() -> void:
 	box.add_child(_line("The largest company in the chain, measured before the new tile, survives. A tie among those largest companies waits for the player who placed the tile. Smaller companies in that chain are bought out.\nFor each company that does not survive, the majority pool is 2 × its price and the minority pool is 1 × its price. One holder of the most shares receives both pools. A tie for the most shares splits the combined pools. Otherwise the minority pool goes to the tied second place. Leftover $1 bills are dealt one at a time by ascending player id.\nAfter the bonus, every losing share is sold back to the bank at that same snapshotted price. The survivor is repriced once. Inactive shares are worth nothing at the end.", 14, Palette.TEXT))
 	var close_button := Button.new()
 	close_button.text = "Close rules"
+	close_button.custom_minimum_size.y = 44
 	close_button.focus_mode = Control.FOCUS_ALL
 	close_button.pressed.connect(hide_panel)
 	Palette.remember(close_button, 15)
 	box.add_child(close_button)
+	DialogFocus.install(self)
 
 
 func show_panel() -> void:

@@ -55,3 +55,11 @@ Focused history checks cover duplicate/stale snapshots, gaps, bounded memory, im
 ## Remaining acceptance
 
 Run a first-time-human guided playtest and refine explanations from observed confusion. Complete a human keyboard/screen-reader/text-size review and measure load/frame/input budgets on representative physical devices. Online quote history remains page-local rather than a complete archive; detailed local trade analysis is not fabricated for online snapshots. Public HTTPS, unavailable browser/device compatibility and inaccessible CI results remain M9 external gates. Do not mark M10 complete or ship `0.21.x` until the remaining acceptance is verified.
+
+## Keyboard dialog review
+
+M10 now contains keyboard focus inside local and online choice, confirmation, event and error dialogs, Rules and final standings. Dialogs restore the opener when it remains available; nested Rules returns to the underlying choice. Confirmations initially focus Cancel. Required company choices retain their existing Escape behavior. Rules supports keyboard scrolling, follows focused controls and uses a 44px close target. Number/arrow hand shortcuts focus the placement action after selecting a tile.
+
+`client/tests/m10_focus_check.gd` drives production local dialogs with real Godot keyboard events: forward/reverse Tab containment, background-focus recovery, Escape restoration, required-choice persistence, nested Rules restoration and Enter on Cancel without placement. These automated checks do not establish screen-reader usability. Use the [human acceptance worksheet](M10_HUMAN_ACCEPTANCE.md) to close the remaining comprehension, assistive-technology and physical-device gates.
+
+Verification of this focus pass: 87 Python tests passed, the strict Godot M0–M10/history/focus suite passed, web export succeeded, and Chromium 154 loaded the export. The [canvas opening regression](evidence/m10-focus-browser-smoke.json) passed three placements, BYTE purchase/sale and recorded-history expansion. It explicitly reports `completed: false`: this pass did not repeat the prior full tutorial or multiplayer match. Keyboard assertions ran in Godot headless; the canvas regression used mouse interaction, so browser keyboard and assistive-technology acceptance remain open.

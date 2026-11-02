@@ -14,6 +14,7 @@ var lobby_button: Button
 
 func _ready() -> void:
 	grab()
+	DialogFocus.install(self)
 	resized.connect(_fit)
 	get_viewport().size_changed.connect(func() -> void: call_deferred("_fit"))
 	_fit()

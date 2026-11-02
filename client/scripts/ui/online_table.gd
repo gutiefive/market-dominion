@@ -1102,6 +1102,7 @@ func _choice_layer(title: String) -> Control:
 	var buttons := VBoxContainer.new()
 	buttons.add_theme_constant_override("separation", 6)
 	box.add_child(buttons)
+	DialogFocus.install(layer)
 	return layer
 
 

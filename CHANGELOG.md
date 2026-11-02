@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — M10 keyboard dialog review
+
+- Contained keyboard focus inside local/online dialogs, Rules and final standings, with safe Cancel focus and opener restoration. Rules now supports keyboard scrolling; hand-selection shortcuts focus placement.
+- Added production-dialog keyboard regressions and a human acceptance worksheet. Human comprehension, screen-reader and physical-device acceptance remain pending.
+
 ## Unreleased — M10 recorded history, analysis and validation
 
 - Added bounded, in-memory quote history at successful local rules-engine actions, with actual event explanations, immutable views and no speculative/bot-planning or rejected-trade movement. Online charts show only observations since this page joined, with explicit reconnect gaps and no fabricated archive.

@@ -1,0 +1,10 @@
+{
+  "completed": false,
+  "smoke": true,
+  "browser": "154.0.8037.57",
+  "teachingSteps": 5,
+  "placements": 1,
+  "eventLessons": 1,
+  "boughtByte": true,
+  "soldByte": true
+}

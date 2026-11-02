@@ -45,7 +45,7 @@ The browser runner uses mouse/keyboard input and screenshots/OCR of the actual e
 
 ## Acceptance still open
 
-The revised course needs a repeat human playtest: can a new player explain why a company forms, how trading affects cash, what an event changes, why a merger survivor is chosen and how net worth is scored? Automated completion cannot answer that. Screen-reader usability, representative physical devices, public HTTPS deployment and unavailable browser/CI checks retain their existing gates. Do not begin M11 or label M10 complete from automation alone.
+The revised course needs a repeat human playtest: can a new player explain why a company forms, how trading affects cash, what an event changes, why a merger survivor is chosen and how net worth is scored? Automated completion cannot answer that. Screen-reader usability, representative physical devices, public HTTPS deployment and unavailable browser/CI checks retain their existing gates. The user subsequently accepted the build for continued development and authorized M11. These unperformed release checks remain explicitly open; automation and progression approval do not certify them.
 
 Software-rendered Chromium screenshots also show missing-glyph boxes for some decorative company symbols. Company names and tickers remain present. Font fallback and assistive-technology reading are still part of the open accessibility review; the screenshots do not establish a pass for those items.
 

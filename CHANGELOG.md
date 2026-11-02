@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — M11 ruleset foundation
+
+- Began M11 after the user accepted the scripted M10 build for continued development. Deferred human, accessibility, physical-device and deployment checks retain their unverified status.
+- Wrote the Dominion v1 design before code, including proposed company equations, supply-constrained merger swaps, BYTE flow/event order, edge cases, vectors and implementation gates. These mechanics remain unimplemented and unbalanced; Dominion is disabled.
+- Added a shared `classic_v1` / reserved `dominion_v1` registry and matching Python/Godot fingerprints of Classic fixture semantics. New authoritative saves carry explicit identity. Legacy saves continue without reshuffling; unknown, disabled, partial or incompatible identities fail before execution. Public protocol 0.1.0 and existing Classic equations/fixtures remain unchanged.
+- Verified 102 Python tests, strict Godot M0–M11/history/focus checks, web export, five-lesson actual-canvas tutorial smoke, five-command two-browser online regression, and Docker build/installed registry round-trip/health. Dominion gameplay, balance and external release acceptance remain pending.
+
 ## Unreleased — M10 scripted teaching match
 
 - Replaced the reactive guide after a Windows human playtest found it did not teach company formation or explain enough beyond the opening. Added an explicit 39-step practice game with arranged tiles/events/opponent moves, action gating, real outcome feedback, two company foundings, share/BYTE trades, passing, events, growth, a tied merger and normal final scoring.

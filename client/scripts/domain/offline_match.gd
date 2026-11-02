@@ -10,6 +10,8 @@ class_name OfflineMatch
 ## another round.
 
 var journal := MatchJournal.new()
+var ruleset_id := Rulesets.CLASSIC
+var ruleset_fingerprint := ""
 
 var seed: int
 var hand_size: int
@@ -43,7 +45,10 @@ var end_occupied: int
 var log: Array[String] = []
 
 
-static func create(seed_value: int, names: Array, bot_names: Array = []) -> OfflineMatch:
+static func create(seed_value: int, names: Array, bot_names: Array = [], selected_ruleset: String = Rulesets.CLASSIC) -> OfflineMatch:
+	var identity := Rulesets.resolve(selected_ruleset)
+	if identity.is_empty():
+		return null
 	var rules = SharedFiles.read_json("fixtures/rules_constants.json")
 	var roster_file = SharedFiles.read_json("fixtures/corporations.json")
 	if rules == null or roster_file == null or seed_value < 0:
@@ -59,6 +64,8 @@ static func create(seed_value: int, names: Array, bot_names: Array = []) -> Offl
 			return null
 		seen[text] = true
 	var table := OfflineMatch.new()
+	table.ruleset_id = str(identity["id"])
+	table.ruleset_fingerprint = str(identity["fingerprint"])
 	table.seed = seed_value
 	table.hand_size = int(rules["starting_hand_size"])
 	table.starting_cash = int(rules["starting_cash"])

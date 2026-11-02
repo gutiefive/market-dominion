@@ -32,6 +32,7 @@ from app.domain.mergers import bonus_payouts
 from app.domain.pricing import byte_price_after_delta, share_price
 from app.domain.scoring import rank_players
 from app.domain.rng import MatchRng, shuffle
+from app.domain.rulesets import CLASSIC, resolve_ruleset, restore_ruleset
 from app.domain.tiles import conservation_errors
 from app.files import load_rules
 
@@ -39,7 +40,10 @@ _NICKNAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 _-]{0,23}$")
 
 
 class OfflineMatch:
-    def __init__(self, seed: int, names: list[str]) -> None:
+    def __init__(self, seed: int, names: list[str], *, ruleset_id: str = CLASSIC) -> None:
+        identity = resolve_ruleset(ruleset_id)
+        self.ruleset_id = identity["id"]
+        self.ruleset_fingerprint = identity["fingerprint"]
         rules = load_rules()
         cleaned = [str(name) for name in names]
         minimum = int(rules["players_min"])
@@ -655,6 +659,8 @@ class OfflineMatch:
     def export_state(self) -> dict[str, Any]:
         """JSON-ready match, including the generator state and private hands."""
         return {
+            "ruleset_id": self.ruleset_id,
+            "ruleset_fingerprint": self.ruleset_fingerprint,
             "seed": self.seed,
             "byte_price": self.byte_price,
             "byte_exchange": self.byte_exchange,
@@ -683,8 +689,11 @@ class OfflineMatch:
     @classmethod
     def from_export(cls, data: dict[str, Any]) -> OfflineMatch:
         """Restore a match without reshuffling. The caller supplies a prior export."""
+        identity = restore_ruleset(data)
         rules = load_rules()
         match = cls.__new__(cls)
+        match.ruleset_id = identity["id"]
+        match.ruleset_fingerprint = identity["fingerprint"]
         match.rules = rules
         match.seed = int(data["seed"])
         match.hand_size = int(rules["starting_hand_size"])

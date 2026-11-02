@@ -61,7 +61,7 @@ Focused history checks cover duplicate/stale snapshots, gaps, bounded memory, im
 
 ## Remaining acceptance
 
-Run a first-time-human guided playtest and refine explanations from observed confusion. Complete a human keyboard/screen-reader/text-size review and measure load/frame/input budgets on representative physical devices. Online quote history remains page-local rather than a complete archive; detailed local trade analysis is not fabricated for online snapshots. Public HTTPS, unavailable browser/device compatibility and inaccessible CI results remain M9 external gates. Do not mark M10 complete or ship `0.21.x` until the remaining acceptance is verified.
+Run a first-time-human guided playtest and refine explanations from observed confusion. Complete a human keyboard/screen-reader/text-size review and measure load/frame/input budgets on representative physical devices. Online quote history remains page-local rather than a complete archive; detailed local trade analysis is not fabricated for online snapshots. Public HTTPS, unavailable browser/device compatibility and inaccessible CI results remain M9 external gates. The user has authorized continuing into M11 while these checks remain open; do not describe them as verified or ship a completed `0.21.x` release on that basis.
 
 ## Keyboard dialog review
 
@@ -80,3 +80,8 @@ MD_BROWSER_EVIDENCE=/tmp/md-keyboard node scripts/keyboard_browser.cjs
 ```
 
 The harness requires Playwright, Chromium, Pillow and tesseract and defaults to the same web server as `tutorial_browser.cjs`. Set `MD_BROWSER_WEB` to the served export URL when needed. It removes stale result JSON before running. A failed OCR assertion is a failed run, not a release pass.
+
+
+## User acceptance for continued development
+
+After the scripted-course build `9c2d014`, the user said, “lets keep moving for now its passed enough for now.” M11 development is authorized on that basis. This is acceptance for progression, not a claim that the replacement course received a second complete human playtest or that screen readers, physical devices, Windows maximize behavior, CI or public HTTPS were verified. The outstanding checks remain in the acceptance worksheet and release documentation; they no longer block beginning M11 work. Client/release version is not bumped from this authorization alone.

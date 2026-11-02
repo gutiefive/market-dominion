@@ -171,3 +171,9 @@ Do not add COOP or COEP for this single-threaded export.
 6. Two to four people must finish a real match on that invite URL, including a refresh, before M9 is complete. The server-side two-player test is not that match.
 
 No secret belongs in the repository. `.env.example` lists the variable names only.
+
+## Saved ruleset compatibility (M11 foundation)
+
+Match JSON now records `ruleset_id` and `ruleset_fingerprint`; SQL schema remains 1. Old saves with neither field load as Classic without a redeal and receive identity on a later normal save. Unknown, disabled, partial or mismatched identities are rejected. A changed Classic fixture also fails the committed fingerprint check.
+
+Back up the database before upgrading as usual. If startup reports incompatible rule identity, preserve the database and use the matching engine/fixtures or an appropriate compatible backup. Do not delete identity fields to force a different ruleset. The check fingerprints fixture semantics, not engine code or save authenticity. Public protocol 0.1.0 remains Classic-only with unchanged snapshot fields; Dominion is not playable yet. Before Dominion activation, a schema-version upgrade must prevent older binaries that ignore the new JSON fields from opening that database.

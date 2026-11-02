@@ -407,3 +407,48 @@ def test_old_socket_cleanup_keeps_replacement_subscription():
     assert old.empty()
     assert hub.detach("room", "seat", current) is True
     assert "room" not in hub.queues
+
+
+def test_legacy_room_restart_pins_classic_without_changing_private_hand(tmp_path):
+    import sqlite3
+
+    database = tmp_path / "legacy-identity.db"
+    original = RoomService(database=database, seed=7710)
+    host, guest = _open_pair(original, "legacy_rules")
+    started = _ready_and_start(original, "legacy_rules", host, guest)
+    hand = _snapshot(started)["payload"]["your_hand"]
+    version = _state(started)["version"]
+    with sqlite3.connect(database) as connection:
+        data = json.loads(connection.execute("SELECT blob FROM rooms").fetchone()[0])
+        del data["match"]["ruleset_id"]
+        del data["match"]["ruleset_fingerprint"]
+        connection.execute("UPDATE rooms SET blob = ?", (json.dumps(data),))
+    restarted = RoomService(database=database, seed=999)
+    snap = restarted.apply(_command("legacy_rules", "identity-read", 0, "request_snapshot", {}, host["session_token"]))
+    assert _snapshot(snap)["payload"]["your_hand"] == hand
+    assert _state(snap)["version"] == version
+    assert "ruleset_id" not in _state(snap)
+    restarted.apply(_command("legacy_rules", "identity-place", version, "place_tile", {"coordinate": hand[0]}, host["session_token"]))
+    with sqlite3.connect(database) as connection:
+        saved = json.loads(connection.execute("SELECT blob FROM rooms").fetchone()[0])
+    assert saved["match"]["ruleset_id"] == "classic_v1"
+    assert len(saved["match"]["ruleset_fingerprint"]) == 64
+
+
+def test_restart_refuses_incompatible_rules_without_rewriting_database(tmp_path):
+    import sqlite3
+    import pytest
+
+    database = tmp_path / "incompatible-identity.db"
+    original = RoomService(database=database, seed=7710)
+    host, guest = _open_pair(original, "wrong_rules")
+    _ready_and_start(original, "wrong_rules", host, guest)
+    with sqlite3.connect(database) as connection:
+        data = json.loads(connection.execute("SELECT blob FROM rooms").fetchone()[0])
+        data["match"]["ruleset_fingerprint"] = "f" * 64
+        bad_blob = json.dumps(data)
+        connection.execute("UPDATE rooms SET blob = ?", (bad_blob,))
+    with pytest.raises(ValueError, match="fingerprint"):
+        RoomService(database=database)
+    with sqlite3.connect(database) as connection:
+        assert connection.execute("SELECT blob FROM rooms").fetchone()[0] == bad_blob

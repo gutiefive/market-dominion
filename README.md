@@ -4,6 +4,8 @@ A fictional tile-and-market strategy game for 2–4 players. Cash, shares, and B
 
 **Client 0.20.0 is a browser-beta slice.** The page is a Godot 4.7.2 Compatibility single-threaded export. The API is a long-lived FastAPI process with SQLite. The M9 candidate completed a full two-browser Chromium match on loopback HTTP, including refresh/reconnect and identical final standings. See [release validation](docs/milestones/M9_RELEASE_CANDIDATE.md). There is no public HTTPS site. See [TASKS.md](TASKS.md), [docs/ROADMAP_M9_M12.md](docs/ROADMAP_M9_M12.md), and [RUNBOOK.md](RUNBOOK.md).
 
+M10 development has started with a main menu and a guided local Classic match. See [M10 scope and remaining acceptance](docs/milestones/M10_PLAYER_EXPERIENCE.md). This first slice is not a completed `0.21.x` release.
+
 ## Tested Godot build
 
 Pinned and executed in this checkout:

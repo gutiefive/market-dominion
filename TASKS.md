@@ -130,6 +130,17 @@ Client `0.20.0`. Protocol stays `0.1.0`. Local M9 acceptance is verified; public
 - [x] Container image rebuilt; readiness and room creation passed with `MD_ENV=container`
 - [x] Tablet/phone desktop viewport interaction: placement and share buys/sells at 768×1024 and 390×844
 
+## M10 First-time player experience
+
+In Progress. See [M10 scope and acceptance](docs/milestones/M10_PLAYER_EXPERIENCE.md). Client remains `0.20.0` until the milestone deliverable is verified.
+
+- [x] Main menu routes to guided Classic, computers, pass-and-play and existing online rooms
+- [x] Guided seeded Classic match with phase-specific explanations and a non-mutating tile-selection helper
+- [x] Headless production-UI regression reaches guided standings with invariant checks
+- [ ] First-time-human tutorial usability acceptance
+- [ ] Real market-history feedback and post-match analysis
+- [ ] Analytics/privacy decision, multi-seed simulation harness, accessibility/performance budgets
+
 ## Known limits
 
 - `POST /v1/protocol/commands/validate` never mutates a match. Authoritative play goes through the room API.

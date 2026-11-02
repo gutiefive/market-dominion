@@ -16,6 +16,13 @@ var _hover := ""
 var _concealed := false
 var _wide := true
 
+var _menu: VBoxContainer
+var _guided := false
+var _guide_card: PanelContainer
+var _guide_title: Label
+var _guide_copy: Label
+var _guide_select: Button
+
 var _setup: VBoxContainer
 var _order: VBoxContainer
 var _order_list: Label
@@ -152,7 +159,7 @@ func _build() -> void:
 	_standings.visible = false
 	add_child(_standings)
 	_standings.play_again_pressed.connect(_on_deal_pressed)
-	_standings.lobby_pressed.connect(_show_setup)
+	_standings.lobby_pressed.connect(_show_menu)
 
 	var root := VBoxContainer.new()
 	root.add_theme_constant_override("separation", 6)
@@ -160,10 +167,12 @@ func _build() -> void:
 	root.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.add_child(root)
 
-	var header := HBoxContainer.new()
-	header.add_theme_constant_override("separation", 12)
+	var header := HFlowContainer.new()
+	header.add_theme_constant_override("h_separation", 12)
+	header.add_theme_constant_override("v_separation", 8)
 	root.add_child(header)
 	var titles := VBoxContainer.new()
+	titles.custom_minimum_size.x = 240
 	titles.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(titles)
 	titles.add_child(_label("Market Dominion", 22, TEXT))
@@ -183,8 +192,8 @@ func _build() -> void:
 	var rules_button := _button("Rules", false)
 	rules_button.pressed.connect(func() -> void: _rules.show_panel())
 	tools.add_child(rules_button)
-	var fresh := _button("New table", false)
-	fresh.pressed.connect(_show_setup)
+	var fresh := _button("Main menu", false)
+	fresh.pressed.connect(_show_menu)
 	tools.add_child(fresh)
 
 	_status = _label("", 14, MUTED)
@@ -193,6 +202,8 @@ func _build() -> void:
 	_error.visible = false
 	root.add_child(_error)
 
+	_menu = _build_menu()
+	root.add_child(_menu)
 	_setup = _build_setup()
 	_order = _build_order()
 	_play = _build_play()
@@ -206,7 +217,55 @@ func _build() -> void:
 	add_child(_online)
 	for layer in [_merger_layer, _founder_layer, _confirm_layer, _event_layer, _error_layer, _rules, _online]:
 		layer.move_to_front()
+	_show_menu()
+
+
+func _build_menu() -> VBoxContainer:
+	var panel := VBoxContainer.new()
+	panel.add_theme_constant_override("separation", 12)
+	panel.add_child(_label("Choose your table", 24, TEXT))
+	panel.add_child(_label("Grow companies on the district board, trade fictional shares and BYTE, and finish with the highest net worth.", 16, MUTED))
+	var learn := _button("Learn Classic · guided match", true)
+	learn.pressed.connect(_start_guided)
+	panel.add_child(learn)
+	panel.add_child(_label("Learn by playing a full Classic match against one Easy computer. Guidance follows each real game phase. No account or network is needed.", 14, MUTED))
+	var solo := _button("Play computers", false)
+	solo.pressed.connect(_open_local_setup.bind(true))
+	panel.add_child(solo)
+	var shared := _button("Pass and play", false)
+	shared.pressed.connect(_open_local_setup.bind(false))
+	panel.add_child(shared)
+	var online := _button("Online room", false)
+	online.pressed.connect(_show_online)
+	panel.add_child(online)
+	return panel
+
+
+func _show_menu() -> void:
 	_show_setup()
+	_setup.visible = false
+	_menu.visible = true
+	_status.text = "Choose a guided match, local play, or an online room."
+	_scroll.scroll_vertical = 0
+
+
+func _open_local_setup(solo: bool) -> void:
+	_show_setup()
+	_vs_bots.button_pressed = solo
+	_sync_seat_mode()
+
+
+func _start_guided() -> void:
+	_show_setup()
+	_guided = true
+	_vs_bots.button_pressed = true
+	_sync_seat_mode()
+	_seed_input.text = "7710"
+	_difficulty.selected = 0
+	_name_inputs[0].text = "Rowan"
+	_seat_checks[2].button_pressed = false
+	_seat_checks[3].button_pressed = false
+	_on_deal_pressed()
 
 
 func _build_setup() -> VBoxContainer:
@@ -307,6 +366,21 @@ func _build_play() -> VBoxContainer:
 	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	panel.add_theme_constant_override("separation", 6)
 
+	_guide_card = _card()
+	_guide_card.visible = false
+	panel.add_child(_guide_card)
+	var guide_box := _box_of(_guide_card)
+	_guide_title = _label("", 18, TEAL)
+	_guide_copy = _label("", 14, TEXT)
+	guide_box.add_child(_guide_title)
+	guide_box.add_child(_guide_copy)
+	_guide_select = _button("Show a tile in my hand", false)
+	_guide_select.pressed.connect(_select_guided_tile)
+	guide_box.add_child(_guide_select)
+	var stop := _button("Continue without guidance", false)
+	stop.pressed.connect(func() -> void: _guided = false; _refresh())
+	guide_box.add_child(stop)
+
 	var seats := preload("res://scenes/components/seat_bar.tscn").instantiate() as SeatBar
 	_seats = seats
 	seats.grab()
@@ -346,6 +420,7 @@ func _build_play() -> VBoxContainer:
 
 	_checklist = _label("", 13, TEXT)
 	_checklist.visible = false
+	_column.add_child(_checklist)
 
 	var board_panel := preload("res://scenes/components/board_panel.tscn").instantiate() as BoardPanel
 	board_panel.grab()
@@ -491,6 +566,9 @@ func _hide_online() -> void:
 
 
 func _show_setup() -> void:
+	_guided = false
+	if _menu != null:
+		_menu.visible = false
 	_match = null
 	_selected = ""
 	_concealed = false
@@ -596,6 +674,7 @@ func _on_deal_pressed() -> void:
 
 func _begin_match(table: OfflineMatch) -> void:
 	_match = table
+	_menu.visible = false
 	_selected = ""
 	_seen_ready = false
 	if _standings != null:
@@ -636,6 +715,7 @@ func _reveal() -> void:
 	_selected = ""
 	_order.visible = false
 	_play.visible = true
+	_scroll.scroll_vertical = 0
 	if _solo() and _match.phase != "completed" and bool(_match.active_player().get("bot", false)):
 		_run_bots()
 		return
@@ -740,6 +820,7 @@ func _refresh() -> void:
 	_sync_error_line()
 	if _match == null:
 		return
+	_refresh_guidance()
 	var player := _match.active_player()
 	var hand: Array = player["hand"]
 	var placing := _match.phase == "place" and not _concealed and not _viewing_bot()
@@ -806,6 +887,23 @@ func _refresh() -> void:
 	_sync_dock()
 	if _play.visible:
 		_fit_board()
+
+
+func _refresh_guidance() -> void:
+	_guide_card.visible = _guided
+	if not _guided or _match == null:
+		return
+	var info := GuidedMatch.guidance(_match)
+	_guide_title.text = str(info["title"])
+	_guide_copy.text = str(info["body"])
+	_guide_select.visible = not _concealed and GuidedMatch.suggested_tile(_match) != ""
+
+
+func _select_guided_tile() -> void:
+	if not _guided or _match == null or _concealed:
+		return
+	_selected = GuidedMatch.suggested_tile(_match)
+	_refresh()
 
 
 func _fill_dock(player: Dictionary, market_open: bool) -> void:
@@ -1077,7 +1175,7 @@ func _show_standings() -> void:
 			"book": " · ".join(book_bits),
 		})
 		rank += 1
-	_standings.present(_winner_line(), rows)
+	_standings.present(("Guided match complete. " if _guided else "") + _winner_line(), rows)
 	_standings.move_to_front()
 
 

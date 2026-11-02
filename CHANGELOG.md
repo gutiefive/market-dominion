@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased — M10 first slice
+
+M10 is in progress. Client remains `0.20.0` and protocol `0.1.0`; the complete `0.21.x` milestone is not claimed.
+
+- Added a main menu for guided Classic, computers, pass-and-play and existing online rooms, with a wrapping header at phone-sized widths.
+- Added a full guided local Classic match against one Easy computer. Guidance reads actual placement, founding, merger, market and completion phases. Tile help selects a real hand tile without placing it or changing the game state; guidance can be dismissed for the rest of the match.
+- Added `m10_check.gd` to the standard Godot check script. A complete seed-7710 guided match passes 59 automated human-seat actions, per-action tile/economy invariants, non-mutating guidance checks, completion standings and menu-route checks. This is an automated UI regression, not a human usability playtest or a general multi-seed simulation harness.
+- Fixed ownership of an existing hidden local checklist label found by the UI cleanup regression.
+- Verified 87 Python tests, Godot M0–M10, web export, Chromium menu/turn-order/guidance/placement-to-market interaction, and a 390×844 desktop menu viewport. A separate short M9 regression passed first invitation join, ready/start and five UI game actions in two browser contexts; the full M9 match was not repeated for this menu change.
+
+Remaining M10 work and acceptance limits are in [the milestone](docs/milestones/M10_PLAYER_EXPERIENCE.md): human tutorial usability, real market history, post-match analysis, analytics/privacy, multi-seed simulation, and accessibility/performance budgets.
+
 ## 0.20.0 M9 release candidate — 2026-11-01
 
 Continues `231d2ab` and invitation/session follow-up `292c121`. M10 is not started. Classic rules and protocol `0.1.0` remain unchanged.

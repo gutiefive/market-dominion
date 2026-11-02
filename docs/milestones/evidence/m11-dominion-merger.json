@@ -1,0 +1,38 @@
+{
+  "ruleset_id": "dominion_v1",
+  "scope": "isolated financial resolution; not a room/match/UI integration",
+  "scenarios": 4,
+  "state_snapshots": 15,
+  "trace_sha256": "903ce085376b6ae1aaca5e5029c12ca0398fd4192a7a9dacecd7206a4ddcec24",
+  "positive_holdings_bank_combinations": 420,
+  "legal_exchanges_per_engine": 2135,
+  "atomic_over_request_checks_per_engine": 420,
+  "python_tests_passed": 591,
+  "fresh_python_process_restore": true,
+  "examples": [
+    "specified cash and swap result",
+    "multiple losing companies ordered by fixture then player id",
+    "tied minority bonus remainder",
+    "empty queue"
+  ],
+  "checks": [
+    "share banks and held shares sum to 20",
+    "odd leftovers sold at frozen quote",
+    "invalid actor, company, resolution, version and quantity rejected unchanged",
+    "same request retry returns stored receipt before and after JSON recovery",
+    "changed action-id reuse rejected",
+    "timeout sells only pending holder for cash; late timeout rejected",
+    "derived snapshot corruption rejected by full replay",
+    "input financial copies exclude hands and session metadata",
+    "retry with a refreshed expected-version precondition still returns the original receipt"
+  ],
+  "installed_image_scenarios": 4,
+  "installed_image_trace_sha256": "903ce085376b6ae1aaca5e5029c12ca0398fd4192a7a9dacecd7206a4ddcec24",
+  "docker_image_sha256": "9f927cd115e9ca3922b82303f8877439a2d82b69e6b56d202181146d1960872d",
+  "dominion_playable": false,
+  "room_restart_or_network_recovery_tested": false,
+  "board_repricing_or_market_resume_integrated": false,
+  "balance_verified": false,
+  "browser_smoke_scope": "Canvas/Engine load only; two clean runs after fixing Chromium process/profile cleanup. No Dominion gameplay.",
+  "browser_smoke_clean_exits": 2
+}

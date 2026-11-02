@@ -99,7 +99,7 @@ Implementation order:
 5. Add history-based dashboards and legal private-information-limited AI; run full Classic/Dominion parity simulations.
 6. Complete a whole local and two-browser Dominion match, including mid-disposition refresh/reconnect, matching standings and privacy checks. Run export/container regressions and honest device/browser checks before `0.22.x` release.
 
-The company pricing calculator is now implemented separately in Python and Godot with versioned parameters at `shared/fixtures/dominion_v1/pricing.json`. It is not connected to founding, growth, merger or event transitions yet, and does not enable Dominion in any menu or room. M11.2 game integration and M11.3–M11.8 remain open.
+The company pricing calculator is now implemented separately in Python and Godot with versioned parameters at `shared/fixtures/dominion_v1/pricing.json`. It is not connected to founding, growth, merger or event transitions yet, and does not enable Dominion in any menu or room. The [financial merger core](milestones/M11_MERGER_CORE.md) is also implemented in Python/Godot with ordered choices, finite inventory, transactional receipts and replay-checked serialization. M11.2/M11.3 match integration and M11.4–M11.8 remain open.
 
 ### Pricing calculation contract and evidence
 

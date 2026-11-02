@@ -6,7 +6,7 @@ A fictional tile-and-market strategy game for 2–4 players. Cash, shares, and B
 
 M10 development now includes guided Classic play, recorded quote history, reconciled local post-match analysis and a deterministic simulation harness. See [M10 scope and remaining acceptance](docs/milestones/M10_PLAYER_EXPERIENCE.md). This first slice is not a completed `0.21.x` release.
 
-M11 development has begun with the [Dominion design and ruleset foundation](docs/milestones/M11_DOMINION_MODE.md). Classic is the only playable ruleset. Isolated Dominion company pricing calculators have Python/Godot arithmetic parity; match integration, merger choices, BYTE flow and mode selection are still pending; no `0.22.x` release is claimed.
+M11 development has begun with the [Dominion design and ruleset foundation](docs/milestones/M11_DOMINION_MODE.md). Classic is the only playable ruleset. Isolated Dominion pricing and merger financial cores have Python/Godot parity; full match/room/UI integration, BYTE flow and mode selection are still pending; no `0.22.x` release is claimed.
 
 ## Tested Godot build
 

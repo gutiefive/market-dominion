@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — M11 merger financial core
+
+- Implemented isolated Python/Godot financial resolutions with frozen quote/holding snapshots, single bonus calculation, ordered shareholder choices, finite-bank 2-for-1 exchanges, odd cash leftovers and original-placer resume metadata.
+- Added atomic rejection, version/resolution/holder checks, copied receipts, exact retry handling, cash-only timeout defaults and full replay validation of serialized derived state. Inputs/exports exclude private hands and session metadata.
+- Verified four manual scenarios and matching complete-state traces; all 2,135 legal swap cases and 420 over-requests across 420 holdings/bank combinations; JSON and fresh-process recovery; 591 Python tests and strict Godot checks. The core is not wired to rooms, board updates, UI, timers or scoring; Dominion remains disabled and Classic stays on its existing path.
+- Fixed a browser-smoke cleanup race by stopping only the test Chromium process group, reaping terminated processes and bounding retries of transient profile-directory cleanup. Two repeat browser load checks exited cleanly.
+
 ## Unreleased — M11 company pricing calculators
 
 - Implemented the specified experimental Dominion company growth/sentiment profiles in separate Python and Godot calculators with versioned parameters. Classic remains on its existing price path and Dominion remains disabled.

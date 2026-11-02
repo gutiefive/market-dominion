@@ -82,3 +82,6 @@ run_godot --headless --path "$ROOT/client" --script res://tests/m11_check.gd
 
 run_godot --headless --path "$ROOT/client" --check-only --script res://tests/m11_pricing_check.gd
 run_godot --headless --path "$ROOT/client" --script res://tests/m11_pricing_check.gd
+
+run_godot --headless --path "$ROOT/client" --check-only --script res://tests/m11_merger_check.gd
+run_godot --headless --path "$ROOT/client" --script res://tests/m11_merger_check.gd

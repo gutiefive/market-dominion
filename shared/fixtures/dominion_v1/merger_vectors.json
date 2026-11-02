@@ -1,0 +1,400 @@
+{
+  "ruleset_id": "dominion_v1",
+  "scenarios": [
+    {
+      "name": "written_swap",
+      "opening": {
+        "resolution_id": "m1",
+        "survivor_id": "nova_ai",
+        "placer_id": "p2",
+        "losing_ids": [
+          "volt_grid"
+        ],
+        "companies": [
+          {
+            "id": "evermart",
+            "bank_shares": 20,
+            "share_price": 0
+          },
+          {
+            "id": "pulse_media",
+            "bank_shares": 20,
+            "share_price": 0
+          },
+          {
+            "id": "volt_grid",
+            "bank_shares": 12,
+            "share_price": 220
+          },
+          {
+            "id": "orbit_pay",
+            "bank_shares": 20,
+            "share_price": 0
+          },
+          {
+            "id": "nova_ai",
+            "bank_shares": 3,
+            "share_price": 390
+          }
+        ],
+        "players": [
+          {
+            "id": "p2",
+            "cash": 1000,
+            "shares": {
+              "nova_ai": 17,
+              "orbit_pay": 0,
+              "volt_grid": 3,
+              "pulse_media": 0,
+              "evermart": 0
+            }
+          },
+          {
+            "id": "p1",
+            "cash": 1000,
+            "shares": {
+              "nova_ai": 0,
+              "orbit_pay": 0,
+              "volt_grid": 5,
+              "pulse_media": 0,
+              "evermart": 0
+            }
+          }
+        ]
+      },
+      "choices": [
+        2,
+        1
+      ],
+      "queue": [
+        [
+          "volt_grid",
+          "p1"
+        ],
+        [
+          "volt_grid",
+          "p2"
+        ]
+      ],
+      "cash": {
+        "p1": 1660,
+        "p2": 1440
+      },
+      "survivor_holdings": {
+        "p1": 2,
+        "p2": 18
+      },
+      "survivor_bank": 0
+    },
+    {
+      "name": "multiple_losers",
+      "opening": {
+        "resolution_id": "m2",
+        "survivor_id": "nova_ai",
+        "placer_id": "p3",
+        "losing_ids": [
+          "volt_grid",
+          "orbit_pay"
+        ],
+        "companies": [
+          {
+            "id": "evermart",
+            "bank_shares": 20,
+            "share_price": 0
+          },
+          {
+            "id": "pulse_media",
+            "bank_shares": 20,
+            "share_price": 0
+          },
+          {
+            "id": "volt_grid",
+            "bank_shares": 16,
+            "share_price": 220
+          },
+          {
+            "id": "orbit_pay",
+            "bank_shares": 17,
+            "share_price": 200
+          },
+          {
+            "id": "nova_ai",
+            "bank_shares": 2,
+            "share_price": 390
+          }
+        ],
+        "players": [
+          {
+            "id": "p3",
+            "cash": 1000,
+            "shares": {
+              "nova_ai": 18,
+              "orbit_pay": 0,
+              "volt_grid": 1,
+              "pulse_media": 0,
+              "evermart": 0
+            }
+          },
+          {
+            "id": "p2",
+            "cash": 1000,
+            "shares": {
+              "nova_ai": 0,
+              "orbit_pay": 1,
+              "volt_grid": 2,
+              "pulse_media": 0,
+              "evermart": 0
+            }
+          },
+          {
+            "id": "p1",
+            "cash": 1000,
+            "shares": {
+              "nova_ai": 0,
+              "orbit_pay": 2,
+              "volt_grid": 1,
+              "pulse_media": 0,
+              "evermart": 0
+            }
+          }
+        ]
+      },
+      "choices": [
+        1,
+        0,
+        0,
+        1,
+        0
+      ],
+      "queue": [
+        [
+          "orbit_pay",
+          "p1"
+        ],
+        [
+          "orbit_pay",
+          "p2"
+        ],
+        [
+          "volt_grid",
+          "p1"
+        ],
+        [
+          "volt_grid",
+          "p2"
+        ],
+        [
+          "volt_grid",
+          "p3"
+        ]
+      ],
+      "cash": {
+        "p1": 1730,
+        "p2": 1840,
+        "p3": 1330
+      },
+      "survivor_holdings": {
+        "p1": 1,
+        "p2": 1,
+        "p3": 18
+      },
+      "survivor_bank": 0
+    },
+    {
+      "name": "minority_remainder",
+      "opening": {
+        "resolution_id": "m3",
+        "survivor_id": "nova_ai",
+        "placer_id": "p4",
+        "losing_ids": [
+          "volt_grid"
+        ],
+        "companies": [
+          {
+            "id": "evermart",
+            "bank_shares": 20,
+            "share_price": 0
+          },
+          {
+            "id": "pulse_media",
+            "bank_shares": 20,
+            "share_price": 0
+          },
+          {
+            "id": "volt_grid",
+            "bank_shares": 12,
+            "share_price": 220
+          },
+          {
+            "id": "orbit_pay",
+            "bank_shares": 20,
+            "share_price": 0
+          },
+          {
+            "id": "nova_ai",
+            "bank_shares": 0,
+            "share_price": 390
+          }
+        ],
+        "players": [
+          {
+            "id": "p4",
+            "cash": 1000,
+            "shares": {
+              "nova_ai": 20,
+              "orbit_pay": 0,
+              "volt_grid": 5,
+              "pulse_media": 0,
+              "evermart": 0
+            }
+          },
+          {
+            "id": "p3",
+            "cash": 1000,
+            "shares": {
+              "nova_ai": 0,
+              "orbit_pay": 0,
+              "volt_grid": 1,
+              "pulse_media": 0,
+              "evermart": 0
+            }
+          },
+          {
+            "id": "p2",
+            "cash": 1000,
+            "shares": {
+              "nova_ai": 0,
+              "orbit_pay": 0,
+              "volt_grid": 1,
+              "pulse_media": 0,
+              "evermart": 0
+            }
+          },
+          {
+            "id": "p1",
+            "cash": 1000,
+            "shares": {
+              "nova_ai": 0,
+              "orbit_pay": 0,
+              "volt_grid": 1,
+              "pulse_media": 0,
+              "evermart": 0
+            }
+          }
+        ]
+      },
+      "choices": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "queue": [
+        [
+          "volt_grid",
+          "p1"
+        ],
+        [
+          "volt_grid",
+          "p2"
+        ],
+        [
+          "volt_grid",
+          "p3"
+        ],
+        [
+          "volt_grid",
+          "p4"
+        ]
+      ],
+      "cash": {
+        "p1": 1294,
+        "p2": 1293,
+        "p3": 1293,
+        "p4": 2540
+      },
+      "survivor_holdings": {
+        "p1": 0,
+        "p2": 0,
+        "p3": 0,
+        "p4": 20
+      },
+      "survivor_bank": 0
+    },
+    {
+      "name": "no_holders",
+      "opening": {
+        "resolution_id": "m4",
+        "survivor_id": "nova_ai",
+        "placer_id": "p2",
+        "losing_ids": [
+          "volt_grid"
+        ],
+        "companies": [
+          {
+            "id": "evermart",
+            "bank_shares": 20,
+            "share_price": 0
+          },
+          {
+            "id": "pulse_media",
+            "bank_shares": 20,
+            "share_price": 0
+          },
+          {
+            "id": "volt_grid",
+            "bank_shares": 20,
+            "share_price": 220
+          },
+          {
+            "id": "orbit_pay",
+            "bank_shares": 20,
+            "share_price": 0
+          },
+          {
+            "id": "nova_ai",
+            "bank_shares": 20,
+            "share_price": 390
+          }
+        ],
+        "players": [
+          {
+            "id": "p2",
+            "cash": 1000,
+            "shares": {
+              "nova_ai": 0,
+              "orbit_pay": 0,
+              "volt_grid": 0,
+              "pulse_media": 0,
+              "evermart": 0
+            }
+          },
+          {
+            "id": "p1",
+            "cash": 1000,
+            "shares": {
+              "nova_ai": 0,
+              "orbit_pay": 0,
+              "volt_grid": 0,
+              "pulse_media": 0,
+              "evermart": 0
+            }
+          }
+        ]
+      },
+      "choices": [],
+      "queue": [],
+      "cash": {
+        "p1": 1000,
+        "p2": 1000
+      },
+      "survivor_holdings": {
+        "p1": 0,
+        "p2": 0
+      },
+      "survivor_bank": 20
+    }
+  ],
+  "trace_sha256": "903ce085376b6ae1aaca5e5029c12ca0398fd4192a7a9dacecd7206a4ddcec24",
+  "trace_note": "Canonical full-state trace baseline, with financial balances/queue order separately specified above. Trace includes opening state and each accepted choice; JSON keys sorted, integral numbers, compact separators."
+}

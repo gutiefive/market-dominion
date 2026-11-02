@@ -6,7 +6,7 @@ Add a versioned advanced ruleset while Classic retains the current v1 equations 
 
 ## Current status
 
-**In Progress — identity foundation and isolated company pricing.** The user accepted the scripted M10 build for continued development. Deferred human/device/accessibility/public-release checks remain open.
+**In Progress — identity foundation, isolated pricing and merger financial resolution.** The user accepted the scripted M10 build for continued development. Deferred human/device/accessibility/public-release checks remain open.
 
 The [Dominion specification](../dominion_mode.md) was written before this implementation. It defines experimental company identities, supply-constrained 2-for-1 merger swaps with cash residuals, round BYTE flow/event ordering, arithmetic vectors, timeout/restart behavior, privacy, AI constraints and staged acceptance. Numerical tuning is proposed, not balance-verified.
 
@@ -16,7 +16,7 @@ The [Dominion specification](../dominion_mode.md) was written before this implem
 | --- | --- |
 | M11.1 Classic and Dominion modes | In Progress: shared version registry, Classic fingerprint, persisted identity and legacy restore; Dominion reserved and disabled, network selection/UI pending |
 | M11.2 Company financial identities | Python/Godot standalone calculators verified across 2,050 cases; versioned parameters implemented; match integration pending |
-| M11.3 Merger choices within the share supply | Specified; implementation pending |
+| M11.3 Merger choices within the share supply | Financial core verified in Python/Godot: queue, swaps, cash leftovers, receipts, replay and timeout; match/board/room/UI integration pending |
 | M11.4 BYTE price model | Specified; implementation pending |
 | M11.5 Market events | Existing effects retained in design; Dominion ordering/fixtures pending |
 | M11.6 Financial dashboards from match history | Pending Dominion implementation |
@@ -37,7 +37,7 @@ Results for this foundation are recorded after the Python, strict Godot, export 
 
 ## Next
 
-Implement atomic merger dispositions and flow/event state transitions, then integrate the verified company calculator into the new match lifecycle. Keep Classic fixtures pinned and Dominion selection disabled until its engine, network contract and acceptance checks are ready.
+Implement BYTE flow and round-event ordering next, then integrate the verified pricing/merger components into the new match lifecycle. Keep Classic fixtures pinned and Dominion selection disabled until its engine, network contract and acceptance checks are ready.
 
 ## Foundation results
 
@@ -54,4 +54,11 @@ Public HTTPS, CI runner results, human revised-tutorial comprehension, physical-
 
 The [pricing evidence](evidence/m11-dominion-pricing.json) records matching Python/Godot hashes for all 2,050 company/size/sentiment combinations against an independent exact-Fraction reference. Shared fixtures contain the experimental profiles and explicit written/rounding/boundary vectors. Tests reject invalid inputs, check quote monotonicity and whole-board bounds, preserve Classic's $220 example while Dominion NOVA AI returns $240, and confirm the factory still refuses Dominion. This is arithmetic coverage, not game integration or balance evidence.
 
-127 Python tests and strict Godot M0–M11/history/focus/pricing checks passed. The standard Godot runner now includes the full pricing matrix test. Web export and Chromium canvas/Engine load smoke passed. This is a load check, not browser Dominion gameplay. Docker image `584e085e848f6103b726dd751352af41853617d56b4bfb917e7eb9c327129e48` built successfully; its installed calculator and nested fixtures reproduced all 2,050 quotes and kept Dominion disabled. No Classic equation, core fixture, protocol field, saved-game format or gameplay screen changed in this pricing step.
+127 Python tests and strict Godot M0–M11/history/focus/pricing checks passed. The standard Godot runner now includes the full pricing matrix test. Web export and Chromium canvas/Engine load smoke passed. The harness initially raced profile cleanup after the page loaded; it now terminates its own Chromium process group, waits/reaps processes and retries transient profile-directory cleanup. Two subsequent runs exited cleanly. This is a load check, not browser Dominion gameplay. Docker image `584e085e848f6103b726dd751352af41853617d56b4bfb917e7eb9c327129e48` built successfully; its installed calculator and nested fixtures reproduced all 2,050 quotes and kept Dominion disabled. No Classic equation, core fixture, protocol field, saved-game format or gameplay screen changed in this pricing step.
+
+
+## Merger core results
+
+See the [financial-resolution core and integration contract](M11_MERGER_CORE.md) and [evidence](evidence/m11-dominion-merger.json). Python/Godot match all four manual scenarios and the full 15-snapshot trace. Both check 2,135 legal exchanges across 420 holdings/bank combinations and 420 over-request rejections. JSON restore, fresh-Python-process continuation, bonus/idempotency retries, timeout/late timeout, inconsistent state rejection, copied ledgers and private-field exclusion are covered.
+
+591 Python tests passed. Strict Godot Classic/tutorial/identity/pricing regressions passed, including the final exhaustive merger checks; the standard runner includes the merger script. Web export and Chromium canvas/Engine load smoke passed. The harness initially raced profile cleanup after the page loaded; it now terminates its own Chromium process group, waits/reaps processes and retries transient profile-directory cleanup. Two subsequent runs exited cleanly. This is not browser Dominion gameplay or live-room reconnect acceptance. Docker image `9f927cd115e9ca3922b82303f8877439a2d82b69e6b56d202181146d1960872d` built successfully; its installed module and fixtures reproduced all four scenarios and the same complete state trace, including JSON recovery. Classic's merger path, wire protocol and persisted room schema remain unchanged.

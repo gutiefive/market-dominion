@@ -14,6 +14,9 @@ that loaded and then failed the checks.
 from __future__ import annotations
 
 import argparse
+import errno
+import os
+import signal
 import asyncio
 import json
 import shutil
@@ -179,6 +182,7 @@ def main() -> None:
             ],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
+            start_new_session=os.name == "posix",
         )
         if not _debugger_up(args.debug_port):
             print("BROWSER_SMOKE_UNVERIFIED chrome debugger did not answer")
@@ -204,18 +208,40 @@ def main() -> None:
         print("Checked the canvas node and that Godot Engine was created.")
         print("Did not play a match, did not send touch input, and did not use a phone.")
     finally:
-        if chrome is not None and chrome.poll() is None:
-            chrome.terminate()
+        if chrome is not None:
+            # Chromium's renderer/GPU children can outlive the launcher and
+            # keep writing its profile. Signal only the group this run created.
+            if os.name == "posix":
+                try:
+                    os.killpg(chrome.pid, signal.SIGTERM)
+                except ProcessLookupError:
+                    pass
+            elif chrome.poll() is None:
+                chrome.terminate()
             try:
                 chrome.wait(timeout=3)
             except subprocess.TimeoutExpired:
                 chrome.kill()
+                chrome.wait(timeout=3)
+            if os.name == "posix":
+                try:
+                    os.killpg(chrome.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
         server.terminate()
         try:
             server.wait(timeout=3)
         except subprocess.TimeoutExpired:
             server.kill()
-        profile.cleanup()
+            server.wait(timeout=3)
+        for attempt in range(6):
+            try:
+                profile.cleanup()
+                break
+            except OSError as exc:
+                if exc.errno not in (errno.ENOTEMPTY, errno.EBUSY) or attempt == 5:
+                    raise
+                time.sleep(0.1 * (attempt + 1))
 
 
 if __name__ == "__main__":

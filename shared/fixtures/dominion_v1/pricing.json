@@ -1,0 +1,17 @@
+{
+  "ruleset_id": "dominion_v1",
+  "status": "experimental_disabled",
+  "base_offset": 100,
+  "money_step": 10,
+  "size_min": 0,
+  "size_max": 81,
+  "sentiment_min": -2,
+  "sentiment_max": 2,
+  "companies": [
+    {"id": "nova_ai", "sector": "ai", "growth": 55, "sensitivity": 12},
+    {"id": "orbit_pay", "sector": "fintech", "growth": 45, "sensitivity": 8},
+    {"id": "volt_grid", "sector": "energy", "growth": 60, "sensitivity": 10},
+    {"id": "pulse_media", "sector": "media", "growth": 40, "sensitivity": 15},
+    {"id": "evermart", "sector": "retail", "growth": 50, "sensitivity": 5}
+  ]
+}

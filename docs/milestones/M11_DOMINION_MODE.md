@@ -6,7 +6,7 @@ Add a versioned advanced ruleset while Classic retains the current v1 equations 
 
 ## Current status
 
-**In Progress — specification and identity foundation.** The user accepted the scripted M10 build for continued development. Deferred human/device/accessibility/public-release checks remain open.
+**In Progress — identity foundation and isolated company pricing.** The user accepted the scripted M10 build for continued development. Deferred human/device/accessibility/public-release checks remain open.
 
 The [Dominion specification](../dominion_mode.md) was written before this implementation. It defines experimental company identities, supply-constrained 2-for-1 merger swaps with cash residuals, round BYTE flow/event ordering, arithmetic vectors, timeout/restart behavior, privacy, AI constraints and staged acceptance. Numerical tuning is proposed, not balance-verified.
 
@@ -15,7 +15,7 @@ The [Dominion specification](../dominion_mode.md) was written before this implem
 | Item | Status |
 | --- | --- |
 | M11.1 Classic and Dominion modes | In Progress: shared version registry, Classic fingerprint, persisted identity and legacy restore; Dominion reserved and disabled, network selection/UI pending |
-| M11.2 Company financial identities | Specified; implementation pending |
+| M11.2 Company financial identities | Python/Godot standalone calculators verified across 2,050 cases; versioned parameters implemented; match integration pending |
 | M11.3 Merger choices within the share supply | Specified; implementation pending |
 | M11.4 BYTE price model | Specified; implementation pending |
 | M11.5 Market events | Existing effects retained in design; Dominion ordering/fixtures pending |
@@ -37,7 +37,7 @@ Results for this foundation are recorded after the Python, strict Godot, export 
 
 ## Next
 
-Implement the specification's versioned company pricing and shared arithmetic vectors behind the disabled Dominion boundary. Keep Classic fixtures pinned. Then implement atomic merger dispositions and flow/event state transitions before enabling selection or a new protocol.
+Implement atomic merger dispositions and flow/event state transitions, then integrate the verified company calculator into the new match lifecycle. Keep Classic fixtures pinned and Dominion selection disabled until its engine, network contract and acceptance checks are ready.
 
 ## Foundation results
 
@@ -48,3 +48,10 @@ Implement the specification's versioned company pricing and shared arithmetic ve
 - Docker image `55766a3d56dcf0f29612e9464b0f88d7a3298905c38a4695dffeacd11ccebc30` built successfully. Inside the installed image, Classic fingerprint resolution and saved-state round-trip passed. `/health`, `/ready` and Docker health status passed; database schema and public protocol remain `1` and `0.1.0`. The temporary verification container was removed.
 
 Public HTTPS, CI runner results, human revised-tutorial comprehension, physical-device budgets and human accessibility checks remain unverified. These do not become Dominion acceptance evidence.
+
+
+## Company pricing results
+
+The [pricing evidence](evidence/m11-dominion-pricing.json) records matching Python/Godot hashes for all 2,050 company/size/sentiment combinations against an independent exact-Fraction reference. Shared fixtures contain the experimental profiles and explicit written/rounding/boundary vectors. Tests reject invalid inputs, check quote monotonicity and whole-board bounds, preserve Classic's $220 example while Dominion NOVA AI returns $240, and confirm the factory still refuses Dominion. This is arithmetic coverage, not game integration or balance evidence.
+
+127 Python tests and strict Godot M0–M11/history/focus/pricing checks passed. The standard Godot runner now includes the full pricing matrix test. Web export and Chromium canvas/Engine load smoke passed. This is a load check, not browser Dominion gameplay. Docker image `584e085e848f6103b726dd751352af41853617d56b4bfb917e7eb9c327129e48` built successfully; its installed calculator and nested fixtures reproduced all 2,050 quotes and kept Dominion disabled. No Classic equation, core fixture, protocol field, saved-game format or gameplay screen changed in this pricing step.

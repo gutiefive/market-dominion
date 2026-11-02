@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — M11 company pricing calculators
+
+- Implemented the specified experimental Dominion company growth/sentiment profiles in separate Python and Godot calculators with versioned parameters. Classic remains on its existing price path and Dominion remains disabled.
+- Added written vectors, exact half-up rounding cases, strict input/bound checks and all 2,050 board-size/sentiment combinations against a committed independent Fraction reference. Both engines produce the same matrix hash; these results are not balance or gameplay acceptance.
+- Verified 127 Python tests, strict Godot M0–M11/history/focus/pricing checks, web export/Chromium load and all 2,050 quotes inside the installed Docker image. Game integration, merger choices and BYTE flow are still pending.
+
 ## Unreleased — M11 ruleset foundation
 
 - Began M11 after the user accepted the scripted M10 build for continued development. Deferred human, accessibility, physical-device and deployment checks retain their unverified status.

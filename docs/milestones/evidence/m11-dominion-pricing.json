@@ -1,0 +1,17 @@
+{
+  "ruleset_id": "dominion_v1",
+  "scope": "isolated company quote calculators; no playable mode or match integration",
+  "python_cases": 2050,
+  "godot_cases": 2050,
+  "matrix_sha256": "e1c37367cf678f805ea2f20fa6cfcf3c5bb3a4c0082d5c539eabcdc729b00cf4",
+  "reference": "committed matrix from exact Fraction arithmetic using written specification identities",
+  "written_vectors": 9,
+  "invalid_inputs": "unknown IDs, board/sentiment bounds, booleans, strings, floats and nulls rejected",
+  "classic_ruleset_fingerprint": "fe23d6bda25d5b798ace18a387e5400f236f5c3fd026b4cc17c2a38e1b173a47",
+  "dominion_playable": false,
+  "balance_verified": false,
+  "installed_python_cases": 2050,
+  "installed_matrix_sha256": "e1c37367cf678f805ea2f20fa6cfcf3c5bb3a4c0082d5c539eabcdc729b00cf4",
+  "docker_image_sha256": "584e085e848f6103b726dd751352af41853617d56b4bfb917e7eb9c327129e48",
+  "browser_scope": "Rebuilt web export canvas/Engine load check only; no Dominion gameplay"
+}

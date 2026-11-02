@@ -2,7 +2,7 @@
 
 Audit base: `2ffc6b55928e54a0c39d303ca900a563c48e7fe0`, client `0.19.0`, protocol `0.1.0`.
 
-Current client: `0.20.0`. Protocol is still `0.1.0`. M9 local Chromium acceptance is verified; public release, CI runner results and additional browser/device gates remain pending. M10 has a scripted teaching course, recorded history, local analysis, privacy decisions and seeded simulation. The user accepted it for continued development; human/accessibility/device and public-release checks remain open. M11 has started with its written Dominion specification and Classic ruleset identity foundation. M12 is not started.
+Current client: `0.20.0`. Protocol is still `0.1.0`. M9 local Chromium acceptance is verified; public release, CI runner results and additional browser/device gates remain pending. M10 has a scripted teaching course, recorded history, local analysis, privacy decisions and seeded simulation. The user accepted it for continued development; human/accessibility/device and public-release checks remain open. M11 has its written Dominion specification, Classic identity foundation and isolated Python/Godot company pricing calculators. M12 is not started.
 
 ## What already existed
 
@@ -22,7 +22,7 @@ M0–M8 are in [TASKS.md](../TASKS.md). The server already had authoritative roo
 | 1 Audit and these documents | Done with the 0.20.0 commit | Gaps were the deadline loop, invite URLs, web server default, export checks, and deploy examples |
 | 2–3 M9 | Local acceptance verified; public release blocked | Full two-browser match, refresh/reconnect, responsive desktop viewports and container readiness passed. Public HTTPS, inaccessible CI results and physical devices remain pending |
 | 4 M10 | Accepted for continued development | Scripted course and local checks implemented/verified; user authorized moving on without declaring deferred release checks passed |
-| 5 M11 | In progress | Dominion specification written; Classic identity/fingerprint and legacy-save compatibility foundation implemented; advanced mechanics disabled |
+| 5 M11 | In progress | Classic identity/restore and isolated company pricing verified; Dominion engine and selection disabled |
 | 6 M12 | Not started | Profiles, server-side bots, rankings, replays |
 | 7 Regression | Not started | Full suite plus Classic, local AI, rooms, and web export |
 | 8 Final docs | Not started | Status labels must match the commands that were run |
@@ -35,4 +35,4 @@ M0–M8 are in [TASKS.md](../TASKS.md). The server already had authoritative roo
 
 ## Next
 
-Continue M11 from the written [Dominion specification](dominion_mode.md): implement versioned company pricing next, then merger dispositions, BYTE flow and the coordinated network contract. M10 human accessibility, revised-course comprehension and physical-device load/frame/input checks remain deferred, not verified. Leave public HTTPS blocked until authorized hosting exists and the real URL is tested. The milestone files use the labels Not Started, In Progress, Implemented, Verified, and Blocked.
+Continue M11 from the written [Dominion specification](dominion_mode.md): implement merger dispositions, BYTE flow and the coordinated network contract, then integrate the isolated company calculator. M10 human accessibility, revised-course comprehension and physical-device load/frame/input checks remain deferred, not verified. Leave public HTTPS blocked until authorized hosting exists and the real URL is tested. The milestone files use the labels Not Started, In Progress, Implemented, Verified, and Blocked.

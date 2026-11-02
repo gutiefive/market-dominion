@@ -1,0 +1,73 @@
+{
+  "ruleset_id": "dominion_v1",
+  "note": "Experimental, not balance acceptance. Expected matrix generated independently from the written spec with exact fractions.",
+  "company_order": [
+    "nova_ai",
+    "orbit_pay",
+    "volt_grid",
+    "pulse_media",
+    "evermart"
+  ],
+  "size_min": 0,
+  "size_max": 81,
+  "sentiment_min": -2,
+  "sentiment_max": 2,
+  "cases": 2050,
+  "matrix_sha256": "e1c37367cf678f805ea2f20fa6cfcf3c5bb3a4c0082d5c539eabcdc729b00cf4",
+  "quotes": [
+    {
+      "company_id": "nova_ai",
+      "size": 2,
+      "sentiment": 1,
+      "price": 240
+    },
+    {
+      "company_id": "orbit_pay",
+      "size": 2,
+      "sentiment": -1,
+      "price": 170
+    },
+    {
+      "company_id": "volt_grid",
+      "size": 3,
+      "sentiment": 0,
+      "price": 280
+    },
+    {
+      "company_id": "pulse_media",
+      "size": 2,
+      "sentiment": 2,
+      "price": 230
+    },
+    {
+      "company_id": "evermart",
+      "size": 2,
+      "sentiment": -2,
+      "price": 180
+    },
+    {
+      "company_id": "nova_ai",
+      "size": 1,
+      "sentiment": 0,
+      "price": 160
+    },
+    {
+      "company_id": "orbit_pay",
+      "size": 1,
+      "sentiment": 0,
+      "price": 150
+    },
+    {
+      "company_id": "volt_grid",
+      "size": 81,
+      "sentiment": 2,
+      "price": 5950
+    },
+    {
+      "company_id": "nova_ai",
+      "size": 0,
+      "sentiment": 2,
+      "price": 0
+    }
+  ]
+}

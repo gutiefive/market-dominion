@@ -1,0 +1,31 @@
+{
+  "cases": [
+    {
+      "actions": 157,
+      "difficulty": "normal",
+      "digest": "e8452b4143b9da23593487ac0f8d0059a46a185e2564a594ca949a5e762a9231",
+      "max_action_us": 78909,
+      "ranking": [
+        "p1",
+        "p2"
+      ],
+      "seats": 2,
+      "seed": 7710
+    },
+    {
+      "actions": 157,
+      "difficulty": "hard",
+      "digest": "e8452b4143b9da23593487ac0f8d0059a46a185e2564a594ca949a5e762a9231",
+      "max_action_us": 77739,
+      "ranking": [
+        "p1",
+        "p2"
+      ],
+      "seats": 2,
+      "seed": 7710
+    }
+  ],
+  "engine": "4.7.2-stable (official)",
+  "total_actions": 628,
+  "total_games": 4
+}

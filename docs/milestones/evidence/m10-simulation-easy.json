@@ -1,0 +1,202 @@
+{
+  "cases": [
+    {
+      "actions": 125,
+      "difficulty": "easy",
+      "digest": "a23700e4416f3ca5fab5ce83b1883c527a20a65cb97b5cfde063b99aa4a0324e",
+      "max_action_us": 12560,
+      "ranking": [
+        "p2",
+        "p1"
+      ],
+      "seats": 2,
+      "seed": 0
+    },
+    {
+      "actions": 185,
+      "difficulty": "easy",
+      "digest": "77989b69b7b81f7c3c8eef5ef02e58a301e08ae884c4fe08e054253cc92d664d",
+      "max_action_us": 25434,
+      "ranking": [
+        "p2",
+        "p3",
+        "p1"
+      ],
+      "seats": 3,
+      "seed": 0
+    },
+    {
+      "actions": 186,
+      "difficulty": "easy",
+      "digest": "63b5a2c59cc74b3547c7dc0847cb52088be8bbd2eec75ccb6f5f32475f2ba32b",
+      "max_action_us": 31505,
+      "ranking": [
+        "p4",
+        "p1",
+        "p2",
+        "p3"
+      ],
+      "seats": 4,
+      "seed": 0
+    },
+    {
+      "actions": 152,
+      "difficulty": "easy",
+      "digest": "741accd5257791b7714baeec3ab1560d865466c08813e00b445095a0f61d504e",
+      "max_action_us": 14776,
+      "ranking": [
+        "p1",
+        "p2"
+      ],
+      "seats": 2,
+      "seed": 1
+    },
+    {
+      "actions": 167,
+      "difficulty": "easy",
+      "digest": "d59b47d06754edcbfb7ac74edd89cd3aad71bb77ea51bef88b4c677c12c670d3",
+      "max_action_us": 23034,
+      "ranking": [
+        "p2",
+        "p3",
+        "p1"
+      ],
+      "seats": 3,
+      "seed": 1
+    },
+    {
+      "actions": 186,
+      "difficulty": "easy",
+      "digest": "5da501b906768e02922b801b0101fa85b0f4bc1e41db88d4cb30b000f4d0157e",
+      "max_action_us": 37330,
+      "ranking": [
+        "p2",
+        "p1",
+        "p3",
+        "p4"
+      ],
+      "seats": 4,
+      "seed": 1
+    },
+    {
+      "actions": 162,
+      "difficulty": "easy",
+      "digest": "902dc4d925ee5e9a40899e280dc169c8189881226130ea44af683ea51b6d9660",
+      "max_action_us": 21553,
+      "ranking": [
+        "p2",
+        "p1"
+      ],
+      "seats": 2,
+      "seed": 4
+    },
+    {
+      "actions": 158,
+      "difficulty": "easy",
+      "digest": "05f4b8891a93910d704e9535e5e91231263cc14471ae690e9170f53ee4b27fe4",
+      "max_action_us": 34448,
+      "ranking": [
+        "p1",
+        "p2",
+        "p3"
+      ],
+      "seats": 3,
+      "seed": 4
+    },
+    {
+      "actions": 173,
+      "difficulty": "easy",
+      "digest": "1ddb4032d9f04c3ee0c6347fa11ae6c924daff3b1cb7316be87ff06cec4df328",
+      "max_action_us": 34811,
+      "ranking": [
+        "p2",
+        "p1",
+        "p4",
+        "p3"
+      ],
+      "seats": 4,
+      "seed": 4
+    },
+    {
+      "actions": 146,
+      "difficulty": "easy",
+      "digest": "865cfa99b74312f0a66cec913accae2350029c32a1fcdc45d60f16f1e8e126dc",
+      "max_action_us": 16143,
+      "ranking": [
+        "p2",
+        "p1"
+      ],
+      "seats": 2,
+      "seed": 17
+    },
+    {
+      "actions": 185,
+      "difficulty": "easy",
+      "digest": "6f5d4774905a1ca96b9a0afb96c44bec0a41b1516da096a6a7eefdba3e858712",
+      "max_action_us": 27408,
+      "ranking": [
+        "p2",
+        "p3",
+        "p1"
+      ],
+      "seats": 3,
+      "seed": 17
+    },
+    {
+      "actions": 197,
+      "difficulty": "easy",
+      "digest": "1b7444d0c2687821837bd3b4c57f50e8fcf86a9fb8645186ea006e2e35d618dc",
+      "max_action_us": 35645,
+      "ranking": [
+        "p3",
+        "p1",
+        "p4",
+        "p2"
+      ],
+      "seats": 4,
+      "seed": 17
+    },
+    {
+      "actions": 163,
+      "difficulty": "easy",
+      "digest": "cf1f1848066ee290b4aabf37ba596d80c9935d2e2ab4f9440339b140d1ce3c67",
+      "max_action_us": 19574,
+      "ranking": [
+        "p1",
+        "p2"
+      ],
+      "seats": 2,
+      "seed": 7710
+    },
+    {
+      "actions": 176,
+      "difficulty": "easy",
+      "digest": "de1128d87a6b61002bd435690352316f2e11be32e1db140679c26a00c8e57560",
+      "max_action_us": 30400,
+      "ranking": [
+        "p2",
+        "p3",
+        "p1"
+      ],
+      "seats": 3,
+      "seed": 7710
+    },
+    {
+      "actions": 161,
+      "difficulty": "easy",
+      "digest": "02d37d0ed16460f88e644e4cbdbb1d79bbe404c1da56528cbdd955e060e7b007",
+      "max_action_us": 29537,
+      "ranking": [
+        "p4",
+        "p3",
+        "p1",
+        "p2"
+      ],
+      "seats": 4,
+      "seed": 7710
+    }
+  ],
+  "engine": "4.7.2-stable (official)",
+  "total_actions": 5044,
+  "total_games": 30
+}

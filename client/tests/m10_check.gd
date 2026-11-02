@@ -70,9 +70,38 @@ func _run() -> void:
 	if screen._match.phase != "completed" or not screen._standings.visible:
 		_fail("guided match did not reach visible standings")
 		return
+	for row in screen._match.ledger:
+		var analysis: Dictionary = screen._match.journal.analysis(str(row["id"]), screen._match.starting_cash, row)
+		if not bool(analysis["cash_reconciled"]):
+			_fail("completed local cash history did not reconcile")
+			return
 	if "Guided match complete" not in screen._standings.winner_label.text:
 		_fail("guided completion was not identified")
 		return
+	# Analysis remains inside a phone viewport at the largest existing text setting.
+	var saved_scale := Palette.text_scale
+	Palette.text_scale = float(Palette.SCALES[-1])
+	root.content_scale_size = Vector2i.ZERO
+	root.size = Vector2i(390, 844)
+	Palette.restyle(screen)
+	await process_frame
+	await process_frame
+	var card := screen._standings.get_node("Center/Card") as Control
+	if card.size.x > 390 or card.get_global_rect().position.x < 0 or card.get_global_rect().end.x > 390 or card.get_global_rect().end.y > 844 or screen._standings.again_button.custom_minimum_size.y < 44:
+		_fail("analysis layout: card=%s viewport=%s button_height=%s minimum=%s rectangle=%s" % [card.size, root.get_visible_rect().size, screen._standings.again_button.custom_minimum_size.y, card.get_combined_minimum_size(), card.get_global_rect()])
+		return
+	for button in screen._watch.find_children("*", "Button", true, false):
+		if button.focus_mode != Control.FOCUS_ALL or button.get_theme_font_size("font_size") != Palette.px(14):
+			_fail("history controls did not preserve focus or text scaling")
+			return
+	screen._standings.again_button.grab_focus()
+	await process_frame
+	await process_frame
+	var scroll := screen._standings.get_node("Center/Card/Margin/Scroll") as ScrollContainer
+	if screen._standings.again_button.get_global_rect().end.y > scroll.get_global_rect().end.y + 1:
+		_fail("analysis did not scroll the focused replay control into view")
+		return
+	Palette.text_scale = saved_scale
 	screen._show_menu()
 	screen._open_local_setup(false)
 	if screen._guided or screen._vs_bots.button_pressed or not screen._setup.visible:

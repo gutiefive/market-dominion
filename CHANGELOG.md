@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — M10 recorded history, analysis and validation
+
+- Added bounded, in-memory quote history at successful local rules-engine actions, with actual event explanations, immutable views and no speculative/bot-planning or rejected-trade movement. Online charts show only observations since this page joined, with explicit reconnect gaps and no fabricated archive.
+- Added collapsible, keyboard-focusable history charts with numeric text, gap breaks and an explicit non-time x-axis. Added wrapping/scrolling local standings with action counts and a cash bridge covering market spending/sales, merger bonuses and buyouts. Closing holdings remain ledger-sourced; incomplete accounting is disclosed.
+- Added a general multi-seed simulation CLI and wrapper. Thirty Easy games across five seeds and 2–4 seats plus four Normal/Hard games passed 5,672 actions, deterministic replay hashes, conservation and cash reconciliation. Added focused journal regressions and hardened runners against zero-exit Godot script errors.
+- Recorded an automated browser tutorial completion with actual trades/history, desktop analysis, phone-sized standings controls and no external application requests. Modal-detection OCR was corrected during the run; its attempted label clicks are not game statistics.
+- Verified 87 Python tests, strict Godot M0–M10/history checks, web export/MIME/browser smoke, a short two-browser M9 regression, and enlarged-text phone modal/focus geometry.
+- Documented local-only measurement/privacy decisions and deterministic/reference budgets. Human tutorial comprehension, human accessibility and physical-device performance/compatibility remain open; M10 is not a complete `0.21.x` release.
+
 ## Unreleased — M10 first slice
 
 M10 is in progress. Client remains `0.20.0` and protocol `0.1.0`; the complete `0.21.x` milestone is not claimed.

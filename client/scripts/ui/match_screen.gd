@@ -1173,6 +1173,7 @@ func _show_standings() -> void:
 			"portfolio": int(row["share_value"]) + int(row["byte_value"]),
 			"net": int(row["net_worth"]),
 			"book": " · ".join(book_bits),
+			"analysis": _match.journal.analysis(str(player_id), _match.starting_cash, row),
 		})
 		rank += 1
 	_standings.present(("Guided match complete. " if _guided else "") + _winner_line(), rows)
@@ -1346,6 +1347,7 @@ func _fill_watch(player: Dictionary) -> void:
 		"mark": "BYTE",
 		"name": "BYTE coin",
 		"detail": "$%d   exchange %d   you %d" % [_match.byte_price, _match.byte_exchange, int(player["byte_count"])],
+		"history": _match.journal.points("BYTE"),
 	})
 	for corp in _match.corporations:
 		var sector := str(corp["sector"])
@@ -1361,6 +1363,7 @@ func _fill_watch(player: Dictionary) -> void:
 			"size": int(corp["size"]),
 			"bank": int(corp["bank_shares"]),
 			"yours": int(shares.get(corp["id"], 0)),
+			"history": _match.journal.points(str(corp["id"])),
 		})
 	_watch.show_rows(rows)
 

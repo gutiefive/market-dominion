@@ -1,0 +1,38 @@
+{
+  "completed": true,
+  "automated": true,
+  "browser": "154.0.8037.57",
+  "placements": 18,
+  "eventDialogs": 17,
+  "boughtByte": true,
+  "soldByte": true,
+  "openedRecordedHistory": true,
+  "desktopAnalysis": true,
+  "phoneAnalysisActionsReachable": true,
+  "externalApplicationRequests": 0,
+  "companyLabelClickAttempts": 90,
+  "harness_note": "The running harness initially mistook a prior merger description for an active dialog; modal detection was corrected during the run. Label-click attempts are not accepted game actions.",
+  "visibleAnalysis": [
+    {
+      "name": "Ada",
+      "cash": 8920,
+      "portfolio": 1870,
+      "net": 10790,
+      "marketSpent": 400,
+      "marketSaleProceeds": 0,
+      "mergerBonuses": 2490,
+      "mergerBuyouts": 830
+    },
+    {
+      "name": "Rowan",
+      "cash": 5950,
+      "portfolio": 1260,
+      "net": 7210,
+      "marketSpent": 500,
+      "marketSaleProceeds": 450,
+      "mergerBonuses": 0,
+      "mergerBuyouts": 0
+    }
+  ],
+  "visibleAnalysisSource": "Cross-checked against the captured desktop analysis screenshot; cash and net totals reconciled."
+}

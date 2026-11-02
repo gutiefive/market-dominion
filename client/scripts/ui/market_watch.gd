@@ -4,6 +4,7 @@ class_name MarketWatch
 ## Right-hand watchlist. Price, sentiment, size, and bank shares are text, not color alone.
 
 var _cards: Dictionary = {}
+var _expanded: Dictionary = {}
 
 const _ACCENTS := {
 	"BYTE": Color("7dd3fc"),
@@ -53,6 +54,39 @@ func _add_card(info: Dictionary) -> void:
 		box.add_child(_add("sentiment %s   ·   size %d   ·   bank %d   ·   you %d" % [
 			str(info["sentiment"]), int(info["size"]), int(info["bank"]), int(info["yours"])
 		], Palette.MUTED, 12))
+	var history: Array = info.get("history", [])
+	var quoted := false
+	for point in history:
+		if point["price"] != null:
+			quoted = true
+	if quoted:
+		var copy := QuoteHistory.description(history)
+		var history_box := VBoxContainer.new()
+		history_box.visible = bool(_expanded.get(mark, false))
+		var toggle := Button.new()
+		toggle.text = "Price history"
+		Palette.remember(toggle, 14)
+		toggle.theme_type_variation = "GhostButton"
+		toggle.custom_minimum_size.y = 44
+		toggle.focus_mode = Control.FOCUS_ALL
+		toggle.accessibility_name = "Show or hide recorded price history for " + str(info["name"])
+		toggle.pressed.connect(func() -> void:
+			history_box.visible = not history_box.visible
+			_expanded[mark] = history_box.visible
+		)
+		box.add_child(toggle)
+		box.add_child(history_box)
+		if history.size() > 1:
+			var chart := QuoteHistory.new()
+			chart.points = history
+			chart.tooltip_text = copy + "\n" + str(info.get("coverage", "Actual local quote changes; evenly spaced observations, not elapsed time."))
+			chart.accessibility_name = copy + ". Quote-change order, not elapsed time."
+			history_box.add_child(chart)
+		history_box.add_child(_add(copy, Palette.MUTED, 12))
+		history_box.add_child(_add("Change order, not elapsed time.", Palette.MUTED, 12))
+		var latest: Dictionary = history.back()
+		var source := "Round %d · %s" % [int(latest["round"]), str(latest["reason"])]
+		history_box.add_child(_add(source, Palette.MUTED, 12))
 	add_child(panel)
 	if mark != "":
 		_cards[mark] = panel

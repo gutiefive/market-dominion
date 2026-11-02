@@ -28,28 +28,48 @@ else
   echo "${BIN_SHA512}  $BIN" | sha512sum -c -
 fi
 
-echo "Godot: $("$BIN" --version)"
-"$BIN" --headless --path "$ROOT/client" --import
-"$BIN" --headless --path "$ROOT/client" --check-only --script res://tests/m0_check.gd
-"$BIN" --headless --path "$ROOT/client" --script res://tests/m0_check.gd
-"$BIN" --headless --path "$ROOT/client" --check-only --script res://tests/m1_check.gd
-"$BIN" --headless --path "$ROOT/client" --script res://tests/m1_check.gd
-"$BIN" --headless --path "$ROOT/client" --check-only --script res://tests/m2_check.gd
-"$BIN" --headless --path "$ROOT/client" --script res://tests/m2_check.gd
-"$BIN" --headless --path "$ROOT/client" --check-only --script res://tests/m3_check.gd
-"$BIN" --headless --path "$ROOT/client" --script res://tests/m3_check.gd
-"$BIN" --headless --path "$ROOT/client" --check-only --script res://tests/m4_check.gd
-"$BIN" --headless --path "$ROOT/client" --script res://tests/m4_check.gd
-"$BIN" --headless --path "$ROOT/client" --check-only --script res://tests/m5_check.gd
-"$BIN" --headless --path "$ROOT/client" --script res://tests/m5_check.gd
-"$BIN" --headless --path "$ROOT/client" --check-only --script res://tests/m6_check.gd
-"$BIN" --headless --path "$ROOT/client" --script res://tests/m6_check.gd
-"$BIN" --headless --path "$ROOT/client" --check-only --script res://tests/m7_check.gd
-"$BIN" --headless --path "$ROOT/client" --script res://tests/m7_check.gd
-"$BIN" --headless --path "$ROOT/client" --check-only --script res://tests/m8_check.gd
-"$BIN" --headless --path "$ROOT/client" --script res://tests/m8_check.gd
-"$BIN" --headless --path "$ROOT/client" --check-only --script res://tests/m9_check.gd
-"$BIN" --headless --path "$ROOT/client" --script res://tests/m9_check.gd
+# Some Godot script/compile errors still exit zero; never accept those as a pass.
+run_godot() {
+  local check_log
+  check_log="$(mktemp)"
+  if ! "$BIN" "$@" >"$check_log" 2>&1; then
+    cat "$check_log"
+    rm -f "$check_log"
+    return 1
+  fi
+  cat "$check_log"
+  if grep -Eq 'SCRIPT ERROR:|^ERROR:' "$check_log"; then
+    rm -f "$check_log"
+    return 1
+  fi
+  rm -f "$check_log"
+}
 
-"$BIN" --headless --path "$ROOT/client" --check-only --script res://tests/m10_check.gd
-"$BIN" --headless --path "$ROOT/client" --script res://tests/m10_check.gd
+echo "Godot: $("$BIN" --version)"
+run_godot --headless --path "$ROOT/client" --import
+run_godot --headless --path "$ROOT/client" --check-only --script res://tests/m0_check.gd
+run_godot --headless --path "$ROOT/client" --script res://tests/m0_check.gd
+run_godot --headless --path "$ROOT/client" --check-only --script res://tests/m1_check.gd
+run_godot --headless --path "$ROOT/client" --script res://tests/m1_check.gd
+run_godot --headless --path "$ROOT/client" --check-only --script res://tests/m2_check.gd
+run_godot --headless --path "$ROOT/client" --script res://tests/m2_check.gd
+run_godot --headless --path "$ROOT/client" --check-only --script res://tests/m3_check.gd
+run_godot --headless --path "$ROOT/client" --script res://tests/m3_check.gd
+run_godot --headless --path "$ROOT/client" --check-only --script res://tests/m4_check.gd
+run_godot --headless --path "$ROOT/client" --script res://tests/m4_check.gd
+run_godot --headless --path "$ROOT/client" --check-only --script res://tests/m5_check.gd
+run_godot --headless --path "$ROOT/client" --script res://tests/m5_check.gd
+run_godot --headless --path "$ROOT/client" --check-only --script res://tests/m6_check.gd
+run_godot --headless --path "$ROOT/client" --script res://tests/m6_check.gd
+run_godot --headless --path "$ROOT/client" --check-only --script res://tests/m7_check.gd
+run_godot --headless --path "$ROOT/client" --script res://tests/m7_check.gd
+run_godot --headless --path "$ROOT/client" --check-only --script res://tests/m8_check.gd
+run_godot --headless --path "$ROOT/client" --script res://tests/m8_check.gd
+run_godot --headless --path "$ROOT/client" --check-only --script res://tests/m9_check.gd
+run_godot --headless --path "$ROOT/client" --script res://tests/m9_check.gd
+
+run_godot --headless --path "$ROOT/client" --check-only --script res://tests/m10_check.gd
+run_godot --headless --path "$ROOT/client" --script res://tests/m10_check.gd
+
+run_godot --headless --path "$ROOT/client" --check-only --script res://tests/m10_history_check.gd
+run_godot --headless --path "$ROOT/client" --script res://tests/m10_history_check.gd

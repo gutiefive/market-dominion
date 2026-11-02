@@ -9,6 +9,8 @@ class_name OfflineMatch
 ## applied when a round completes. A final round scores instead of starting
 ## another round.
 
+var journal := MatchJournal.new()
+
 var seed: int
 var hand_size: int
 var starting_cash: int
@@ -124,6 +126,7 @@ static func create(seed_value: int, names: Array, bot_names: Array = []) -> Offl
 	table.phase = "place"
 	table.final_round = false
 	table.market_actions_left = 0
+	table.journal.observe(1, 0, table._history_quotes(), "Opening quotes")
 	return table
 
 
@@ -176,6 +179,7 @@ func place(coordinate: String) -> Dictionary:
 			company_ids.append(corp_id)
 	hand.remove_at(hand.find(coordinate))
 	occupied[coordinate] = true
+	journal.add(str(player["id"]), "tiles_placed")
 	if company_ids.size() >= 2:
 		var involved: Array = []
 		for corp in corporations:
@@ -191,7 +195,7 @@ func place(coordinate: String) -> Dictionary:
 		var growth_message := "%s placed %s and grew %s to size %d. Share price is $%d." % [
 			player["display_name"], coordinate, grown["name"], int(grown["size"]), int(grown["share_price"])
 		]
-		log.append(growth_message)
+		_record(growth_message)
 		return {"ok": true, "placed": coordinate, "resolution": "growth", "log": growth_message}
 	if touched.size() >= 2 and not _inactive().is_empty():
 		pending = []
@@ -201,7 +205,7 @@ func place(coordinate: String) -> Dictionary:
 		var choice_message := "%s placed %s. Choose a company for the %d-district cluster." % [
 			player["display_name"], coordinate, touched.size()
 		]
-		log.append(choice_message)
+		_record(choice_message)
 		return {"ok": true, "placed": coordinate, "resolution": "choose_founder", "log": choice_message}
 	var message := ""
 	if touched.size() >= 2:
@@ -211,7 +215,7 @@ func place(coordinate: String) -> Dictionary:
 	else:
 		message = "%s placed %s. The district stays unincorporated." % [player["display_name"], coordinate]
 	_enter_market()
-	log.append(message)
+	_record(message)
 	return {"ok": true, "placed": coordinate, "resolution": "unincorporated", "log": message}
 
 
@@ -239,6 +243,7 @@ func choose_founder(corp_id: String) -> Dictionary:
 		shares[corp["id"]] = int(shares[corp["id"]]) + 1
 		granted = true
 	_enter_market()
+	journal.add(str(player["id"]), "companies_founded")
 	var message := ""
 	if granted:
 		message = "%s founded %s on %d districts and received one founder share." % [
@@ -248,7 +253,7 @@ func choose_founder(corp_id: String) -> Dictionary:
 		message = "%s founded %s on %d districts. The bank had no share to grant." % [
 			player["display_name"], corp["name"], int(corp["size"])
 		]
-	log.append(message)
+	_record(message)
 	return {"ok": true, "founded": corp["id"], "granted": granted, "log": message}
 
 
@@ -275,7 +280,7 @@ func pass_turn() -> Dictionary:
 	if not hand.is_empty():
 		return {"ok": false, "error": "hand still has a tile"}
 	var message := "%s has no tile to place." % player["display_name"]
-	log.append(message)
+	_record(message)
 	_enter_market()
 	return {"ok": true, "passed": true, "log": message}
 
@@ -295,6 +300,7 @@ func buy_share(corp_id: String) -> Dictionary:
 	corp["bank_shares"] = int(corp["bank_shares"]) - 1
 	var shares: Dictionary = player["shares"]
 	shares[corp["id"]] = int(shares[corp["id"]]) + 1
+	journal.trade(str(player["id"]), "buy_share", price)
 	return _spend_action("%s bought 1 %s share for $%d." % [player["display_name"], corp["name"], price])
 
 
@@ -311,6 +317,7 @@ func sell_share(corp_id: String) -> Dictionary:
 	shares[corp["id"]] = int(shares[corp["id"]]) - 1
 	corp["bank_shares"] = int(corp["bank_shares"]) + 1
 	player["cash"] = int(player["cash"]) + price
+	journal.trade(str(player["id"]), "sell_share", price)
 	return _spend_action("%s sold 1 %s share for $%d." % [player["display_name"], corp["name"], price])
 
 
@@ -325,6 +332,7 @@ func buy_byte() -> Dictionary:
 	player["cash"] = int(player["cash"]) - byte_price
 	player["byte_count"] = int(player["byte_count"]) + 1
 	byte_exchange -= 1
+	journal.trade(str(player["id"]), "buy_byte", byte_price)
 	return _spend_action("%s bought 1 BYTE for $%d." % [player["display_name"], byte_price])
 
 
@@ -337,6 +345,7 @@ func sell_byte() -> Dictionary:
 	player["byte_count"] = int(player["byte_count"]) - 1
 	player["cash"] = int(player["cash"]) + byte_price
 	byte_exchange += 1
+	journal.trade(str(player["id"]), "sell_byte", byte_price)
 	return _spend_action("%s sold 1 BYTE for $%d." % [player["display_name"], byte_price])
 
 
@@ -495,7 +504,7 @@ func _begin_merger(coordinate: String, player: Dictionary, touched: PackedString
 		var message := "%s placed %s. Choose the survivor. %s are tied at size %d." % [
 			player["display_name"], coordinate, _join_names(names), top
 		]
-		log.append(message)
+		_record(message)
 		return {"ok": true, "placed": coordinate, "resolution": "choose_survivor", "log": message}
 	pending_options = []
 	pending_options.append(str(tied[0]["id"]))
@@ -558,6 +567,7 @@ func _resolve_merger(survivor_id: String, coordinate: String, player: Dictionary
 				if amount <= 0:
 					continue
 				holder["cash"] = int(holder["cash"]) + amount
+				journal.add(str(holder["id"]), "merger_bonus", amount)
 				messages.append("%s received a $%d bonus on %s." % [holder["display_name"], amount, str(corp["name"])])
 		for holder in ordered:
 			var count := int(holdings[str(holder["id"])])
@@ -567,6 +577,7 @@ func _resolve_merger(survivor_id: String, coordinate: String, player: Dictionary
 			var shares: Dictionary = holder["shares"]
 			shares[corp_id] = 0
 			holder["cash"] = int(holder["cash"]) + proceeds
+			journal.add(str(holder["id"]), "merger_buyout", proceeds)
 			messages.append("%s liquidated %d %s shares for $%d." % [
 				holder["display_name"], count, str(corp["name"]), proceeds
 			])
@@ -587,9 +598,9 @@ func _resolve_merger(survivor_id: String, coordinate: String, player: Dictionary
 		summary = "%s placed %s. %s survives the merger at size %d. Share price is $%d." % [
 			player["display_name"], coordinate, survivor["name"], int(survivor["size"]), int(survivor["share_price"])
 		]
-	log.append(summary)
+	_record(summary)
 	for line in messages:
-		log.append(line)
+		_record(line)
 	return {"ok": true, "placed": coordinate, "resolution": "merger", "survivor": survivor_id, "log": summary}
 
 
@@ -636,7 +647,7 @@ func _open_share_trade(corp_id: String) -> Dictionary:
 
 
 func _spend_action(message: String) -> Dictionary:
-	log.append(message)
+	_record(message)
 	market_actions_left -= 1
 	var finished := false
 	if market_actions_left == 0:
@@ -650,9 +661,9 @@ func _finish_turn() -> void:
 	if not bag.is_empty():
 		player["hand"].append(bag[0])
 		bag.remove_at(0)
-		log.append("%s drew from the bag." % player["display_name"])
+		_record("%s drew from the bag." % player["display_name"])
 	else:
-		log.append("%s drew nothing. The bag is empty." % player["display_name"])
+		_record("%s drew nothing. The bag is empty." % player["display_name"])
 	phase = "place"
 	market_actions_left = 0
 	pending = []
@@ -662,9 +673,9 @@ func _finish_turn() -> void:
 	if not final_round and _end_triggered():
 		final_round = true
 		if closing:
-			log.append("Final round. The round is complete.")
+			_record("Final round. The round is complete.")
 		else:
-			log.append("Final round. Everyone who has not acted this round still takes one turn.")
+			_record("Final round. Everyone who has not acted this round still takes one turn.")
 	turn_index += 1
 	if turn_index >= players.size():
 		turn_index = 0
@@ -718,7 +729,7 @@ func _apply_round_event() -> void:
 		var value := int(sentiment[key])
 		var shown := "+%d" % value if value > 0 else str(value)
 		parts.append("%s %s" % [_sector_label(key), shown])
-	log.append("Round event: %s. %s. BYTE is $%d." % [str(drawn["name"]), ", ".join(parts), byte_price])
+	_record("Round event: %s. %s. BYTE is $%d." % [str(drawn["name"]), ", ".join(parts), byte_price])
 
 
 func _score_game() -> void:
@@ -769,7 +780,7 @@ func _score_game() -> void:
 		if str(row["id"]) == str(ranking[0]):
 			winner_name = str(row["display_name"])
 			winner_net = int(row["net_worth"])
-	log.append("%s wins with $%d fictional." % [winner_name, winner_net])
+	_record("%s wins with $%d fictional." % [winner_name, winner_net])
 
 
 func _sector_label(sector: String) -> String:
@@ -785,3 +796,15 @@ func _sector_label(sector: String) -> String:
 		"retail":
 			return "Retail"
 	return sector
+
+
+func _history_quotes() -> Dictionary:
+	var quotes := {"BYTE": byte_price}
+	for corp in corporations:
+		quotes[str(corp["id"])] = int(corp["share_price"]) if bool(corp["active"]) else null
+	return quotes
+
+
+func _record(message: String) -> void:
+	log.append(message)
+	journal.observe(round_number, log.size(), _history_quotes(), message)

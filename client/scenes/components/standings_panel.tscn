@@ -43,16 +43,24 @@ theme_override_constants/margin_top = 14
 theme_override_constants/margin_right = 16
 theme_override_constants/margin_bottom = 14
 
-[node name="Body" type="VBoxContainer" parent="Center/Card/Margin"]
+[node name="Scroll" type="ScrollContainer" parent="Center/Card/Margin"]
+custom_minimum_size = Vector2(0, 520)
+layout_mode = 2
+focus_mode = 2
+horizontal_scroll_mode = 0
+follow_focus = true
+
+[node name="Body" type="VBoxContainer" parent="Center/Card/Margin/Scroll"]
+size_flags_horizontal = 3
 layout_mode = 2
 theme_override_constants/separation = 10
 
-[node name="Title" type="Label" parent="Center/Card/Margin/Body"]
+[node name="Title" type="Label" parent="Center/Card/Margin/Scroll/Body"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 22
 text = "Standings"
 
-[node name="Winner" type="Label" parent="Center/Card/Margin/Body"]
+[node name="Winner" type="Label" parent="Center/Card/Margin/Scroll/Body"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.176471, 0.831373, 0.74902, 1)
@@ -60,23 +68,23 @@ theme_override_font_sizes/font_size = 16
 text = "The match is over."
 autowrap_mode = 2
 
-[node name="List" type="VBoxContainer" parent="Center/Card/Margin/Body"]
+[node name="List" type="VBoxContainer" parent="Center/Card/Margin/Scroll/Body"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="Actions" type="HBoxContainer" parent="Center/Card/Margin/Body"]
+[node name="Actions" type="HBoxContainer" parent="Center/Card/Margin/Scroll/Body"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="Again" type="Button" parent="Center/Card/Margin/Body/Actions"]
+[node name="Again" type="Button" parent="Center/Card/Margin/Scroll/Body/Actions"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 theme_type_variation = &"PrimaryButton"
 text = "Play again"
 
-[node name="Lobby" type="Button" parent="Center/Card/Margin/Body/Actions"]
+[node name="Lobby" type="Button" parent="Center/Card/Margin/Scroll/Body/Actions"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3

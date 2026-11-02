@@ -138,8 +138,10 @@ In Progress. See [M10 scope and acceptance](docs/milestones/M10_PLAYER_EXPERIENC
 - [x] Guided seeded Classic match with phase-specific explanations and a non-mutating tile-selection helper
 - [x] Headless production-UI regression reaches guided standings with invariant checks
 - [ ] First-time-human tutorial usability acceptance
-- [ ] Real market-history feedback and post-match analysis
-- [ ] Analytics/privacy decision, multi-seed simulation harness, accessibility/performance budgets
+- [x] Recorded local/observed online quote history and reconciled local post-match analysis
+- [x] Local-only privacy/measurement decision and multi-seed deterministic simulation harness
+- [x] Bounded histories, reference action budgets and accessible history/analysis controls
+- [ ] Human accessibility review and physical-device load/frame/input budgets
 
 ## Known limits
 

@@ -13,6 +13,9 @@ const MUTED := Color("93a0b8")
 const DANGER := Color("f0a0a0")
 const AMBER := Color("fbbf24")
 
+var _market_history := MatchJournal.new()
+var _history_room := ""
+
 var _base := "http://127.0.0.1:8741"
 var _match_id := ""
 var _token := ""
@@ -336,7 +339,7 @@ func _build() -> void:
 	side.add_theme_constant_override("separation", 6)
 	(_play.get_meta("table") as HBoxContainer).add_child(side)
 	_play.set_meta("side", side)
-	side.add_child(_note("Market watchlist"))
+	side.add_child(_note("Market watchlist · history since this page joined"))
 	_watch = MarketWatch.new()
 	side.add_child(_watch)
 	side.add_child(_note("Activity"))
@@ -476,6 +479,7 @@ func _on_socket(event: Dictionary) -> void:
 func _on_socket_closed() -> void:
 	if _token == "":
 		return
+	_market_history.gap()
 	_reconnect_attempts += 1
 	if _reconnect_attempts > 4:
 		_link_banner.text = "Connection lost. Press Reconnect to try again."
@@ -529,6 +533,13 @@ func _apply_snapshot(payload: Dictionary) -> void:
 	_step = str(payload.get("step", "lobby"))
 	_pending = payload.get("pending_options", [])
 	var state: Dictionary = payload["state"]
+	if _history_room != str(state["match_id"]):
+		_market_history = MatchJournal.new()
+		_history_room = str(state["match_id"])
+	var quotes := {"BYTE": int(state["crypto_market"]["price"])}
+	for corp in state["corporations"]:
+		quotes[str(corp["id"])] = int(corp["share_price"]) if bool(corp["active"]) else null
+	_market_history.observe(int(state["round_number"]), int(state["version"]), quotes, "Received snapshot")
 	_public = state
 	_version = int(state["version"])
 	if _reconnect_attempts > 0:
@@ -716,6 +727,8 @@ func _fill_online_chrome(state: Dictionary, mine: bool) -> void:
 		"mark": "BYTE",
 		"name": "BYTE coin",
 		"detail": "$%d   exchange %d   you %d" % [int(market["price"]), int(market["exchange_coin_count"]), byte_count],
+		"history": _market_history.points("BYTE"),
+		"coverage": "Observed since this page joined; reconnect gaps are not interpolated.",
 	})
 	var holdings: Dictionary = mine_player.get("holdings_by_corp", {}) if not mine_player.is_empty() else {}
 	var sentiment: Dictionary = state["sector_sentiment"]
@@ -733,6 +746,8 @@ func _fill_online_chrome(state: Dictionary, mine: bool) -> void:
 			"size": int(corp["size"]),
 			"bank": int(corp["bank_shares"]),
 			"yours": int(holdings.get(corp["id"], 0)),
+			"history": _market_history.points(str(corp["id"])),
+			"coverage": "Observed since this page joined; reconnect gaps are not interpolated.",
 		})
 	_watch.show_rows(rows)
 	var latest := ""

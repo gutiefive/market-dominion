@@ -63,3 +63,13 @@ M10 now contains keyboard focus inside local and online choice, confirmation, ev
 `client/tests/m10_focus_check.gd` drives production local dialogs with real Godot keyboard events: forward/reverse Tab containment, background-focus recovery, Escape restoration, required-choice persistence, nested Rules restoration and Enter on Cancel without placement. These automated checks do not establish screen-reader usability. Use the [human acceptance worksheet](M10_HUMAN_ACCEPTANCE.md) to close the remaining comprehension, assistive-technology and physical-device gates.
 
 Verification of this focus pass: 87 Python tests passed, the strict Godot M0–M10/history/focus suite passed, web export succeeded, and Chromium 154 loaded the export. The [canvas opening regression](evidence/m10-focus-browser-smoke.json) passed three placements, BYTE purchase/sale and recorded-history expansion. It explicitly reports `completed: false`: this pass did not repeat the prior full tutorial or multiplayer match. Keyboard assertions ran in Godot headless; the canvas regression used mouse interaction, so browser keyboard and assistive-technology acceptance remain open.
+
+The subsequent [Chromium keyboard regression](evidence/m10-keyboard-browser.json) uses the actual exported canvas: Enter starts guided Classic, Enter reveals the hand, R opens Rules, Tab/Shift+Tab navigate, Escape closes Rules, and 1 then Enter advances placement into the visible market phase. Screenshots/OCR assert visible phases without reading engine state or sending game commands through an API. The main menu and turn-order screen now focus their primary action when shown; deferred entry focus checks visibility to avoid taking focus from online entry. This extends browser keyboard evidence without claiming a full keyboard-only match or human assistive-technology acceptance.
+
+Reproduce after export and serving the web build:
+
+```bash
+MD_BROWSER_EVIDENCE=/tmp/md-keyboard node scripts/keyboard_browser.cjs
+```
+
+The harness requires Playwright, Chromium, Pillow and tesseract and defaults to the same web server as `tutorial_browser.cjs`. Set `MD_BROWSER_WEB` to the served export URL when needed. It removes stale result JSON before running. A failed OCR assertion is a failed run, not a release pass.

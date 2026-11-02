@@ -1,0 +1,9 @@
+{
+  "browser": "154.0.8037.57",
+  "keyboardMenu": true,
+  "keyboardTurnOrder": true,
+  "rulesOpenedAndClosed": true,
+  "tileShortcutAndEnter": true,
+  "completedMatch": false,
+  "limitation": "Desktop Chromium keyboard canvas regression; not a human or screen-reader playtest."
+}

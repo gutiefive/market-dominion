@@ -64,6 +64,7 @@ var _difficulty_row: HBoxContainer
 var _difficulty: OptionButton
 var _setup_blurb: Label
 var _order_help: Label
+var _menu_primary: Button
 var _order_go: Button
 var _cash_label: Label
 var _net_label: Label
@@ -226,6 +227,7 @@ func _build_menu() -> VBoxContainer:
 	panel.add_child(_label("Choose your table", 24, TEXT))
 	panel.add_child(_label("Grow companies on the district board, trade fictional shares and BYTE, and finish with the highest net worth.", 16, MUTED))
 	var learn := _button("Learn Classic · guided match", true)
+	_menu_primary = learn
 	learn.pressed.connect(_start_guided)
 	panel.add_child(learn)
 	panel.add_child(_label("Learn by playing a full Classic match against one Easy computer. Guidance follows each real game phase. No account or network is needed.", 14, MUTED))
@@ -247,6 +249,14 @@ func _show_menu() -> void:
 	_menu.visible = true
 	_status.text = "Choose a guided match, local play, or an online room."
 	_scroll.scroll_vertical = 0
+	call_deferred("_focus_entry")
+
+
+func _focus_entry() -> void:
+	if _menu.is_visible_in_tree() and (_online == null or not _online.visible):
+		_menu_primary.grab_focus()
+	elif _order.is_visible_in_tree():
+		_order_go.grab_focus()
 
 
 func _open_local_setup(solo: bool) -> void:
@@ -706,6 +716,7 @@ func _begin_match(table: OfflineMatch) -> void:
 	_error.text = ""
 	_sync_error_line()
 	_sync_dock()
+	call_deferred("_focus_entry")
 
 
 func _reveal() -> void:

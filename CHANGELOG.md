@@ -3,7 +3,7 @@
 ## Unreleased — M10 keyboard dialog review
 
 - Contained keyboard focus inside local/online dialogs, Rules and final standings, with safe Cancel focus and opener restoration. Rules now supports keyboard scrolling; hand-selection shortcuts focus placement.
-- Added production-dialog keyboard regressions and a human acceptance worksheet. Human comprehension, screen-reader and physical-device acceptance remain pending.
+- Added initial keyboard focus for the main menu/turn order and an actual Chromium canvas regression through Rules and tile placement. Added production-dialog keyboard regressions and a human acceptance worksheet. Human comprehension, screen-reader and physical-device acceptance remain pending.
 
 ## Unreleased — M10 recorded history, analysis and validation
 

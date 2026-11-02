@@ -1,0 +1,40 @@
+{
+  "viewportAcceptance": false,
+  "completed": false,
+  "refreshed": false,
+  "reconnected": false,
+  "counts": {
+    "commands": 5,
+    "placed": [
+      1,
+      1
+    ],
+    "bought": [
+      0,
+      0
+    ],
+    "sold": [
+      0,
+      0
+    ],
+    "events": 0,
+    "mergers": 0
+  },
+  "errors": [],
+  "browser": "154.0.8037.57",
+  "finalVersion": 10,
+  "commands": [
+    [
+      "ready",
+      "start_match",
+      "place_tile",
+      "choose_founder"
+    ],
+    [
+      "ready",
+      "place_tile",
+      "pass_market_action",
+      "pass_market_action"
+    ]
+  ]
+}

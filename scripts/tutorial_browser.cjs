@@ -43,10 +43,10 @@ text.save(sys.argv[3])`,
     primary,
   ]);
   let rows = [];
-  for (const file of [binary, primary]) {
+  for (const [file, mode] of [[binary, "11"], [primary, "11"], [primary, "6"]]) {
     const tsv = execFileSync(
       "tesseract",
-      [file, "stdout", "--psm", "11", "tsv"],
+      [file, "stdout", "--psm", mode, "tsv"],
       {
         encoding: "utf8",
         env: { ...process.env, OMP_THREAD_LIMIT: "1" },
@@ -87,9 +87,8 @@ async function click(pattern, rows = null) {
   for (let attempt = 0; attempt < 4; attempt++) {
     const current = rows || (await read());
     rows = null;
-    let match = current.find((r) => pattern.test(r.text));
-    if (!match) {
-      const candidates = [];
+    const candidates = current.filter((r) => pattern.test(r.text));
+    {
       for (const line of current)
         for (let start = 0; start < line.words.length; start++)
           for (
@@ -108,8 +107,8 @@ async function click(pattern, rows = null) {
                 b: Math.max(...words.map((w) => w.b)),
               });
           }
-      match = candidates.sort((a, b) => b.y - a.y)[0];
     }
+    const match = candidates.sort((a, b) => b.y - a.y)[0];
     if (match) {
       await page.mouse.click((match.x + match.r) / 2, (match.y + match.b) / 2);
       await sleep(200);
@@ -122,171 +121,110 @@ async function click(pattern, rows = null) {
   throw Error("Canvas control not found: " + pattern);
 }
 (async () => {
-  const browser = await chromium.launch({
-    executablePath: process.env.CHROMIUM_BIN || "/usr/bin/chromium",
-    headless: true,
-    args: [
-      "--no-sandbox",
-      "--enable-unsafe-swiftshader",
-      "--disable-dev-shm-usage",
-    ],
-  });
+  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_BIN || "/usr/bin/chromium", headless: true,
+    args: ["--no-sandbox", "--enable-unsafe-swiftshader", "--disable-dev-shm-usage"] });
   const requests = new Set();
-  let completed = false,
-    chart = false,
-    bought = false,
-    sold = false,
-    turns = 0,
-    events = 0,
-    decisions = 0;
+  // An acceptance itinerary, executed only through visible canvas controls.
+  const itinerary = [
+    ["place", "A1"], ["buy_byte"], ["sell_byte"], ["demo"], ["event"],
+    ["place", "A2"], ["founder", "NOVA AI"], ["buy_share", "NA"], ["sell_share", "NA"], ["demo"], ["event"],
+    ["place", "C1"], ["pass"], ["pass"], ["demo"], ["event"],
+    ["place", "C2"], ["founder", "VOLT GRID"], ["buy_share", "VG"], ["buy_share", "NA"], ["demo"], ["event"],
+    ["place", "B2"], ["survivor", "NOVA AI"], ["buy_byte"], ["pass"], ["demo"], ["event"],
+    ["place", "A3"], ["sell_byte"], ["pass"], ["demo"], ["event"], ["fast_forward"],
+    ["place", "A8"], ["pass"], ["pass"], ["demo"], ["finish"]
+  ];
+  let teachingSteps = 0, placements = 0, events = 0;
   try {
-    const context = await browser.newContext({
-      viewport: { width: 1280, height: 900 },
-    });
-    page = await context.newPage();
-    const url =
-      process.env.MD_BROWSER_WEB || "http://127.0.0.1:8097/index.html";
-    page.on("request", (r) => requests.add(new URL(r.url()).origin));
+    page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+    const url = process.env.MD_BROWSER_WEB || "http://127.0.0.1:8097/index.html";
+    page.on("request", r => requests.add(new URL(r.url()).origin));
     await page.goto(url);
     await sleep(5000);
     await click(/Learn Classic/);
     await click(/Look at your tiles/);
-    for (let action = 0; action < 180; action++) {
+    for (const [action, arg] of itinerary) {
+      if (teachingSteps === 0 || teachingSteps === 6) {
+        await page.setViewportSize(teachingSteps === 0 ? { width: 1024, height: 768 } : { width: 390, height: 844 });
+        await sleep(400);
+      }
       const rows = await read();
-      const text = rows.map((r) => r.text).join("\n");
-      if (/Action not applied|SCRIPT ERROR/i.test(text))
-        throw Error("Game rejected a tutorial move");
-      if (/Guided match complete/.test(text)) {
-        completed = true;
-        break;
-      }
-      if (
-        /Round event/.test(text) &&
-        rows.some((r) => /^Continue$/.test(r.text))
-      ) {
-        await click(/^Continue$/, rows);
-        events++;
-        continue;
-      }
-      if (/Confirm market action/.test(text)) {
-        await click(/^Confirm$/, rows);
-        continue;
-      }
-      if (/Found a company|Choose the surviving company/i.test(text)) {
-        await click(
-          /NOVA AI.*\bNA\b|ORBIT PAY.*\bOP\b|VOLT GRID.*\bVG\b|PULSE MEDIA.*\bPM\b|EVERMART.*\bEM\b/,
-          rows,
-        );
-        decisions++;
-        continue;
-      }
-      if (/Show a tile in my hand/.test(text)) {
-        await click(/Show a tile in my hand/, rows);
-        await click(/^Place selected$/);
-        turns++;
-        console.log("TUTORIAL_PLACEMENT", turns);
-        continue;
-      }
-      if (/Pass the market/.test(text)) {
-        if (!bought) {
-          await click(/^Buy BYTE$/, rows);
-          bought = true;
-          continue;
-        }
-        if (bought && !sold && turns > 1) {
-          await click(/^Sell BYTE$/, rows);
-          sold = true;
-          continue;
-        }
-        if (!chart && turns > 2) {
-          await click(/^Price history$/, rows);
-          const history = await read();
-          assert(
-            history.some((r) => /Recorded changes/.test(r.text)),
-            "real history text missing",
-          );
-          await page.screenshot({
-            path: path.join(out, "recorded-history.png"),
-          });
-          chart = true;
-          if (process.env.MD_TUTORIAL_SMOKE) {
-            const report = {
-              completed: false,
-              smoke: true,
-              browser: browser.version(),
-              placements: turns,
-              boughtByte: bought,
-              soldByte: sold,
-              openedRecordedHistory: true,
-            };
-            fs.writeFileSync(result, JSON.stringify(report, null, 2));
-            console.log(
-              "M10_TUTORIAL_BROWSER_SMOKE_OK",
-              JSON.stringify(report),
-            );
-            return;
+      const text = rows.map(row => row.text).join("\n");
+      assert(new RegExp("Lesson " + (teachingSteps + 1) + "\\s*/\\s*39").test(text), "Teaching step missing: " + (teachingSteps + 1) + "\n" + text);
+      assert(!/Action not applied|SCRIPT ERROR/i.test(text), "tutorial rejected a move");
+      if ([6, 16, 23, 33, 38].includes(teachingSteps))
+        await page.screenshot({ path: path.join(out, `lesson-${teachingSteps + 1}.png`) });
+      if (action === "demo") await click(/^Watch Ada$/, rows);
+      else if (action === "event") { await click(/have read the event/, rows); events++; }
+      else if (action === "fast_forward") await click(/Watch the middle game/, rows);
+      else if (action === "finish") await click(/Review final standings/, rows);
+      else {
+        await click(/^Try this step$/, rows);
+        if (teachingSteps === 0 || teachingSteps === 6)
+          await page.screenshot({ path: path.join(out, teachingSteps === 0 ? "tablet-placement.png" : "phone-founding.png") });
+        if (action === "place") {
+          await page.keyboard.press("1");
+          await click(/^Place selected$/);
+          placements++;
+        } else if (action === "founder" || action === "survivor") {
+          await click(new RegExp(arg));
+        } else if (action === "pass") {
+          // This explicitly labelled lesson control passes exactly one action;
+          // unlike the ordinary market-pass control, it cannot skip the course.
+          await click(/^Pass one lesson action$/);
+        } else {
+          if (arg) {
+            // Canvas-only fallback: these desktop footer coordinates are for
+            // 1280x900 at the default text scale. OCR confuses ticker labels on
+            // the board with the adjacent trade controls. No game-state hook.
+            const y = page.viewportSize().height - 102;
+            const threeCompanies = teachingSteps >= 18;
+            await page.mouse.click(arg === "VG" ? 154 : 46, y);
+            await sleep(250);
+            await page.mouse.click(action === "sell_share" ? 218 : (threeCompanies ? 230 : 123), y);
+            await sleep(250);
+          } else {
+            const opening = teachingSteps < 3;
+            const x = action === "buy_byte" ? (opening ? 67 : 370) : (opening ? 161 : 465);
+            await page.mouse.click(x, page.viewportSize().height - 102);
+            await sleep(250);
           }
+          await click(/^Confirm$/);
         }
-        await click(/^Pass the market$/);
-        continue;
       }
-      throw Error("Unrecognized tutorial screen");
+      if (teachingSteps === 0 || teachingSteps === 6) {
+        await page.setViewportSize({ width: 1280, height: 900 });
+        await sleep(300);
+      }
+      teachingSteps++;
+      console.log("SCRIPTED_LESSON", teachingSteps, action, arg || "");
+      if (process.env.MD_TUTORIAL_SMOKE && teachingSteps === 5) {
+        fs.writeFileSync(result, JSON.stringify({ completed: false, smoke: true, browser: browser.version(), teachingSteps, placements, eventLessons: events, boughtByte: true, soldByte: true }, null, 2));
+        console.log("M10_TUTORIAL_BROWSER_SMOKE_OK");
+        return;
+      }
     }
-    assert(completed, "tutorial did not finish");
-    let final = (await read()).map((r) => r.text).join("\n");
-    assert(
-      /Market:/.test(final) && /Merger bonuses/.test(final),
-      "post-match analysis missing",
-    );
-    assert(
-      !/history\s+is\s+incomplete/.test(final),
-      "cash reconciliation failed",
-    );
+    const final = (await read()).map(row => row.text).join("\n");
+    assert(/Guided match complete/.test(final) && /Merger bonuses/.test(final), "final analysis missing");
+    assert(!/history\s+is\s+incomplete/.test(final), "cash reconciliation failed");
     await page.screenshot({ path: path.join(out, "analysis-desktop.png") });
     await page.setViewportSize({ width: 390, height: 844 });
-    await sleep(300);
+    await sleep(400);
     await page.screenshot({ path: path.join(out, "analysis-phone-top.png") });
     await page.mouse.move(200, 500);
-    await page.mouse.wheel(0, 1500);
-    await sleep(200);
-    await page.screenshot({
-      path: path.join(out, "analysis-phone-bottom.png"),
-    });
-    const bottom = (await read()).map((r) => r.text).join("\n");
-    assert(
-      /Play again|Back to lobby/.test(bottom),
-      "phone standings actions unreachable",
-    );
-    assert(
-      [...requests].every(
-        (origin) => origin === new URL(url).origin || origin === "null",
-      ),
-      "unexpected external application request",
-    );
-    const report = {
-      completed,
-      automated: true,
-      browser: browser.version(),
-      placements: turns,
-      eventDialogs: events,
-      companyLabelClickAttempts: decisions,
-      boughtByte: bought,
-      soldByte: sold,
-      openedRecordedHistory: chart,
-      desktopAnalysis: true,
-      phoneAnalysisActionsReachable: true,
-      externalApplicationRequests: 0,
-    };
+    await page.mouse.wheel(0, 1800);
+    await sleep(250);
+    assert(/Play again|Back to lobby/.test((await read()).map(row => row.text).join("\n")), "phone standings actions unreachable");
+    assert([...requests].every(origin => origin === new URL(url).origin || origin === "null"), "unexpected external application request");
+    const report = { completed: true, automated: true, scripted: true, browser: browser.version(), teachingSteps, humanPlacements: placements,
+      eventLessons: events, companyFoundings: 2, tiedMerger: true, boughtAndSoldShares: true, boughtAndSoldByte: true,
+      middleGameDemonstration: true, finalRound: true, tabletViewportPlacement: true, phoneViewportFounding: true, desktopAnalysis: true, phoneAnalysisActionsReachable: true,
+      externalApplicationRequests: 0, tradeInput: "Fixed 1280x900 footer coordinates at default text scale; subsequent lesson transitions verified by OCR", limitation: "Automated desktop Chromium canvas interaction; not human comprehension or physical-device acceptance." };
     fs.writeFileSync(result, JSON.stringify(report, null, 2));
     console.log("M10_TUTORIAL_BROWSER_OK", JSON.stringify(report));
-  } catch (e) {
-    if (page)
-      await page
-        .screenshot({ path: path.join(out, "failure.png") })
-        .catch(() => {});
-    console.error("M10_TUTORIAL_BROWSER_FAILED", e.message);
+  } catch (error) {
+    if (page) await page.screenshot({ path: path.join(out, "failure.png") }).catch(() => {});
+    console.error("M10_TUTORIAL_BROWSER_FAILED", error.message);
     process.exitCode = 1;
-  } finally {
-    await browser.close();
-  }
+  } finally { await browser.close(); }
 })();

@@ -32,6 +32,7 @@ func _run() -> void:
 	await process_frame
 	screen._start_guided()
 	screen._reveal()
+	screen._lesson_continue()
 	await process_frame
 	var opener: Button = screen._place_button
 	opener.grab_focus()

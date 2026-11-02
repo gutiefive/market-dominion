@@ -4,14 +4,14 @@ Status: **pending human execution**. Automated matches and desktop viewport test
 
 ## First-time player
 
-Use a person who has not played this build. Record build commit, browser/version, operating system, viewport and whether the device is physical. Start from the main menu with the guided Classic match. Observe before explaining the controls.
+Use a person who has not played this build. Record build commit, browser/version, operating system, viewport and whether the device is physical. Start from the main menu with the scripted guided Classic match. Confirm that the first lesson identifies an arranged teaching game, and that each new action pauses for instructions/results. Observe before explaining the controls.
 
 1. Ask the player to start learning Classic. Record which entry they choose and any hesitation.
 2. Ask them to select and place a tile. Can they explain why a company was founded or grew?
 3. Let them buy or sell, then ask what price they paid and whether trading itself changed the posted price.
-4. At a company choice, merger or round event, ask them to describe what happened and who acts next. Record phases not encountered as untested.
+4. At a company choice, merger or round event, ask them to describe what happened and who acts next. The scripted course must teach both founding and a tied merger; missing either is a defect.
 5. Ask them to open a recorded price history and distinguish recorded changes from a forecast.
-6. Finish the match. Ask them to identify the winner, closing cash, holdings and the reason net worth differs from cash. Can they find replay and the main menu?
+6. Acknowledge the labelled middle-game demonstration, then place the final-round trigger and finish the match. Ask them to identify the winner, closing cash, holdings and the reason net worth differs from cash. Can they find replay and the main menu?
 7. Record observed confusion, time lost, facilitator assistance and exact unclear text. Propose narrowly scoped copy/layout fixes and repeat affected steps after changes.
 
 Acceptance: the player completes the flow and explains placement, trading, events and final standings without facilitator instruction. Any blocked action or material misunderstanding requires correction and a repeat observation.
@@ -20,6 +20,7 @@ Acceptance: the player completes the flow and explains placement, trading, event
 
 Record browser, operating system, input method and assistive technology/version. Check keyboard-only use separately from screen-reader use.
 
+- At the first lesson, read/scroll the instructions, Tab to **Try this step**, then press Enter before using the table. Each next teaching dialog requires acknowledgement.
 - Tab and Shift+Tab traverse visible actions with an identifiable focus indicator. Number keys select a hand tile; Enter places the intended selection.
 - Open Rules from a focused action. Focus enters the panel; arrow scrolling and Tab reach Close rules; Escape returns to the opener.
 - Open a trade confirmation. Cancel receives initial focus. Tab stays inside the dialog; Enter on Cancel closes without spending cash.

@@ -18,6 +18,14 @@ var _wide := true
 
 var _menu: VBoxContainer
 var _guided := false
+var _tutorial: ScriptedTutorial
+var _lesson_layer: Control
+var _lesson_title: Label
+var _lesson_result: Label
+var _lesson_copy: Label
+var _lesson_button: Button
+var _lesson_card: PanelContainer
+var _lesson_scroll: ScrollContainer
 var _guide_card: PanelContainer
 var _guide_title: Label
 var _guide_copy: Label
@@ -99,10 +107,9 @@ var _seats: SeatBar
 
 
 func _ready() -> void:
-	# Use CSS pixel dimensions on web so narrow viewports reflow instead of shrinking the desktop table.
-	if OS.has_feature("web"):
-		get_tree().root.content_scale_size = Vector2i.ZERO
-	set_anchors_preset(PRESET_FULL_RECT)
+	# Reflow at the actual window size on desktop as well as in the browser.
+	get_tree().root.content_scale_size = Vector2i.ZERO
+	set_anchors_and_offsets_preset(PRESET_FULL_RECT)
 	if theme == null:
 		theme = load("res://theme/market_theme.tres") as Theme
 	if theme == null:
@@ -113,6 +120,7 @@ func _ready() -> void:
 		_feedback = preload("res://scenes/components/table_feedback.tscn").instantiate() as TableFeedback
 		add_child(_feedback)
 	_build()
+	_fit_lesson()
 	if OS.has_feature("web"):
 		call_deferred("_open_web_entry")
 	var args := OS.get_cmdline_user_args()
@@ -121,8 +129,15 @@ func _ready() -> void:
 
 
 func _notification(what: int) -> void:
-	if what == NOTIFICATION_RESIZED and _play != null and _play.visible:
-		_fit_board()
+	if what == NOTIFICATION_RESIZED:
+		if _dock != null and _online != null:
+			_sync_dock()
+		if _play != null and _play.visible:
+			_fit_board()
+		if _lesson_card != null:
+			_fit_lesson()
+		if _dock != null and _online != null:
+			call_deferred("_sync_dock")
 
 
 func _build() -> void:
@@ -159,7 +174,9 @@ func _build() -> void:
 	_standings = preload("res://scenes/components/standings_panel.tscn").instantiate() as StandingsPanel
 	_standings.visible = false
 	add_child(_standings)
-	_standings.play_again_pressed.connect(_on_deal_pressed)
+	_standings.play_again_pressed.connect(_replay_match)
+	_lesson_layer = _build_lesson_layer()
+	add_child(_lesson_layer)
 	_standings.lobby_pressed.connect(_show_menu)
 
 	var root := VBoxContainer.new()
@@ -230,7 +247,7 @@ func _build_menu() -> VBoxContainer:
 	_menu_primary = learn
 	learn.pressed.connect(_start_guided)
 	panel.add_child(learn)
-	panel.add_child(_label("Learn by playing a full Classic match against one Easy computer. Guidance follows each real game phase. No account or network is needed.", 14, MUTED))
+	panel.add_child(_label("Play a scripted Classic lesson with arranged tiles and opponent moves. Practice founding, trading, events, growth, mergers and final scoring. No account or network is needed.", 14, MUTED))
 	var solo := _button("Play computers", false)
 	solo.pressed.connect(_open_local_setup.bind(true))
 	panel.add_child(solo)
@@ -268,14 +285,17 @@ func _open_local_setup(solo: bool) -> void:
 func _start_guided() -> void:
 	_show_setup()
 	_guided = true
-	_vs_bots.button_pressed = true
-	_sync_seat_mode()
-	_seed_input.text = "7710"
-	_difficulty.selected = 0
-	_name_inputs[0].text = "Rowan"
-	_seat_checks[2].button_pressed = false
-	_seat_checks[3].button_pressed = false
-	_on_deal_pressed()
+	_tutorial = ScriptedTutorial.new()
+	BotPolicy.set_difficulty("easy")
+	_begin_match(ScriptedTutorial.create_table())
+	_order_help.text = "Scripted practice: arranged tiles, fixed existing events and demonstrated opponent moves. Normal Classic rules and scoring. The lesson pauses before every new action."
+
+
+func _replay_match() -> void:
+	if _tutorial != null:
+		_start_guided()
+	else:
+		_on_deal_pressed()
 
 
 func _build_setup() -> VBoxContainer:
@@ -387,9 +407,9 @@ func _build_play() -> VBoxContainer:
 	_guide_select = _button("Show a tile in my hand", false)
 	_guide_select.pressed.connect(_select_guided_tile)
 	guide_box.add_child(_guide_select)
-	var stop := _button("Continue without guidance", false)
-	stop.pressed.connect(func() -> void: _guided = false; _refresh())
-	guide_box.add_child(stop)
+	var read_lesson := _button("Read current lesson", false)
+	read_lesson.pressed.connect(_present_lesson)
+	guide_box.add_child(read_lesson)
 
 	var seats := preload("res://scenes/components/seat_bar.tscn").instantiate() as SeatBar
 	_seats = seats
@@ -490,8 +510,14 @@ func _sync_dock() -> void:
 	var playing := _play != null and _play.visible
 	_dock.visible = playing and not _online.visible
 	var market_open := _dock.visible and _match != null and _match.phase == "market" and not _concealed and not _viewing_bot()
-	var dock_h := 228.0 if market_open else 168.0
-	_dock.offset_top = -dock_h if _dock.visible else 0.0
+	var phone := get_viewport_rect().size.x < 720.0
+	var dock_h := (300.0 if market_open else 240.0) if phone else (228.0 if market_open else 168.0)
+	# Explicit viewport bounds also handle browser canvas resizes before anchor layout settles.
+	_step_row.visible = not phone
+	dock_h = maxf(dock_h, _dock.get_combined_minimum_size().y + 8.0)
+	_dock.set_anchors_preset(PRESET_TOP_LEFT)
+	_dock.position = Vector2(12.0, get_viewport_rect().size.y - dock_h)
+	_dock.size = Vector2(maxf(0.0, get_viewport_rect().size.x - 24.0), dock_h - 8.0)
 	_scroll.offset_bottom = -(dock_h + 8.0) if _dock.visible else -8.0
 	if _action_row != null and _action_row.get_parent() is CanvasItem:
 		(_action_row.get_parent() as CanvasItem).visible = market_open
@@ -506,6 +532,7 @@ func _paint_steps() -> void:
 	if _step_row == null or _match == null:
 		return
 	for child in _step_row.get_children():
+		_step_row.remove_child(child)
 		child.queue_free()
 	var place_on := _match.phase == "place"
 	var resolve_on := _match.phase == "choose_founder" or _match.phase == "choose_survivor"
@@ -529,6 +556,9 @@ func _step_pill(text: String, on: bool) -> PanelContainer:
 
 
 func _finish_market_turn() -> void:
+	if _tutorial != null:
+		_execute_local("pass")
+		return
 	if _match == null or _match.phase != "market" or _concealed or _viewing_bot():
 		return
 	var last_log := ""
@@ -577,6 +607,9 @@ func _hide_online() -> void:
 
 func _show_setup() -> void:
 	_guided = false
+	_tutorial = null
+	if _lesson_layer != null:
+		_lesson_layer.visible = false
 	if _menu != null:
 		_menu.visible = false
 	_match = null
@@ -732,6 +765,7 @@ func _reveal() -> void:
 		return
 	_refresh()
 	_fit_board()
+	_present_lesson()
 
 
 func _solo() -> bool:
@@ -748,6 +782,10 @@ func _viewing_bot() -> bool:
 
 
 func _run_bots() -> void:
+	if _tutorial != null:
+		_concealed = false
+		_refresh()
+		return
 	var before := 0 if _match == null else _match.log.size()
 	var guard := 0
 	while _match != null and _match.phase != "completed" and bool(_match.active_player().get("bot", false)) and guard < 48:
@@ -786,7 +824,7 @@ func _place_selected() -> void:
 		_error.text = "Select a tile in the active hand, or press its cell on the grid."
 		_sync_error_line()
 		return
-	_apply(_match.place(_selected))
+	_execute_local("place", _selected)
 	_selected = ""
 
 
@@ -836,6 +874,8 @@ func _refresh() -> void:
 	var hand: Array = player["hand"]
 	var placing := _match.phase == "place" and not _concealed and not _viewing_bot()
 	var legal: Array = hand.duplicate() if placing else []
+	if _tutorial != null:
+		legal = [str(_tutorial.current()["arg"])] if placing and str(_tutorial.current()["action"]) == "place" else []
 	_board.set_state(_match.occupied, _match.company_of, legal, "" if not placing else _selected)
 	_banner.visible = _concealed
 	_rebuild_hand(hand)
@@ -898,23 +938,46 @@ func _refresh() -> void:
 	_sync_dock()
 	if _play.visible:
 		_fit_board()
+	call_deferred("_sync_dock")
 
 
 func _refresh_guidance() -> void:
 	_guide_card.visible = _guided
-	if not _guided or _match == null:
+	if not _guided or _match == null or _tutorial == null:
 		return
-	var info := GuidedMatch.guidance(_match)
-	_guide_title.text = str(info["title"])
-	_guide_copy.text = str(info["body"])
-	_guide_select.visible = not _concealed and GuidedMatch.suggested_tile(_match) != ""
+	var info := _tutorial.current()
+	_guide_title.text = "Lesson %d/%d · %s" % [mini(_tutorial.index + 1, _tutorial.steps.size()), _tutorial.steps.size(), str(info["title"])]
+	_guide_copy.text = "Follow the current step using the table controls. Open the lesson again whenever you need its explanation or previous result."
+	_guide_select.visible = not _concealed and str(info["action"]) == "place"
+	_guide_select.text = "Select %s from my hand" % str(info["arg"]) if str(info["action"]) == "place" else "Read current lesson"
 
 
 func _select_guided_tile() -> void:
-	if not _guided or _match == null or _concealed:
+	if _tutorial == null or _match == null or _concealed:
 		return
-	_selected = GuidedMatch.suggested_tile(_match)
-	_refresh()
+	var step := _tutorial.current()
+	if str(step["action"]) == "place":
+		_selected = str(step["arg"])
+		_refresh()
+		_place_button.grab_focus()
+	else:
+		_present_lesson()
+
+
+func _execute_local(action: String, arg := "") -> void:
+	if _match == null:
+		return
+	if _tutorial != null and (_lesson_layer.visible or not _tutorial.allows(action, arg)):
+		# Wrong lesson actions never reach the model. Reopen the current instruction.
+		_present_lesson()
+		return
+	var start := _match.log.size()
+	var result := ScriptedTutorial.dispatch(_match, action, arg)
+	if _tutorial != null and bool(result.get("ok", false)):
+		_tutorial.remember(_match, start)
+	_apply(result)
+	if _tutorial != null and bool(result.get("ok", false)):
+		_present_lesson()
 
 
 func _fill_dock(player: Dictionary, market_open: bool) -> void:
@@ -923,6 +986,8 @@ func _fill_dock(player: Dictionary, market_open: bool) -> void:
 	_paint_steps()
 	_place_button.visible = _match.phase == "place" and not _concealed and not _viewing_bot() and _match.phase != "completed"
 	_finish_market.visible = market_open
+	_finish_market.disabled = _tutorial != null and not _tutorial.allows("pass")
+	_finish_market.text = "Pass one lesson action" if _tutorial != null else "Pass the market"
 	if _match.phase == "completed":
 		_dock_title.text = "Match over"
 		_dock_detail.text = _winner_line()
@@ -986,6 +1051,7 @@ func _hands_empty() -> bool:
 
 func _rebuild_hand(hand: Array) -> void:
 	for child in _hand_row.get_children():
+		_hand_row.remove_child(child)
 		child.queue_free()
 	if _match.phase == "completed":
 		_hand_row.add_child(_label("The match is over. Standings show cash, portfolio, and net.", 14, MUTED))
@@ -1005,6 +1071,9 @@ func _rebuild_hand(hand: Array) -> void:
 		var chosen := str(coordinate) == _selected
 		var tile := preload("res://scenes/components/tile_chip.tscn").instantiate() as TileChip
 		tile.setup(str(coordinate), chosen)
+		if get_viewport_rect().size.x < 720.0:
+			tile.custom_minimum_size.x = maxf(44.0, minf(78.0, (get_viewport_rect().size.x - 80.0) / 5.0))
+		tile.disabled = _tutorial != null and not _tutorial.allows("place", str(coordinate))
 		tile.chosen.connect(_select_tile)
 		_hand_row.add_child(tile)
 
@@ -1019,6 +1088,7 @@ func _rebuild_actions() -> void:
 	if _action_row == null:
 		return
 	for child in _action_row.get_children():
+		_action_row.remove_child(child)
 		child.queue_free()
 	if _concealed or _viewing_bot() or _match == null or _match.phase == "completed":
 		return
@@ -1036,12 +1106,16 @@ func _rebuild_actions() -> void:
 	for corp_id in active_ids:
 		var picked := corp_id == _market_corp
 		var choice := _button(str(BoardGrid.MARKS.get(corp_id, corp_id)), picked)
+		if _tutorial != null:
+			choice.disabled = str(_tutorial.current()["arg"]) != corp_id
 		choice.pressed.connect(_select_corp.bind(corp_id))
 		_action_row.add_child(choice)
 	if not active_ids.is_empty():
 		var buy := _button("Buy share", true)
+		buy.disabled = _tutorial != null and not _tutorial.allows("buy_share", _market_corp)
 		buy.pressed.connect(func() -> void: _open_confirm("buy_share"))
 		var sell := _button("Sell share", false)
+		sell.disabled = _tutorial != null and not _tutorial.allows("sell_share", _market_corp)
 		sell.pressed.connect(func() -> void: _open_confirm("sell_share"))
 		_action_row.add_child(buy)
 		_action_row.add_child(sell)
@@ -1050,6 +1124,10 @@ func _rebuild_actions() -> void:
 	var sell_byte := _button("Sell BYTE", false)
 	sell_byte.pressed.connect(func() -> void: _open_confirm("sell_byte"))
 	var pass_action := _button("Pass one", false)
+	if _tutorial != null:
+		buy_byte.disabled = not _tutorial.allows("buy_byte")
+		sell_byte.disabled = not _tutorial.allows("sell_byte")
+		pass_action.disabled = not _tutorial.allows("pass")
 	pass_action.pressed.connect(func() -> void: _open_confirm("pass"))
 	_action_row.add_child(buy_byte)
 	_action_row.add_child(sell_byte)
@@ -1059,37 +1137,42 @@ func _rebuild_actions() -> void:
 func _choose_brand(corp_id: String) -> void:
 	if _match == null:
 		return
-	_apply(_match.choose_founder(corp_id))
+	_execute_local("founder", corp_id)
 
 
 func _select_corp(corp_id: String) -> void:
 	_market_corp = corp_id
 	_refresh()
+	# Refresh replaces the action row; keep keyboard navigation at this company.
+	for child in _action_row.get_children():
+		if child is Button and child.text == str(BoardGrid.MARKS.get(corp_id, corp_id)) and not child.disabled:
+			child.grab_focus()
+			break
 
 
 func _buy_share() -> void:
 	if _match != null:
-		_apply(_match.buy_share(_market_corp))
+		_execute_local("buy_share", _market_corp)
 
 
 func _sell_share() -> void:
 	if _match != null:
-		_apply(_match.sell_share(_market_corp))
+		_execute_local("sell_share", _market_corp)
 
 
 func _buy_byte() -> void:
 	if _match != null:
-		_apply(_match.buy_byte())
+		_execute_local("buy_byte")
 
 
 func _sell_byte() -> void:
 	if _match != null:
-		_apply(_match.sell_byte())
+		_execute_local("sell_byte")
 
 
 func _pass_market() -> void:
 	if _match != null:
-		_apply(_match.pass_market())
+		_execute_local("pass")
 
 
 func _show_feed() -> void:
@@ -1471,15 +1554,15 @@ func _apply_confirm() -> void:
 		return
 	match kind:
 		"buy_share":
-			_apply(_match.buy_share(_market_corp))
+			_execute_local("buy_share", _market_corp)
 		"sell_share":
-			_apply(_match.sell_share(_market_corp))
+			_execute_local("sell_share", _market_corp)
 		"buy_byte":
-			_apply(_match.buy_byte())
+			_execute_local("buy_byte")
 		"sell_byte":
-			_apply(_match.sell_byte())
+			_execute_local("sell_byte")
 		"pass":
-			_apply(_match.pass_market())
+			_execute_local("pass")
 
 
 func _corp_name(corp_id: String) -> String:
@@ -1538,7 +1621,7 @@ func _refresh_event() -> void:
 		if str(line).begins_with("Round event:"):
 			latest = str(line)
 	var choosing := _match.phase == "choose_founder" or _match.phase == "choose_survivor"
-	var show_overlay := latest != "" and latest != _dismissed_event and _match.phase != "completed" and not choosing
+	var show_overlay := _tutorial == null and latest != "" and latest != _dismissed_event and _match.phase != "completed" and not choosing
 	_event_label.visible = false
 	_event_layer.visible = show_overlay
 	_event_copy.text = latest
@@ -1603,7 +1686,7 @@ func _fit_board() -> void:
 	var cell_w := int((board_width - 27.0) / 10.0)
 	var dock_h := 0.0
 	if _dock != null and _dock.visible:
-		dock_h = -_dock.offset_top + 16.0
+		dock_h = _dock.size.y + 16.0
 	# Header, seat line, and the board card sit above the grid. The dock covers
 	# the bottom of the window, so the grid has to finish above it.
 	# Header, status, seat chips, and the board card's tool row. An empty error
@@ -1641,6 +1724,10 @@ func _sync_touch_targets(phone: bool) -> void:
 	var height := 48.0 if phone else 40.0
 	if _dock == null:
 		return
+	for tile in _hand_row.get_children():
+		if tile is TileChip:
+			tile.custom_minimum_size.x = maxf(44.0, minf(78.0, (get_viewport_rect().size.x - 80.0) / 5.0)) if phone else 78.0
+	_step_row.visible = not phone
 	for node in _dock.find_children("*", "Button", true, false):
 		if node is Button:
 			(node as Button).custom_minimum_size.y = height
@@ -1692,7 +1779,7 @@ func _build_merger_modal() -> Control:
 	var box := _box_of(card)
 	box.add_child(_label("Choose the surviving company", 20, TEXT))
 	_merger_copy = _label("", 14, MUTED)
-	_merger_copy.custom_minimum_size = Vector2(420, 0)
+	_merger_copy.custom_minimum_size = Vector2(0, 0)
 	box.add_child(_merger_copy)
 	_merger_buttons = VBoxContainer.new()
 	_merger_buttons.add_theme_constant_override("separation", 8)
@@ -1709,6 +1796,7 @@ func _sync_merger_modal() -> void:
 	if not open:
 		return
 	for child in _merger_buttons.get_children():
+		_merger_buttons.remove_child(child)
 		child.queue_free()
 	var names: PackedStringArray = []
 	for corp_id in _match.pending_options:
@@ -1725,13 +1813,15 @@ func _sync_merger_modal() -> void:
 			var choice := _button("%s  %s   %s     size %d     $%d" % [
 				symbol, str(corp["name"]), mark, int(corp["size"]), int(corp["share_price"])
 			], true)
+			choice.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			choice.disabled = _tutorial != null and not _tutorial.allows("survivor", str(corp_id))
 			choice.pressed.connect(_choose_survivor.bind(str(corp_id)))
 			_merger_buttons.add_child(choice)
 
 
 func _choose_survivor(corp_id: String) -> void:
 	if _match != null:
-		_apply(_match.choose_survivor(corp_id))
+		_execute_local("survivor", corp_id)
 
 
 func _sync_founder_modal() -> void:
@@ -1742,6 +1832,7 @@ func _sync_founder_modal() -> void:
 	if not open:
 		return
 	for child in _founder_buttons.get_children():
+		_founder_buttons.remove_child(child)
 		child.queue_free()
 	_founder_copy.text = "This cluster is not part of a company yet. Pick an inactive brand. You receive one share when that bank has a share left. The symbol on the button is the same mark used on the grid."
 	for corp in _match.corporations:
@@ -1753,6 +1844,8 @@ func _sync_founder_modal() -> void:
 			str(corp["name"]),
 			str(BoardGrid.MARKS.get(corp_id, "")),
 		], true)
+		choice.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		choice.disabled = _tutorial != null and not _tutorial.allows("founder", corp_id)
 		choice.pressed.connect(_choose_brand.bind(corp_id))
 		_founder_buttons.add_child(choice)
 	_founder_layer.move_to_front()
@@ -1763,7 +1856,7 @@ func _build_choice_layer(title: String) -> Control:
 	var box := _modal_box(layer)
 	box.add_child(_label(title, 20, TEXT))
 	var copy := _label("", 14, MUTED)
-	copy.custom_minimum_size = Vector2(420, 0)
+	copy.custom_minimum_size = Vector2(0, 0)
 	box.add_child(copy)
 	var buttons := VBoxContainer.new()
 	buttons.add_theme_constant_override("separation", 8)
@@ -1784,7 +1877,7 @@ func _build_confirm_layer() -> Control:
 	var box := _modal_box(layer)
 	box.add_child(_label("Confirm market action", 20, TEXT))
 	_confirm_copy = _label("", 14, TEXT)
-	_confirm_copy.custom_minimum_size = Vector2(420, 0)
+	_confirm_copy.custom_minimum_size = Vector2(0, 0)
 	box.add_child(_confirm_copy)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
@@ -1894,7 +1987,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		_toggle_motion()
 		get_viewport().set_input_as_handled()
 		return
-	if _rules.visible or _confirm_layer.visible or _event_layer.visible or _error_layer.visible or _founder_layer.visible or _merger_layer.visible:
+	if _lesson_layer.visible or _rules.visible or _confirm_layer.visible or _event_layer.visible or _error_layer.visible or _founder_layer.visible or _merger_layer.visible:
 		return
 	if _match == null or _concealed or _viewing_bot() or not _play.visible or _online.visible:
 		return
@@ -2324,3 +2417,99 @@ func _button(text: String, primary: bool) -> Button:
 	button.theme_type_variation = "PrimaryButton" if primary else "GhostButton"
 	Palette.remember(button, 14)
 	return button
+
+
+func _build_lesson_layer() -> Control:
+	var layer := Control.new()
+	layer.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
+	layer.visible = false
+	layer.mouse_filter = Control.MOUSE_FILTER_STOP
+	var dim := ColorRect.new()
+	dim.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
+	dim.color = Color(0.04, 0.06, 0.12, 0.82)
+	layer.add_child(dim)
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
+	layer.add_child(center)
+	_lesson_card = _card()
+	center.add_child(_lesson_card)
+	var box := _box_of(_lesson_card)
+	_lesson_title = _label("", 20, TEAL)
+	box.add_child(_lesson_title)
+	_lesson_scroll = ScrollContainer.new()
+	_lesson_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_lesson_scroll.follow_focus = true
+	_lesson_scroll.focus_mode = Control.FOCUS_ALL
+	box.add_child(_lesson_scroll)
+	var content := VBoxContainer.new()
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content.add_theme_constant_override("separation", 12)
+	_lesson_scroll.add_child(content)
+	_lesson_result = _label("", 14, AMBER)
+	content.add_child(_lesson_result)
+	_lesson_copy = _label("", 16, TEXT)
+	content.add_child(_lesson_copy)
+	_lesson_button = _button("Try this step", true)
+	_lesson_button.custom_minimum_size.y = 44
+	_lesson_button.pressed.connect(_lesson_continue)
+	box.add_child(_lesson_button)
+	var leave := _button("Leave tutorial · main menu", false)
+	leave.custom_minimum_size.y = 44
+	leave.pressed.connect(_show_menu)
+	box.add_child(leave)
+	DialogFocus.install(layer)
+	return layer
+
+
+func _fit_lesson() -> void:
+	var window := get_viewport_rect().size
+	var width := minf(620.0, maxf(240.0, window.x - 24.0))
+	_lesson_card.custom_minimum_size.x = width
+	# Give wrapped labels a real width, but reserve height for the fixed actions.
+	_lesson_scroll.custom_minimum_size = Vector2(width - 32.0, maxf(100.0, minf(350.0, window.y - 260.0)))
+	_lesson_title.custom_minimum_size.x = width - 32.0
+	for layer in [_founder_layer, _merger_layer, _confirm_layer, _event_layer, _error_layer]:
+		if layer != null:
+			var card := layer.get_child(1).get_child(0) as PanelContainer
+			card.custom_minimum_size.x = minf(480.0, maxf(240.0, window.x - 24.0))
+
+
+func _present_lesson() -> void:
+	if _tutorial == null or _concealed:
+		return
+	var step := _tutorial.current()
+	if str(step["action"]) == "done":
+		_lesson_layer.visible = false
+		return
+	_lesson_title.text = "Lesson %d/%d · %s" % [_tutorial.index + 1, _tutorial.steps.size(), str(step["title"])]
+	_lesson_result.text = "What happened\n" + _tutorial.last_outcome
+	_lesson_copy.text = "What to do next\n" + str(step["body"])
+	var action := str(step["action"])
+	_lesson_button.text = {"demo": "Watch Ada", "event": "I have read the event", "fast_forward": "Watch the middle game", "finish": "Review final standings"}.get(action, "Try this step")
+	_fit_lesson()
+	_lesson_scroll.scroll_vertical = 0
+	_lesson_layer.visible = true
+	_lesson_layer.move_to_front()
+
+
+func _lesson_continue() -> void:
+	if _tutorial == null:
+		return
+	var action := str(_tutorial.current()["action"])
+	_lesson_layer.visible = false
+	if action == "demo" or action == "fast_forward":
+		var result := _tutorial.demonstrate(_match, action == "fast_forward")
+		_apply(result)
+		_present_lesson()
+	elif action == "event":
+		_tutorial.index += 1
+		_refresh()
+		_present_lesson()
+	elif action == "finish":
+		_tutorial.index += 1
+		_refresh()
+	else:
+		# Keep the lesson available on the board while the player uses real controls.
+		_scroll.scroll_vertical = 0
+		if action == "place":
+			_guide_select.grab_focus()

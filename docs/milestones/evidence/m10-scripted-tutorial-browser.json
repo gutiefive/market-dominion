@@ -1,0 +1,22 @@
+{
+  "completed": true,
+  "automated": true,
+  "scripted": true,
+  "browser": "154.0.8037.57",
+  "teachingSteps": 39,
+  "humanPlacements": 7,
+  "eventLessons": 6,
+  "companyFoundings": 2,
+  "tiedMerger": true,
+  "boughtAndSoldShares": true,
+  "boughtAndSoldByte": true,
+  "middleGameDemonstration": true,
+  "finalRound": true,
+  "tabletViewportPlacement": true,
+  "phoneViewportFounding": true,
+  "desktopAnalysis": true,
+  "phoneAnalysisActionsReachable": true,
+  "externalApplicationRequests": 0,
+  "tradeInput": "Fixed 1280x900 footer coordinates at default text scale; subsequent lesson transitions verified by OCR",
+  "limitation": "Automated desktop Chromium canvas interaction; not human comprehension or physical-device acceptance."
+}

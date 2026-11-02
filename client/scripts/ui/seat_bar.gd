@@ -6,7 +6,7 @@ class_name SeatBar
 var badge: Label
 var cash_label: Label
 var net_label: Label
-var opponents: HBoxContainer
+var opponents: Container
 var step_label: Label
 var who_label: Label
 var detail_label: Label
@@ -23,7 +23,7 @@ func grab() -> void:
 	badge = get_node("%Badge") as Label
 	cash_label = get_node("%Cash") as Label
 	net_label = get_node("%Net") as Label
-	opponents = get_node("%Opponents") as HBoxContainer
+	opponents = get_node("%Opponents") as Container
 	step_label = get_node("%Step") as Label
 	who_label = get_node("%Who") as Label
 	detail_label = get_node("%Detail") as Label
@@ -53,6 +53,7 @@ func show_turn(step: String, who: String, detail: String, tone: String) -> void:
 func show_opponents(rows: Array) -> void:
 	grab()
 	for child in opponents.get_children():
+		opponents.remove_child(child)
 		child.queue_free()
 	var chip_scene := preload("res://scenes/components/opponent_chip.tscn")
 	for row in rows:

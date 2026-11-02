@@ -47,15 +47,17 @@ text.save(sys.argv[2])`, file, primary]);
     await page.keyboard.press('Enter');
     assert.match(await read('order'), /Look at your tiles/i);
     await page.keyboard.press('Enter');
-    assert.match(await read('table'), /Place one tile|Place a tile/i);
+    assert.match(await read('table'), /Your hand and the board/i);
     await page.keyboard.press('r');
     assert.match(await read('rules'), /How Market Dominion plays/i);
     for (let i = 0; i < 6; i++) await page.keyboard.press(i % 2 ? 'Shift+Tab' : 'Tab');
     await page.keyboard.press('Escape');
     assert.doesNotMatch(await read('closed-rules'), /How Market Dominion plays/i);
+    await page.keyboard.press('Tab');
+    await page.keyboard.press('Enter');
     await page.keyboard.press('1');
     await page.keyboard.press('Enter');
-    assert.match(await read('market'), /market actions|market action|Buy BYTE|Buy 1 BYTE/i);
+    assert.match(await read('market'), /Cash becomes a holding/i);
     fs.writeFileSync(result, JSON.stringify({ browser: browser.version(), keyboardMenu: true, keyboardTurnOrder: true,
       rulesOpenedAndClosed: true, tileShortcutAndEnter: true, completedMatch: false,
       limitation: 'Desktop Chromium keyboard canvas regression; not a human or screen-reader playtest.' }, null, 2) + '\n');

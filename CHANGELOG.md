@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — M10 scripted teaching match
+
+- Replaced the reactive guide after a Windows human playtest found it did not teach company formation or explain enough beyond the opening. Added an explicit 39-step practice game with arranged tiles/events/opponent moves, action gating, real outcome feedback, two company foundings, share/BYTE trades, passing, events, growth, a tied merger and normal final scoring.
+- Added a labelled legal-command middle-game demonstration, a responsive scrolling lesson card and compact table reminders. Native windows now reflow at actual size; company choice text and player rows wrap, phone hand tiles fit, and the dock settles within the viewport without clipped commands. Godot's embedded-player sizing remains separate from the standalone game window.
+- Verified 87 Python tests, strict Godot M0–M10/history/focus checks, deterministic full-course replay and invariants, web export/serving smoke, all 39 lessons through the actual Chromium canvas, tablet placement, phone founding/standings, keyboard entry and a five-command two-browser online regression. Canvas trade input uses documented fixed coordinates where OCR is ambiguous.
+- Human acceptance of the revised course remains pending; M10 is not complete and M11 has not started.
+
 ## Unreleased — M10 keyboard dialog review
 
 - Contained keyboard focus inside local/online dialogs, Rules and final standings, with safe Cancel focus and opener restoration. Rules now supports keyboard scrolling; hand-selection shortcuts focus placement.

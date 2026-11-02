@@ -1,6 +1,6 @@
 extends SceneTree
 
-## M10 first slice: real menu routes, non-mutating guidance, and a complete guided Classic match.
+## Production scripted tutorial: explicit teaching, real controls, full match and responsive bounds.
 
 var _failed := false
 
@@ -31,40 +31,101 @@ func _run() -> void:
 		_fail("guided setup did not use the documented Classic configuration")
 		return
 	screen._reveal()
+	root.size = Vector2i(390, 844)
+	await process_frame
+	await process_frame
 	var steps := 0
 	var phases := {}
-	while screen._match.phase != "completed" and steps < 500 and not _failed:
+	var taught := {}
+	# The first lesson blocks accidental game commands before it is acknowledged.
+	var opening := _fingerprint(screen._match)
+	screen._selected = "C1"
+	screen._place_selected()
+	if _fingerprint(screen._match) != opening:
+		_fail("an unacknowledged/wrong tutorial action changed the game")
+		return
+	while screen._tutorial.index < screen._tutorial.steps.size() and steps < 100 and not _failed:
 		var table: OfflineMatch = screen._match
 		var before := _fingerprint(table)
-		var info := GuidedMatch.guidance(table)
-		GuidedMatch.suggested_tile(table)
-		if before != _fingerprint(table) or str(info["body"]) == "":
-			_fail("guidance mutated the match or lost its explanation")
+		var info: Dictionary = screen._tutorial.current()
+		if before != _fingerprint(table) or str(info["body"]) == "" or not screen._lesson_layer.visible:
+			_fail("a teaching step was skipped or mutated the table")
+			return
+		var action := str(info["action"])
+		var arg := str(info["arg"])
+		await process_frame
+		await process_frame
+		var page: Control = screen._scroll.get_child(0)
+		if page.size.x > 391 or screen._dock.get_global_rect().end.x > 391 or screen._dock.get_global_rect().end.y > 845:
+			_fail("gameplay exceeded phone width at lesson %d: page=%s dock=%s" % [steps, page.size, screen._dock.get_global_rect()])
 			return
 		phases[table.phase] = true
-		if bool(table.active_player().get("bot", false)):
-			_fail("computer turn did not return control to the human")
-			return
-		if table.phase == "place":
-			screen._select_guided_tile()
-			if screen._selected != GuidedMatch.suggested_tile(table):
-				_fail("tile help did not select an actual hand tile")
-				return
-			screen._place_selected()
-		elif table.phase == "choose_founder":
-			screen._choose_brand(str(table._inactive()[0]["id"]))
-		elif table.phase == "choose_survivor":
-			screen._choose_survivor(table.pending_options[0])
-		elif table.phase == "market":
-			screen._apply(table.pass_market())
+		taught[action] = true
+		if action in ["demo", "event", "fast_forward", "finish"]:
+			screen._lesson_continue()
 		else:
-			_fail("unhandled tutorial phase")
-			return
+			screen._lesson_continue()
+			# Off-script input must not consume a turn, tile or money.
+			var snapshot := _fingerprint(table)
+			screen._execute_local("place", "I9")
+			if _fingerprint(table) != snapshot:
+				_fail("off-script input mutated the table")
+				return
+			screen._lesson_continue()
+			if action == "place":
+				screen._select_guided_tile()
+				if screen._selected != arg:
+					_fail("lesson selector did not select its authored hand tile")
+					return
+				screen._place_selected()
+			elif action == "founder":
+				screen._choose_brand(arg)
+			elif action == "survivor":
+				screen._choose_survivor(arg)
+			else:
+				if arg != "":
+					screen._select_corp(arg)
+					var focused: Control = root.gui_get_focus_owner()
+					if not focused is Button or focused.text != str(BoardGrid.MARKS[arg]):
+						_fail("company selection lost keyboard focus")
+						return
+				screen._open_confirm(action)
+				screen._apply_confirm()
 		if not screen._match.economy_errors().is_empty() or screen._error.text != "":
-			_fail("guided progression broke an invariant or rejected a move")
+			_fail("scripted progression broke an invariant or rejected a move: %s" % screen._error.text)
 			return
 		steps += 1
 		await process_frame
+	for action in ["founder", "survivor", "buy_share", "sell_share", "buy_byte", "sell_byte", "pass", "event", "fast_forward", "finish"]:
+		if not taught.has(action):
+			_fail("tutorial skipped mechanic: " + action)
+			return
+	# Replaying the authored commands produces identical rules state, logs and ledger.
+	var replay := ScriptedTutorial.create_table()
+	var course := ScriptedTutorial.new()
+	while course.index < course.steps.size():
+		var step := course.current()
+		var kind := str(step["action"])
+		if kind in ["demo", "fast_forward"]:
+			var result := course.demonstrate(replay, kind == "fast_forward")
+			if not bool(result["ok"]):
+				_fail("scripted replay demonstration failed")
+				return
+		elif kind in ["event", "finish"]:
+			course.index += 1
+		else:
+			var start := replay.log.size()
+			var result := ScriptedTutorial.dispatch(replay, kind, str(step["arg"]))
+			if not bool(result["ok"]) or not replay.economy_errors().is_empty():
+				_fail("scripted replay action failed")
+				return
+			course.remember(replay, start)
+	if _fingerprint(replay) != _fingerprint(screen._match):
+		_fail("scripted replay diverged from UI playthrough")
+		return
+	if screen._match.event_ids.size() != 22 or int(screen._match._corp("nova_ai")["size"]) != 22 or not screen._match.final_round:
+		_fail("the authored match did not finish via normal round/end rules")
+		return
 	if _failed:
 		return
 	if screen._match.phase != "completed" or not screen._standings.visible:
@@ -77,6 +138,12 @@ func _run() -> void:
 			return
 	if "Guided match complete" not in screen._standings.winner_label.text:
 		_fail("guided completion was not identified")
+		return
+	# Desktop windows reflow at their real size instead of stretching a fixed canvas.
+	root.size = Vector2i(1920, 1080)
+	await process_frame
+	if root.content_scale_size != Vector2i.ZERO or screen.get_viewport_rect().size != Vector2(1920, 1080) or screen.size != Vector2(1920, 1080):
+		_fail("native-sized viewport did not use the resized window")
 		return
 	# Analysis remains inside a phone viewport at the largest existing text setting.
 	var saved_scale := Palette.text_scale
@@ -101,6 +168,16 @@ func _run() -> void:
 	if screen._standings.again_button.get_global_rect().end.y > scroll.get_global_rect().end.y + 1:
 		_fail("analysis did not scroll the focused replay control into view")
 		return
+	for lesson in range(screen._tutorial.steps.size()):
+		screen._tutorial.index = lesson
+		screen._present_lesson()
+		await process_frame
+		await process_frame
+		var bounds: Rect2 = screen._lesson_card.get_global_rect()
+		if bounds.position.x < 0 or bounds.end.x > 391 or bounds.position.y < 0 or bounds.end.y > 845 or screen._lesson_button.get_global_rect().end.y > 845:
+			_fail("enlarged phone lesson overflow at %d: %s" % [lesson, bounds])
+			return
+	screen._lesson_layer.visible = false
 	Palette.text_scale = saved_scale
 	screen._show_menu()
 	screen._open_local_setup(false)
@@ -116,7 +193,7 @@ func _run() -> void:
 	await process_frame
 	await process_frame
 	BotPolicy.set_difficulty("normal")
-	print("M10_CLIENT_OK guided match %d human actions; phases %s" % [steps, str(phases.keys())])
+	print("M10_CLIENT_OK scripted tutorial %d teaching steps; phases %s" % [steps, str(phases.keys())])
 	quit(0)
 
 

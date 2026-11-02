@@ -1,5 +1,12 @@
 # M10 — First-time player experience
 
+## Current tutorial revision
+
+Human Windows feedback rejected the first guide as insufficient: it felt like an ordinary game after the opening instructions and did not teach founding. The replacement is a [scripted teaching match](M10_SCRIPTED_TUTORIAL.md) with 39 explicit steps, an arranged deal, controlled opponent demonstrations, action gates and actual before/after explanations through founding, trading, events, growth, a tied merger and normal final scoring. Human revalidation is pending. Native resizing and bounded lesson layouts also address the reported crowding/embedded-window concern; physical Windows window behavior remains to be retested.
+
+The first-slice behavior and evidence below describe earlier iterations; the scripted-course document defines the current tutorial.
+
+
 ## Goal
 
 A new player can finish a guided match without knowing the original board game. Target deliverable version `0.21.x` once the milestone is verified. Development retains client version `0.20.0` and protocol `0.1.0`; this is not a complete M10 release.
@@ -13,7 +20,7 @@ In Progress. The client now has a main menu, a guided local Classic match, phase
 | Item | Status |
 | --- | --- |
 | M10.1 Main menu | Implemented; local/browser route checks |
-| M10.2 Guided tutorial | Initial guided Classic match implemented; first-time-human usability acceptance still open |
+| M10.2 Guided tutorial | Scripted 39-step Classic course replaces the first guide after failed human comprehension; repeat playtest pending |
 | M10.3 Contextual explanations | Implemented for the guided local placement, founding, merger, market and completion phases |
 | M10.4 Visual hierarchy | In Progress: clear menu entry and separate guidance card; broader gameplay review pending |
 | M10.5 Market feedback from real history | Implemented: actual local quote changes; online observations since page entry with reconnect gaps |
